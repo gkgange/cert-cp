@@ -20,6 +20,8 @@ Inductive bound :=
   | Unbounded : bound
   | Bounded : Z -> bound.
 
+Definition dbound := (bound * bound)%type.
+
 (* Evaluating bounds under an assignment. *)
 Definition sat_lb (b : bound) (k : Z) :=
   match b with
@@ -38,6 +40,12 @@ Definition sat_ub (b : bound) (k : Z) :=
 
 Definition eval_ub (x : ivar) (b : bound) (theta : asg) :=
   sat_ub b (eval_ivar x theta).
+
+Definition sat_dbound (db : dbound) (k : Z) :=
+  sat_lb (fst db) k /\ sat_ub (snd db) k.
+
+Definition eval_dbound (x : ivar) (db : dbound) (theta : asg) :=
+  sat_dbound db (eval_ivar x theta).
 
 Definition bound_le (x : bound) (y : bound) : Prop :=
   match x with
@@ -115,27 +123,49 @@ Proof.
   Hint Resolve Z.le_max_l. eauto.
 Qed.
 
-Theorem bmax_valid : forall (v : ivar) (x : bound) (y : bound) (theta : asg),
-  eval_lb v x theta /\ eval_lb v y theta -> eval_lb v (bound_max x y) theta.
+Theorem bmax_valid : forall (x : bound) (y : bound) (k : Z),
+  sat_lb x k /\ sat_lb y k -> sat_lb (bound_max x y) k.
 Proof.
   intros. destruct H.
   unfold bound_max. destruct x. destruct y.
   exact H. exact H0.
   destruct y. exact H.
-  unfold eval_lb in *.
-  assert (z <= eval_ivar v theta ->
-    z0 <= eval_ivar v theta -> Zmax z z0 <= eval_ivar v theta).
+  unfold sat_lb in *.
+  assert (z <= k ->
+    z0 <= k -> Zmax z z0 <= k).
   apply Zmax_lub. apply H1. exact H. exact H0.
 Qed.
 
-
-Definition bound_add (x : bound) (y : bound) :=
+Definition bound_min (x : bound) (y : bound) :=
   match x with
-  | Unbounded => Unbounded
+  | Unbounded => y
   | Bounded kx =>
-    match y with 
+    match y with
+    | Unbounded => Bounded kx
+    | Bounded ky =>
+       Bounded (Zmin kx ky)
+    end
+  end.
+
+Theorem bmin_valid : forall (x : bound) (y : bound) (k : Z),
+  sat_ub x k /\ sat_ub y k -> sat_ub (bound_min x y) k.
+Proof.
+  intros. destruct H.
+  unfold bound_min. destruct x. destruct y.
+  exact H. exact H0.
+  destruct y. exact H. unfold sat_ub in *.
+  assert (k <= z ->
+    k <= z0 -> k <= Zmin z z0).
+  apply Zmin_glb. apply H1. exact H. exact H0.
+Qed.
+
+Definition bound_add (u v : bound) :=
+  match u with
+  | Unbounded => Unbounded
+  | Bounded x =>
+    match v with
     | Unbounded => Unbounded
-    | Bounded ky => Bounded (kx + ky)
+    | Bounded y => Bounded (x + y)
     end
   end.
 
@@ -148,68 +178,251 @@ Proof.
   destruct bk, bk'.
   trivial. trivial. trivial. omega.
 Qed.
-  
 
-Definition lb_from_lit (x : ivar) (l : lit) :=
+Definition db_meet (dx : dbound) (dy : dbound) :=
+  (bound_max (fst dx) (fst dy), bound_min (snd dx) (snd dy)).
+Theorem db_sat_impl_meet : forall (dx dy : dbound) (k : Z),
+  sat_dbound dx k /\ sat_dbound dy k -> sat_dbound (db_meet dx dy) k.
+Proof.
+  unfold sat_dbound; intros.
+  destruct H as [Hx Hy].
+  destruct Hx as [Hlx Hux]; destruct Hy as [Hly Huy].
+  unfold db_meet.
+  destruct dx, dy.
+  simpl in *. 
+  split.
+  apply bmax_valid.
+  split. exact Hlx. exact Hly.
+  apply bmin_valid.
+  split. exact Hux. exact Huy.
+Qed.
+
+Definition minus_bound (u : bound) :=
+  match u with
+  | Unbounded => Unbounded
+  | Bounded x => Bounded (-x)
+  end.
+Theorem sat_lb_iff_minus_ub : forall (u : bound) (k : Z),
+  sat_lb u k <-> sat_ub (minus_bound u) (-k).
+Proof.
+  unfold minus_bound; unfold sat_lb; unfold sat_ub; intros.
+  destruct u. tauto. omega.
+Qed.
+
+Theorem sat_ub_iff_minus_lb : forall (u : bound) (k : Z),
+  sat_ub u k <-> sat_lb (minus_bound u) (-k).
+Proof.
+  unfold minus_bound, sat_lb, sat_ub; intros.
+  destruct u. tauto. omega.
+Qed.
+
+Definition mul_pos_bound (k : Z) (u : bound) :=
+  match u with
+  | Unbounded => Unbounded
+  | Bounded x => Bounded (k*x)
+  end.
+Theorem mul_pos_bound_ub_valid : forall (k k' : Z) (u : bound),
+  k > 0%Z -> (sat_ub u k' <-> sat_ub (mul_pos_bound k u) (k*k')).
+Proof.
+  unfold mul_pos_bound, sat_ub; intros.
+  destruct u. tauto.
+  split.
+  intro. 
+  assert (k > 0 -> k' <= z -> k'*k <= z*k). apply Zmult_gt_0_le_compat_r.
+  eauto with zarith.
+  intro.
+  assert (k > 0 -> k'*k <= z*k -> k' <= z). apply Zmult_le_reg_r.
+  apply H1. exact H.
+  rewrite Zmult_comm; apply Zge_le; rewrite Zmult_comm; apply Zle_ge; exact H0.
+Qed.
+
+Theorem mul_pos_bound_lb_valid : forall (k k' : Z) (u : bound),
+  k > 0%Z -> (sat_lb u k' <-> sat_lb (mul_pos_bound k u) (k*k')).
+Proof.
+  unfold mul_pos_bound, sat_lb; intros.
+  destruct u. tauto.
+  split.
+  intro. 
+  assert (k > 0 -> k' <= z -> k'*k <= z*k). apply Zmult_gt_0_le_compat_r.
+  eauto with zarith.
+  intro.
+  assert (k > 0 -> z*k <= k'*k -> z <= k'). apply Zmult_le_reg_r.
+  apply H1. exact H.
+  rewrite Zmult_comm; apply Zge_le; rewrite Zmult_comm; apply Zle_ge; exact H0.
+Qed.
+
+Check Zcompare.
+Print comparison.
+
+Definition minus_dbound (db : dbound) :=
+  (minus_bound (snd db), minus_bound (fst db)).
+Theorem sat_minus_dbound_iff : forall (db : dbound) (k : Z),
+  sat_dbound db k <-> sat_dbound (minus_dbound db) (-k).
+Proof.
+  unfold sat_dbound; unfold minus_dbound; intros.
+  destruct db; simpl.
+  split.
+  intro. destruct H as [Hpl Hpu].
+  split.
+  apply sat_ub_iff_minus_lb; exact Hpu.
+  apply sat_lb_iff_minus_ub; exact Hpl.
+  intro. destruct H as [Hml Hmu].
+  split.
+  apply sat_lb_iff_minus_ub; exact Hmu.
+  apply sat_ub_iff_minus_lb; exact Hml.
+Qed.
+
+Theorem sat_minus_dbound_if : forall (db : dbound) (k : Z),
+  sat_dbound db k -> sat_dbound (minus_dbound db) (-k).
+Proof.
+  intros.
+  assert (sat_dbound db k <-> sat_dbound (minus_dbound db) (-k)) as Hiff.
+  apply sat_minus_dbound_iff.
+  destruct Hiff.
+  apply H0. exact H.
+Qed.
+
+
+Definition mul_pos_dbound (k : Z) (db : dbound) :=
+  (mul_pos_bound k (fst db), mul_pos_bound k (snd db)).
+Theorem mul_pos_dbound_valid : forall (c : Z) (k : Z) (db : dbound),
+  c > 0 -> sat_dbound db k -> sat_dbound (mul_pos_dbound c db) (c*k).
+Proof.
+  unfold sat_dbound, mul_pos_dbound; destruct db. simpl. intros.
+  destruct H0 as [Hl Hu].
+  split.
+  apply mul_pos_bound_lb_valid. exact H. exact Hl.
+  apply mul_pos_bound_ub_valid. exact H. exact Hu.
+Qed.
+
+Definition mul_neg_dbound (k : Z) (db : dbound) :=
+  minus_dbound (mul_pos_dbound (-k) db).
+Theorem mul_neg_dbound_valid : forall (c : Z) (k : Z) (db : dbound),
+  c < 0 -> sat_dbound db k -> sat_dbound (mul_neg_dbound c db) (c*k).
+Proof.
+  unfold mul_neg_dbound. intros.
+  assert ((-c) > 0). omega.
+  assert (sat_dbound (mul_pos_dbound (- c) db) ((-c)*k)).
+  apply mul_pos_dbound_valid. exact H1. exact H0.
+  rewrite <- Zopp_involutive with (n := c*k).
+  apply sat_minus_dbound_if.
+  rewrite Zopp_mult_distr_l. exact H2.
+Qed.
+
+Definition mul_z_dbound (k : Z) (db : dbound) :=
+  match Zcompare k 0%Z with
+  | Eq => (Bounded 0%Z, Bounded 0%Z)
+  | Gt => mul_pos_dbound k db
+  | Lt => mul_neg_dbound k db
+  end.
+
+Theorem mul_z_dbound_valid : forall (c : Z) (k : Z) (db : dbound),
+  sat_dbound db k -> sat_dbound (mul_z_dbound c db) (c*k).
+Proof.
+  intros.
+  unfold mul_z_dbound; intros.
+  apply Zcompare_rec with (n := c) (m := 0%Z).
+  intro.
+  assert (c = 0) as Hc0. apply Zcompare_Eq_iff_eq; exact H0.
+  destruct (Zcompare c 0).
+  unfold sat_dbound, sat_lb, sat_ub; rewrite Hc0; simpl. omega.
+  discriminate. discriminate.
+
+  intro.
+  assert (c < 0). eauto with zarith.
+  destruct (Zcompare c 0).
+  discriminate.
+  apply mul_neg_dbound_valid. exact H1. exact H.
+  discriminate.
+  
+  intro.
+  assert (c > 0). eauto with zarith.
+  destruct (Zcompare c 0).
+  discriminate.
+  discriminate.
+  apply mul_pos_dbound_valid. exact H1. exact H.
+Qed.
+
+Definition db_from_lit (x : ivar) (l : lit) :=
   match l with
   | Pos (IEq x' k) =>
-      if beq_nat x x' then Bounded k else Unbounded
+      if beq_nat x x' then (Bounded k, Bounded k) else (Unbounded, Unbounded)
+  | Pos (ILeq x' k) =>
+      if beq_nat x x' then (Unbounded, Bounded k) else (Unbounded, Unbounded)
   | Neg (ILeq x' k) =>
-      if beq_nat x x' then Bounded (k+1%Z) else Unbounded
-  | _ => Unbounded
+      if beq_nat x x' then (Bounded (k+1), Unbounded) else (Unbounded, Unbounded)
+  | _ => (Unbounded, Unbounded)
   end.
-Theorem lb_from_lit_valid : forall (x : ivar) (l : lit),
-  implies (eval_lit l) (eval_lb x (lb_from_lit x l)).
+Theorem db_from_lit_valid : forall (x : ivar) (l : lit) (theta : asg),
+  (eval_lit l theta) -> sat_dbound (db_from_lit x l) (eval_ivar x theta).
 Proof.
-  intros. unfold implies; intros.
-  unfold eval_lb; unfold sat_lb; unfold lb_from_lit.
-  destruct l. unfold eval_lit in H; unfold eval_vprop in H.
+  intros. unfold sat_dbound; unfold db_from_lit.
+  unfold sat_lb, sat_ub.
+
+  destruct l.
+  unfold eval_lit in H. unfold eval_vprop in H.
   induction v.
-  trivial.
+
+  assert (beq_nat x i = true <-> x = i).
+  apply beq_nat_true_iff.
+  destruct (beq_nat x i). simpl.
+  assert (x = i). apply H0. trivial.
+  split. trivial. rewrite H1. exact H.
+
+  simpl. tauto.
+
+  assert (beq_nat x i = true <-> x = i). apply beq_nat_true_iff.
+  destruct (beq_nat x i).
+
+  simpl. assert (x = i). apply H0; trivial.
+  rewrite H1; rewrite H. eauto with zarith.
+
+  simpl. tauto.
+
+  simpl. tauto.
+
+  unfold eval_lit in H; unfold eval_vprop in H; induction v.
+
   assert (beq_nat x i = true <-> x = i).
   apply beq_nat_true_iff.
   destruct (beq_nat x i).
-  destruct H0.
-  assert (x = i). apply H0; tauto. rewrite H2. rewrite H. omega.
-  trivial. trivial.
-  induction v.
-  assert (beq_nat x i = true <-> x = i). apply beq_nat_true_iff.
-  destruct (beq_nat x i).
-  assert (x = i). apply H0; trivial. rewrite H1.
-  unfold eval_lit in H; unfold eval_vprop in H.
-  assert (~(eval_ivar i theta <= z) -> eval_ivar i theta > z).
-  apply Znot_le_gt.
-  assert (eval_ivar i theta > z).
-  apply H2; exact H.
-  apply Zlt_le_succ. apply Zgt_lt. exact H3.
-  trivial.
-  trivial.
-  trivial.
-Qed.
 
-Fixpoint lb_from_negclause (x : ivar) (cl : clause) :=
+  simpl. assert (x = i). apply H0; trivial.
+  rewrite H1. split.
+  clear H0; omega. trivial.
+
+  simpl. tauto.
+
+  simpl. tauto.
+ 
+  simpl. tauto.
+Qed.
+  
+Fixpoint db_from_negclause (x : ivar) (cl : clause) :=
   match cl with
-  | nil => Unbounded
-  | cons l ls => bound_max (lb_from_lit x (neglit l)) (lb_from_negclause x ls)
+  | nil => (Unbounded, Unbounded)
+  | cons l ls => db_meet (db_from_lit x (neglit l)) (db_from_negclause x ls)
   end.
 
-Theorem lb_from_negclause_valid : forall (x : ivar) (cl : clause) (theta : asg),
- ~eval_clause cl theta -> eval_lb x (lb_from_negclause x cl) theta.
+Theorem db_from_negclause_valid : forall (x : ivar) (cl : clause) (theta : asg),
+ ~eval_clause cl theta -> sat_dbound (db_from_negclause x cl) (eval_ivar x theta).
 Proof.
   intros.
   induction cl.
-  unfold lb_from_negclause; unfold eval_lb; unfold sat_lb; trivial.
+  unfold db_from_negclause; unfold sat_dbound; unfold sat_lb; unfold sat_ub; simpl.
+  tauto.
+
   unfold eval_clause in H; fold eval_clause in H.
   assert (~(eval_lit a theta) /\ ~(eval_clause cl theta)).
   apply Decidable.not_or; exact H. destruct H0.
   assert (eval_lit (neglit a) theta).
   apply neglit_not_lit. exact H0.
-  unfold lb_from_negclause ; fold lb_from_negclause.
-  assert (eval_lb x (lb_from_lit x (neglit a)) theta).
-  apply lb_from_lit_valid; exact H2.
-  assert (eval_lb x (lb_from_negclause x cl) theta).
+  unfold db_from_negclause ; fold db_from_negclause.
+  assert (sat_dbound (db_from_lit x (neglit a)) (eval_ivar x theta)).
+  apply db_from_lit_valid; exact H2.
+  assert (sat_dbound (db_from_negclause x cl) (eval_ivar x theta)).
   apply IHcl; exact H1.
-  apply bmax_valid. split. exact H3. exact H4.
+  apply db_sat_impl_meet. split. exact H3. exact H4.
 Qed.
 
 (* FIXME: Implement UB handling. *)

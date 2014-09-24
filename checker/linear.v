@@ -35,6 +35,11 @@ Proof.
   assert (eval_lb i (lb_from_negclause i cl) theta) as Hsatlb.
   apply lb_from_negclause_valid; exact H.
   unfold eval_lb in Hsatlb.
+  destruct Z_lt_dec.
+  unfold sat_lb. trivial.
+  assert (z >= 0). tauto.
+  destruct lb_from_negclause. destruct lb_from_negclause.
+  unfold sat_lb. trivial.
 
 
 (* Compute the lb of a linear sum implied by ~cl. *)
