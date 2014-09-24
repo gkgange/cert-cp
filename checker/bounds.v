@@ -44,6 +44,130 @@ Definition eval_ub (x : ivar) (b : bound) (theta : asg) :=
 Definition sat_dbound (db : dbound) (k : Z) :=
   sat_lb (fst db) k /\ sat_ub (snd db) k.
 
+Definition satb_lb (b : bound) (k : Z) :=
+  match b with
+  | Unbounded => true
+  | Bounded k' => Z_leb k' k
+  end.
+Theorem satb_lb_iff_lb : forall (b : bound) (k : Z),
+  satb_lb b k = true <-> sat_lb b k.
+Proof.
+  unfold satb_lb, sat_lb; intros; destruct b.
+  tauto.
+  apply Z_leb_iff_le.
+Qed.
+
+Definition satb_ub (b : bound) (k : Z) :=
+  match b with
+  | Unbounded => true
+  | Bounded k' => Z_leb k k'
+  end.
+Theorem satb_ub_iff_ub : forall (b : bound) (k : Z),
+  satb_ub b k = true <-> sat_ub b k.
+Proof.
+  unfold satb_ub, sat_ub; intros; destruct b.
+  tauto.
+  apply Z_leb_iff_le.
+Qed.
+Definition satb_dbound (db : dbound) (k : Z) :=
+  satb_lb (fst db) k && satb_ub (snd db) k.
+Theorem satb_dbound_iff_db : forall (db : dbound) (k : Z),
+  satb_dbound db k = true <-> sat_dbound db k.
+Proof.
+  unfold satb_dbound, sat_dbound. intros.
+  destruct db; simpl.
+
+  assert (satb_lb b k = true <-> sat_lb b k).
+  apply satb_lb_iff_lb.
+  assert (satb_ub b0 k = true <-> sat_ub b0 k).
+  apply satb_ub_iff_ub.
+  rewrite <- H; rewrite <- H0.
+  apply andb_true_iff.
+Qed.
+
+Theorem decidable_sat_db : forall (db : dbound) (k : Z),
+  sat_dbound db k \/ ~ sat_dbound db k.
+Proof.
+  unfold sat_dbound, sat_lb, sat_ub; intros.
+  destruct db; simpl.
+
+  destruct b, b0.
+  tauto.
+  tauto.
+  tauto.
+  omega.
+Qed.
+
+Theorem Zle_satub_trans : forall (b : bound) (k k' : Z),
+  Zle k k' -> sat_ub b k' -> sat_ub b k.
+Proof.
+  unfold sat_ub; intros.
+  destruct b.
+  trivial. omega.
+Qed.
+  
+Theorem Zle_notub_trans : forall (b : bound) (k k' : Z),
+  Zle k k' -> ~sat_ub b k -> ~sat_ub b k'.
+Proof.
+  unfold sat_ub; intros.
+  destruct b.
+  exact H0.
+  omega.
+Qed.
+
+Theorem Zle_notlb_trans : forall (b : bound) (k k' : Z),
+  Zle k k' -> ~sat_lb b k' -> ~sat_lb b k.
+Proof.
+  unfold sat_lb; intros.
+  destruct b.
+  exact H0. omega.
+Qed.
+
+Theorem satb_ub_false_iff_notub : forall (b : bound) (k : Z),
+  satb_ub b k = false <-> ~ sat_ub b k.
+Proof.
+  intros.
+  unfold satb_ub, sat_ub.
+  destruct b.
+ 
+  split.
+  intro; discriminate.
+  tauto.
+  apply Z_leb_false_iff_notle.
+Qed.
+
+Theorem satb_lb_false_iff_notlb : forall (b : bound) (k : Z),
+  satb_lb b k = false <-> ~ sat_lb b k.
+Proof.
+  intros.
+  unfold satb_lb, sat_lb; destruct b.
+
+  split.
+  intro; discriminate.
+  intro. tauto.
+  apply Z_leb_false_iff_notle.
+Qed.
+
+Theorem satb_db_false_iff_notdb : forall (db : dbound) (k : Z),
+  satb_dbound db k = false <-> ~ sat_dbound db k.
+Proof.
+  intros.
+  assert (sat_dbound db k \/ ~sat_dbound db k). apply decidable_sat_db.
+  destruct H.
+  assert (satb_dbound db k = true). apply satb_dbound_iff_db. exact H.
+  rewrite H0.
+  split. discriminate.
+  intro. assert False. tauto. tauto.
+ 
+  split.
+  assert (sat_dbound db k -> satb_dbound db k = true). apply satb_dbound_iff_db.
+  intro. tauto.
+  
+  intro.
+  apply not_true_is_false.
+  rewrite satb_dbound_iff_db. exact H.
+Qed.
+
 Definition eval_dbound (x : ivar) (db : dbound) (theta : asg) :=
   sat_dbound db (eval_ivar x theta).
 
@@ -169,6 +293,7 @@ Definition bound_add (u v : bound) :=
     end
   end.
 
+
 Theorem lb_impl_addlb : forall (k k' : Z) (bk bk' : bound),
   sat_lb bk k /\ sat_lb bk' k' -> sat_lb (bound_add bk bk') (k + k').
 Proof.
@@ -177,6 +302,31 @@ Proof.
   unfold sat_lb in *; unfold bound_add.
   destruct bk, bk'.
   trivial. trivial. trivial. omega.
+Qed.
+
+Definition db_add (du dv : dbound) :=
+  (bound_add (fst du) (fst dv), bound_add (snd du) (snd dv)).
+Theorem db_impl_adddb : forall (k k' : Z) (bk bk' : dbound),
+  sat_dbound bk k /\ sat_dbound bk' k' -> sat_dbound (db_add bk bk') (k+k').
+Proof.
+  unfold sat_dbound, db_add; unfold sat_lb, sat_ub, bound_add.
+  destruct bk, bk'; simpl.
+  intros. destruct H as [Hk Hk'].
+  destruct Hk as [Hkl Hku]; destruct Hk' as [Hk'l Hk'u].
+  split.
+  
+  destruct b.
+
+  trivial.
+  destruct b1.
+  trivial.
+  omega.
+
+  destruct b0.
+  trivial.
+  destruct b2.
+  trivial.
+  omega.
 Qed.
 
 Definition db_meet (dx : dbound) (dy : dbound) :=
@@ -250,9 +400,6 @@ Proof.
   apply H1. exact H.
   rewrite Zmult_comm; apply Zge_le; rewrite Zmult_comm; apply Zle_ge; exact H0.
 Qed.
-
-Check Zcompare.
-Print comparison.
 
 Definition minus_dbound (db : dbound) :=
   (minus_bound (snd db), minus_bound (fst db)).
@@ -425,4 +572,28 @@ Proof.
   apply db_sat_impl_meet. split. exact H3. exact H4.
 Qed.
 
-(* FIXME: Implement UB handling. *)
+Theorem notdb_negclause_impl_clause : forall (x : ivar) (cl : clause) (theta : asg),
+  ~ sat_dbound (db_from_negclause x cl) (eval_ivar x theta) -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta). apply dec_evalclause.
+  destruct H0.
+  
+  exact H0.
+  assert (sat_dbound (db_from_negclause x cl) (eval_ivar x theta)).
+  apply db_from_negclause_valid. exact H0.
+  tauto.
+Qed.
+
+Theorem notsat_ub_impl_notdb : forall (db : dbound) (k : Z),
+  ~ sat_ub (snd db) k -> ~ sat_dbound db k.
+Proof.
+  unfold sat_dbound; destruct db; simpl; intros.
+  tauto.
+Qed.
+
+Theorem notsat_lb_impl_notdb : forall (db : dbound) (k : Z),
+  ~ sat_lb (fst db) k -> ~ sat_dbound db k.
+Proof.
+  unfold sat_dbound; destruct db; simpl; intros. tauto.
+Qed.

@@ -1,4 +1,5 @@
 Require Import ZArith.
+Require Import Bool.
 Require Import prim.
 Require Import bounds.
 
@@ -15,80 +16,76 @@ Fixpoint eval_linsum ts theta :=
   | cons t ts' => (eval_linterm t theta) + (eval_linsum ts' theta)
   end.
 
-(* FIXME: Doesn't handle negative coefficients. *)
-Definition linterm_lb_from_negclause (t : linterm) (cl : clause) :=
-  if Z_lt_dec (fst t) 0 then
-    Unbounded
-  else
-    match lb_from_negclause (snd t) cl with
-    | Unbounded => Unbounded
-    | Bounded l => Bounded ((fst t)*l)
-    end.
+Definition linterm_db_from_negclause (t : linterm) (cl : clause) :=
+  mul_z_dbound (fst t) (db_from_negclause (snd t) cl).
 
-Theorem linterm_lb_from_negclause_valid :
+Theorem linterm_db_from_negclause_valid :
   forall (t : linterm) (cl : clause) (theta : asg),
     ~eval_clause cl theta ->
-      sat_lb (linterm_lb_from_negclause t cl) (eval_linterm t theta).
+      sat_dbound (linterm_db_from_negclause t cl) (eval_linterm t theta).
 Proof.
-  intros. destruct t. unfold linterm_lb_from_negclause.
-  unfold eval_linterm.
-  assert (eval_lb i (lb_from_negclause i cl) theta) as Hsatlb.
-  apply lb_from_negclause_valid; exact H.
-  unfold eval_lb in Hsatlb.
-  destruct Z_lt_dec.
-  unfold sat_lb. trivial.
-  assert (z >= 0). tauto.
-  destruct lb_from_negclause. destruct lb_from_negclause.
-  unfold sat_lb. trivial.
-
+  intros. destruct t. unfold linterm_db_from_negclause.
+  apply mul_z_dbound_valid. apply db_from_negclause_valid. exact H.
+Qed.
 
 (* Compute the lb of a linear sum implied by ~cl. *)
-Fixpoint linsum_lb_from_negclause (ts : list linterm) (cl : clause) :=
+Fixpoint linsum_db_from_negclause (ts : list linterm) (cl : clause) :=
   match ts with
-  | nil => Bounded 0%Z
+  | nil => (Bounded 0%Z, Bounded 0%Z)
   | cons t ts' =>
-      bound_add (linterm_lb_from_negclause t cl)
-                (linsum_lb_from_negclause ts' cl)
+      db_add (linterm_db_from_negclause t cl)
+             (linsum_db_from_negclause ts' cl)
   end.
 
-Theorem linsum_lb_valid : forall (ts : list linterm) (cl : clause) (theta : asg),
+Theorem linsum_db_valid : forall (ts : list linterm) (cl : clause) (theta : asg),
   ~ eval_clause cl theta ->
-      sat_lb (linsum_lb_from_negclause ts cl) (eval_linsum ts theta).
+      sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta).
 Proof.
-  intros. unfold sat_lb. induction ts.
-  unfold linsum_lb_from_negclause; unfold eval_linsum. apply Zle_refl.
-  unfold linsum_lb_from_negclause ; fold linsum_lb_from_negclause.
+  intros.
+  induction ts.
+  unfold linsum_db_from_negclause, sat_dbound; simpl. omega.
+
+  unfold linsum_db_from_negclause ; fold linsum_db_from_negclause.
   unfold eval_linsum; fold eval_linsum.
-  unfold eval_linterm.
-  assert (eval_lb (snd a) (lb_from_negclause (snd a) cl) theta).
-  apply lb_from_negclause_valid; exact H.
-(*
-Theorem linterm_lb_valid : forall (t : linterm) (cl : clause) (theta : asg),
-  ~ eval_clause cl theta -> 
-*)
+  apply db_impl_adddb.
+  split.
+
+  apply linterm_db_from_negclause_valid; exact H.
+  exact IHts.
+Qed.
+
+Theorem notlinsumdb_negcl_impl_clause : forall (ts : list linterm) (cl : clause) (theta : asg),
+  ~ sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta) -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta). apply dec_evalclause.
+  destruct H0.
+  exact H0.
+  assert (sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta)).
+  apply linsum_db_valid. exact H0.
+  tauto.
+Qed.
 
 Definition eval_lincon lincon (theta : asg) :=
   (eval_linsum (fst lincon) theta) <= (snd lincon).
-
-Fixpoint lincon_implies_rec (ts : list linterm) (k : Z) (cl : clause) :=
-  match ts with
-  | nil => Z_ltb k 0%Z
-  | cons t ts' =>
-    match linterm_lb_from_negclause t cl with
-    | Unbounded => false
-    | Bounded k' =>
-      lincon_implies_rec ts' (k - k') cl
-    end
-  end.
   
-Fixpoint lincon_implies (lincon : lin_leq) (cl : clause) : bool :=
-  lincon_implies_rec (fst lincon) (snd lincon) cl.
+Definition lincon_implies (lincon : lin_leq) (cl : clause) : bool :=
+  negb (satb_lb (fst (linsum_db_from_negclause (fst lincon) cl)) (snd lincon)).
 
 Theorem lincon_implies_valid : forall (lincon : lin_leq) (cl : clause),
   lincon_implies lincon cl = true ->
     implies (eval_lincon lincon) (eval_clause cl).
 Proof.
-  intros. unfold implies. intros.
-  induction cl.
-  assert eval_lincon 
-  unfold lincon_implies. unfold lincon_implies_rec. destruct nil.
+  unfold implies, lincon_implies, eval_lincon.
+  intros lincon cl.
+  destruct lincon; simpl.
+  rewrite negb_true_iff.
+  rewrite satb_lb_false_iff_notlb.
+  intros.
+  apply notlinsumdb_negcl_impl_clause with (ts := l).
+  apply notsat_lb_impl_notdb.
+  destruct (linsum_db_from_negclause l cl); simpl in *.
+  apply Zle_notlb_trans with (k' := z).
+  exact H0.
+  exact H.
+Qed.

@@ -47,7 +47,18 @@ Proof.
   split. intros.
   destruct Z_le_dec. tauto. discriminate.
   intros. destruct Z_le_dec. trivial. tauto.
-Qed. 
+Qed.
+
+Theorem Z_leb_false_iff_notle : forall (x y : Z),
+  Z_leb x y = false <-> ~ x <= y.
+Proof.
+  unfold Z_leb. intros.
+  destruct Z_le_dec.
+  split. intro; discriminate.
+  intro. assert False. omega. tauto.
+  split. intro. exact n.
+  intro. trivial.
+Qed.
 
 Definition Z_ltb (x y : Z) : bool :=
   if Z_lt_dec x y then true else false.
