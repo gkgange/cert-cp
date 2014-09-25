@@ -185,7 +185,13 @@ Definition equiv (con_x : asg -> Prop) (con_y : asg -> Prop) : Prop :=
 Definition lit_leq (x : lit) (y : lit) : Prop :=
   implies (eval_lit x) (eval_lit y).
 
-
+Record Constraint : Type := mkConstraint
+  { T : Type ;
+    eval : T -> asg -> Prop ;
+    check : T -> clause -> bool ;
+    check_valid : 
+      forall (x : T) (cl : clause),
+      check x cl = true -> implies (eval x) (eval_clause cl) }.
 
 Definition vprop_leqb (u : vprop) (v : vprop) :=
   match u with
