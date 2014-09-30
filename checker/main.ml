@@ -22,6 +22,8 @@ let log_failure checker _ =
 let log info args =
   Format.fprintf fmt info args ; Format.fprintf fmt "@."
 
+(* Find the checker corresponding to a specified
+ * constraint name, call it on the given clause. *)
 let check_inference model ident clause =
   try
     let checker = M.get_checker model ident in
@@ -35,21 +37,33 @@ let check_inference model ident clause =
       false
     end
 
+(* Check a set of inferences; will continue checking
+ * after a failure. *)
 let check_inferences model infs =
   L.fold_left (fun b (id, cl) -> b && check_inference model id cl) true infs
   
+(* Parsing code for definitions. *)
 let parse_defn spec = parser
   | [< 'GL.Ident id ; 'GL.Kwd ":=" ; v = spec id >] -> v
 
+(* Determining the value of an identifier. *)
 let term_defn model id =
   let aux key = match key with
   | "int" ->
      begin parser
-       | [< >] -> M.add_ivar model id
+       | [< 'GL.Int l ; 'GL.Int u >] -> M.add_ivar model id (Some (l,u))
+       | [< >] -> M.add_ivar model id None
      end
   | "bool" ->
       begin parser
         | [< >] -> M.add_bvar model id
+      end
+  | "prop" ->
+      begin parser
+        | [< 'GL.Ident x ; 'GL.Kwd "<=" ; 'GL.Int k >] ->
+            M.add_vprop model id (MT.ILe (M.get_ivar model x, k))
+        | [< 'GL.Ident x ; 'GL.Kwd "=" ; 'GL.Int k >] ->
+            M.add_vprop model id (MT.IEq (M.get_ivar model x, k))
       end
   | _ -> let pcon = Registry.find key in
     begin parser

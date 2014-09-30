@@ -6,6 +6,8 @@ module C = Checker
 
 type ident = MT.ident
 
+let error str = failwith str
+
 (* Symbol kind. *)
 type ident_kind =
 | IdBool (* Bool variable *)
@@ -17,8 +19,8 @@ type model = {
   (* Symbol table. *)
   symbols : (ident, ident_kind*int) Hashtbl.t;
 
-  bvar_names : ident A.t ;
-  ivar_names : ident A.t ;
+  bvars : ident A.t ;
+  ivars : (ident * ((int*int) option)) A.t ;
   constraints : (ident * C.t) A.t;
   vprops : (ident * MT.vprop) A.t
 }
@@ -28,22 +30,22 @@ type t = model
 let create () = {
   symbols = Hashtbl.create 17 ;
 
-  bvar_names = A.create ();
-  ivar_names = A.create ();
+  bvars = A.create ();
+  ivars = A.create ();
   constraints = A.create ();
   vprops = A.create ();
 }
 
 (* Fixme: Add checking of duplicates. *)
-let add_ivar model ident =
-  let idx = A.length model.ivar_names in
+let add_ivar model ident bounds =
+  let idx = A.length model.ivars in
   Hashtbl.add model.symbols ident (IdInt, idx) ;
-  A.add model.ivar_names ident
+  A.add model.ivars (ident, bounds)
 
 let add_bvar model ident =
-  let idx = A.length model.bvar_names in
+  let idx = A.length model.bvars in
   Hashtbl.add model.symbols ident (IdBool, idx) ;
-  A.add model.bvar_names ident
+  A.add model.bvars ident
 
 let add_vprop model ident prop =
   let idx = A.length model.vprops in
@@ -54,6 +56,15 @@ let add_checker model ident checker =
   let idx = A.length model.constraints in
   Hashtbl.add model.symbols ident (IdCon, idx) ;
   A.add model.constraints (ident, checker)
+
+let get_ivar (model : t) ident =
+  try
+    let (kind, idx) = Hashtbl.find model.symbols ident in
+    match kind with
+    | IdInt -> idx
+    | _ -> error (Format.sprintf "Error: symbol %s not an integer variable." ident)
+  with Not_found ->
+    error (Format.sprintf "Error: symbol not found - %s." ident)
 
 let get_vprop (model : t) ident =
   try

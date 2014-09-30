@@ -20,9 +20,11 @@ let boolconst = parser
   | [< 'Ident s >] -> bool_of_string s
 
 let listof sub_parse =
-  let rec aux = parser
-    | [< k = sub_parse ; 'Kwd "," ; t = aux >] -> k :: t
-    | [< k = sub_parse >] -> [k]
+  let rec tail = parser
+    | [< 'Kwd "," ; k = sub_parse ; t = tail >] -> k :: t
+    | [< >] -> [] in
+  let aux = parser
+    | [< k = sub_parse ; t = tail >] -> k :: t
     | [< >] -> []
   in parser
     | [< 'Kwd "[" ; elts = aux ; 'Kwd "]" >] -> elts
