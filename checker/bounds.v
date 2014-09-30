@@ -259,6 +259,15 @@ Proof.
     z0 <= k -> Zmax z z0 <= k).
   apply Zmax_lub. apply H1. exact H. exact H0.
 Qed.
+Theorem bmax_b : forall (x : bound) (y : bound) (k : Z),
+  sat_lb (bound_max x y) k -> sat_lb x k /\ sat_lb y k.
+Proof.
+  unfold sat_lb, bound_max; intros.
+  destruct x, y.
+    tauto. eauto. eauto.
+    apply Z.max_lub_iff. exact H.
+Qed.
+  
 
 Definition bound_min (x : bound) (y : bound) :=
   match x with
@@ -282,7 +291,14 @@ Proof.
     k <= z0 -> k <= Zmin z z0).
   apply Zmin_glb. apply H1. exact H. exact H0.
 Qed.
-
+Theorem bmin_b : forall (x : bound) (y : bound) (k : Z),
+  sat_ub (bound_min x y) k -> sat_ub x k /\ sat_ub y k.
+Proof.
+  unfold sat_ub, bound_min; intros.
+  destruct x, y.
+    tauto. eauto. eauto.
+    rewrite <- Z.min_glb_iff. exact H.
+Qed.
 Definition bound_add (u v : bound) :=
   match u with
   | Unbounded => Unbounded
@@ -345,6 +361,15 @@ Proof.
   split. exact Hlx. exact Hly.
   apply bmin_valid.
   split. exact Hux. exact Huy.
+Qed.
+Theorem db_satmeet : forall (dx dy : dbound) (k : Z),
+  sat_dbound (db_meet dx dy) k -> sat_dbound dx k /\ sat_dbound dy k.
+Proof.
+  unfold db_meet, sat_dbound; intros.
+  destruct dx, dy; simpl in *.
+  destruct H as [Hl Hu].
+  apply bmax_b in Hl. apply bmin_b in Hu.
+  tauto.
 Qed.
 
 Definition minus_bound (u : bound) :=
@@ -596,4 +621,18 @@ Theorem notsat_lb_impl_notdb : forall (db : dbound) (k : Z),
   ~ sat_lb (fst db) k -> ~ sat_dbound db k.
 Proof.
   unfold sat_dbound; destruct db; simpl; intros. tauto.
+Qed.
+
+Definition inbounds_negcl (cl : clause) (x : ivar) (k : Z) :=
+  satb_dbound (db_from_negclause x cl) k.
+Theorem inbounds_negcl_false_impl_cl :
+  forall (cl : clause) (x : ivar) (theta : asg),
+  inbounds_negcl cl x (eval_ivar x theta) = false ->
+    eval_clause cl theta.
+Proof.
+  unfold inbounds_negcl; intros.
+  Check notdb_negclause_impl_clause.
+  rewrite satb_db_false_iff_notdb in H.
+  apply notdb_negclause_impl_clause with
+    (x := x); exact H.
 Qed.
