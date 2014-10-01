@@ -66,6 +66,18 @@ let get_ivar (model : t) ident =
   with Not_found ->
     error (Format.sprintf "Error: symbol not found - %s." ident)
 
+let ivar_name model ivar = fst (A.get model.ivars ivar)
+let bvar_name model bvar = A.get model.bvars bvar
+
+let get_bvar (model : t) ident =
+  try
+    let (kind, idx) = Hashtbl.find model.symbols ident in
+    match kind with
+    | IdBool -> idx
+    | _ -> error (Format.sprintf "Error: symbol %s not an Boolean variable." ident)
+  with Not_found ->
+    error (Format.sprintf "Error: symbol not found - %s." ident)
+
 let get_vprop (model : t) ident =
   try
     let (kind, idx) = Hashtbl.find model.symbols ident in

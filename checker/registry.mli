@@ -5,3 +5,6 @@ val add : MTypes.ident -> (Model.t -> Genlex.token Stream.t -> Checker.t) -> uni
 
 (* Find the checker-constructor for the given class. *)
 val find : MTypes.ident -> Model.t -> Genlex.token Stream.t -> Checker.t
+
+(* A null checker; always returns false. *)
+val null_checker : Model.t -> Genlex.token Stream.t -> Checker.t

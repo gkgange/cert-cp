@@ -126,8 +126,8 @@ MLFILES:=\
 	mTypes.ml\
 	spec.ml\
 	checker.ml\
-	registry.ml\
 	model.ml\
+	registry.ml\
 	parse.ml\
 	builtins.ml\
   main.ml\

@@ -6,6 +6,7 @@ module MT = MTypes
 module C = Checker
 module M = Model
 module S = Spec
+module P = Parse
 
 module DL = Dynlink
 
@@ -15,9 +16,26 @@ type inference = (MT.ident * MT.clause)
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
 
-let log_failure checker _ =
-  Format.fprintf fmt "Inference failed: %s |- {{FIXME}}."
-    (checker.C.repr) (* (MT.string_of_clause clause) *)
+let string_of_vprop model = function
+| MT.ILe (x, k) -> (M.ivar_name model x) ^ "<=" ^ (string_of_int k)
+| MT.IEq (x, k) -> (M.ivar_name model x) ^ "=" ^ (string_of_int k)
+| MT.BTrue x -> M.bvar_name model x
+
+let string_of_lit model = function
+| MT.Pos vp -> string_of_vprop model vp
+| MT.Neg vp -> "~" ^ string_of_vprop model vp
+
+let string_of_clause model cl =
+  let rec aux = function
+  | [] -> ""
+  | [x] -> string_of_lit model x
+  | (x :: xs) -> (string_of_lit model x) ^ ", " ^ (aux xs)
+  in
+  "[" ^ (aux cl) ^ "]"
+
+let log_failure model checker cl =
+  Format.fprintf fmt "Inference failed: %s |- %s.@."
+    (checker.C.repr) (string_of_clause model cl)
 
 let log info args =
   Format.fprintf fmt info args ; Format.fprintf fmt "@."
@@ -29,7 +47,7 @@ let check_inference model ident clause =
     let checker = M.get_checker model ident in
     let okay = checker.C.check clause in
     if !COption.verbosity > 0 && not okay then
-      log_failure checker clause ;
+      log_failure model checker clause ;
     okay
   with Not_found ->
     begin
@@ -60,10 +78,8 @@ let term_defn model id =
       end
   | "prop" ->
       begin parser
-        | [< 'GL.Ident x ; 'GL.Kwd "<=" ; 'GL.Int k >] ->
-            M.add_vprop model id (MT.ILe (M.get_ivar model x, k))
-        | [< 'GL.Ident x ; 'GL.Kwd "=" ; 'GL.Int k >] ->
-            M.add_vprop model id (MT.IEq (M.get_ivar model x, k))
+        | [< prop = P.parse_vprop model >] ->
+            M.add_vprop model id prop
       end
   | _ -> let pcon = (Registry.find key) model in
     begin parser
@@ -73,6 +89,7 @@ let term_defn model id =
   parser
     | [< 'GL.Ident key ; v = aux key >] -> v
 
+(*
 let parse_clause model =
   let parse_lit = parser
     | [< 'GL.Kwd "~" ; 'GL.Ident id >] ->
@@ -80,6 +97,7 @@ let parse_clause model =
     | [< 'GL.Ident id >] ->
         MT.Pos (M.get_vprop model id)
   in S.listof parse_lit
+  *)
 
 let parse_model =
   let model = M.create () in
@@ -96,7 +114,7 @@ let parse_model =
 
 let parse_inferences model =
   let parse_inf = parser
-    | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = parse_clause model >] -> (id, cl)
+    | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = P.parse_clause model >] -> (id, cl)
   in let rec aux = parser
     | [< inf = parse_inf ; tail = aux >] -> inf :: tail
     | [< >] -> []
