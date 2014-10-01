@@ -65,7 +65,7 @@ let term_defn model id =
         | [< 'GL.Ident x ; 'GL.Kwd "=" ; 'GL.Int k >] ->
             M.add_vprop model id (MT.IEq (M.get_ivar model x, k))
       end
-  | _ -> let pcon = Registry.find key in
+  | _ -> let pcon = (Registry.find key) model in
     begin parser
       | [< 'GL.Kwd "(" ; checker = pcon ; 'GL.Kwd ")" >] ->
           M.add_checker model id checker
@@ -120,6 +120,7 @@ let main () =
       | Some file -> open_in file
   in
   (* Register any additional checker modules. *)
+  Builtins.register ();
   List.iter (fun m -> DL.loadfile_private m) !COption.modules ;
   let tokens = Spec.lexer (Stream.of_channel input) in 
   let model = parse_model tokens in

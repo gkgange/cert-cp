@@ -128,6 +128,8 @@ MLFILES:=\
 	checker.ml\
 	registry.ml\
 	model.ml\
+	parse.ml\
+	builtins.ml\
   main.ml\
 
 CMOFILES:=$(MLFILES:.ml=.cmo)
@@ -139,7 +141,7 @@ CMXSFILES:=$(MLFILES:.ml=.cmxs)
 CMXSFILES0:=$(filter-out ,$(CMXSFILES))
 OFILES:=$(MLFILES:.ml=.o)
 
-TARGETS:=main
+TARGETS:=check-cp
 all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 spec: $(VIFILES)
 
@@ -175,8 +177,8 @@ all-gal.pdf: $(VFILES)
 
 .PHONY: all opt byte archclean clean install depend html
 
-$(TARGETS) : % : $(CMXFILES)
-	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $@.mli $^ $(LINKPKG_FLAGS)
+check-cp : $(CMXFILES)
+	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
 
 %.cmi: %.mli
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PKG_FLAGS) $<

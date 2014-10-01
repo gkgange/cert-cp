@@ -13,4 +13,4 @@ let find ident =
   with
     Not_found ->
       failwith
-        (Format.sprintf "Checker not found for %s; using null checker." ident )
+        (Format.sprintf "Checker not found for %s." ident )
