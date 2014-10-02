@@ -96,3 +96,20 @@ let get_checker model ident =
     | _ -> failwith (Format.sprintf "Error: symbol %s not a constraint." ident)
   with Not_found ->
     failwith (Format.sprintf "Error: symbol not found - %s." ident)
+
+let string_of_vprop model = function
+| MT.ILe (x, k) -> (ivar_name model x) ^ "<=" ^ (string_of_int k)
+| MT.IEq (x, k) -> (ivar_name model x) ^ "=" ^ (string_of_int k)
+| MT.BTrue x -> bvar_name model x
+
+let string_of_lit model = function
+| MT.Pos vp -> string_of_vprop model vp
+| MT.Neg vp -> "~" ^ string_of_vprop model vp
+
+let string_of_clause model cl =
+  let rec aux = function
+  | [] -> ""
+  | [x] -> string_of_lit model x
+  | (x :: xs) -> (string_of_lit model x) ^ ", " ^ (aux xs)
+  in
+  "[" ^ (aux cl) ^ "]"

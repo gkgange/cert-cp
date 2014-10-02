@@ -6,6 +6,7 @@ module C = Checker
 module MT = MTypes
 module P = Parse
 module S = Spec
+module M = Model
 module C_impl = Checker_impl
 
 let impl_vprop_of_vprop = function
@@ -28,14 +29,30 @@ let check_linear_le model =
      (S.cons int_list (S.cons (ivar_list model) S.intconst)) tokens in
    let linterms = List.map2 (fun c v -> (c, C_impl.nat_of_int v)) coeffs vars in
 {
-  C.repr = "linear_le" ;
+  C.repr = "linear_le(...)" ;
   C.check =
     (fun cl ->
       C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl))
 }
 
+let check_element model =
+  fun tokens ->
+    let (x, (i, ys)) =
+      (S.cons
+        (P.parse_ivar model)
+        (S.cons (P.parse_ivar model) int_list)) tokens in
+  {
+    C.repr = "element(...)" ;
+    C.check =
+      (fun cl ->
+        C_impl.check_element
+          (C_impl.Elem (C_impl.nat_of_int x, C_impl.nat_of_int i, ys))
+          (impl_clause_of_clause cl))
+  }
+
 let register () =
-  R.add "linear_le" check_linear_le
+  R.add "linear_le" check_linear_le ;
+  R.add "element" check_element
 (*
   R.add "clause" R.null_checker ;
   R.add "linear_le" R.null_checker

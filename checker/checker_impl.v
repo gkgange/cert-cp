@@ -8,5 +8,7 @@ Require reif.
 Require element.
 
 Set Extraction Optimize.
-Extraction "checker_impl.ml" cumulative.check_cumul reif.check_reif linear.check_lincon
+Extraction "checker_impl.ml"
+  cumulative.check_cumul reif.check_reif linear.check_lincon
+  element.check_element
   nat_of_int int_of_nat.

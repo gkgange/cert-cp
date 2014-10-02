@@ -16,26 +16,9 @@ type inference = (MT.ident * MT.clause)
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
 
-let string_of_vprop model = function
-| MT.ILe (x, k) -> (M.ivar_name model x) ^ "<=" ^ (string_of_int k)
-| MT.IEq (x, k) -> (M.ivar_name model x) ^ "=" ^ (string_of_int k)
-| MT.BTrue x -> M.bvar_name model x
-
-let string_of_lit model = function
-| MT.Pos vp -> string_of_vprop model vp
-| MT.Neg vp -> "~" ^ string_of_vprop model vp
-
-let string_of_clause model cl =
-  let rec aux = function
-  | [] -> ""
-  | [x] -> string_of_lit model x
-  | (x :: xs) -> (string_of_lit model x) ^ ", " ^ (aux xs)
-  in
-  "[" ^ (aux cl) ^ "]"
-
 let log_failure model checker cl =
   Format.fprintf fmt "Inference failed: %s |- %s.@."
-    (checker.C.repr) (string_of_clause model cl)
+    (checker.C.repr) (M.string_of_clause model cl)
 
 let log info args =
   Format.fprintf fmt info args ; Format.fprintf fmt "@."
