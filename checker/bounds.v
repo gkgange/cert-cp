@@ -309,7 +309,6 @@ Definition bound_add (u v : bound) :=
     end
   end.
 
-
 Theorem lb_impl_addlb : forall (k k' : Z) (bk bk' : bound),
   sat_lb bk k /\ sat_lb bk' k' -> sat_lb (bound_add bk bk') (k + k').
 Proof.
@@ -635,4 +634,90 @@ Proof.
   rewrite satb_db_false_iff_notdb in H.
   apply notdb_negclause_impl_clause with
     (x := x); exact H.
+Qed.
+
+(*
+Definition lb_from_negclause (x : ivar) (cl : clause) :=
+  fst (db_from_negclause x cl).
+Definition ub_from_negclause (x : ivar) (cl : clause) :=
+  snd (db_from_negclause x cl).
+
+Theorem lb_from_negclause_valid :
+  forall (x : ivar) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta ->
+        eval_lb x (lb_from_negclause x cl) theta.
+Proof.
+  unfold lb_from_negclause, eval_lb.
+  intros.
+  assert (sat_dbound (db_from_negclause x cl) (eval_ivar x theta)).
+    apply db_from_negclause_valid; exact H.
+  unfold sat_dbound in H0 ; destruct H0 as [Hl Hu].
+  exact Hl.
+Qed.
+
+Theorem ub_from_negclause_valid :
+  forall (x : ivar) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta ->
+        eval_ub x (ub_from_negclause x cl) theta.
+Proof.
+  unfold ub_from_negclause, eval_ub.
+  intros.
+  assert (sat_dbound (db_from_negclause x cl) (eval_ivar x theta)).
+    apply db_from_negclause_valid; exact H.
+  unfold sat_dbound in H0 ; destruct H0 as [Hl Hu].
+  exact Hu.
+Qed.
+*)
+
+Definition db_contained (db : dbound) (lb ub : Z) :=
+  match (fst db) with
+  | Unbounded => False
+  | Bounded l => Zle lb l
+  end /\
+  match (snd db) with
+  | Unbounded => False
+  | Bounded u => Zle u ub
+  end.
+
+Definition db_containedb  (db : dbound) (lb ub : Z) :=
+  match (fst db) with
+  | Unbounded => false
+  | Bounded l => Z_leb lb l
+  end &&
+  match (snd db) with
+  | Unbounded => false
+  | Bounded u => Z_leb u ub
+  end.
+
+Theorem db_containedb_iff_contained :
+  forall (db : dbound) (lb ub : Z),
+    db_containedb db lb ub = true <-> db_contained db lb ub.
+Proof.
+  unfold db_containedb, db_contained; destruct db; simpl; intros.
+  rewrite andb_true_iff.
+  destruct b.
+    split.
+      intro. destruct H as [Hf _]; discriminate.
+      tauto.
+
+    destruct b0.
+      split.
+        intro; destruct H as [_ Hf]; discriminate.
+        tauto.
+
+      rewrite <- Z_leb_iff_le; rewrite <- Z_leb_iff_le.  tauto.
+Qed.
+
+Theorem db_contained_impl_inbounds :
+  forall (db : dbound) (lb ub : Z),
+    db_contained db lb ub -> forall (k : Z),
+      sat_dbound db k -> Zle lb k /\ Zle k ub.
+Proof.
+  unfold sat_dbound, db_contained; destruct db; simpl.
+  destruct b.
+    tauto.
+
+    destruct b0.
+      tauto.
+      unfold sat_lb, sat_ub; intros; omega.
 Qed.

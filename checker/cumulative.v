@@ -76,6 +76,25 @@ Proof.
     exact H0.
 Qed.
 
+Definition span_usageZ (ts : list task) (lb ub : Z) (theta : asg) :=
+  if Z_le_dec lb ub then
+    span_usage ts lb (Zabs_nat (Zminus ub lb)) theta 
+  else O.
+
+Theorem span_usageZ_lim :
+  forall (c : cumul) (lb ub : Z) (theta : asg),
+    Zle lb ub /\ eval_cumul c theta ->
+      le (span_usageZ c.(tasks) lb ub theta) (c.(limit)*(Zabs_nat (Zminus ub lb))).
+Proof.
+  intros.
+    unfold span_usageZ.
+    destruct H as [Hlu Heval].
+    destruct (Z_le_dec lb ub).
+    apply span_usage_lim.
+    exact Heval.
+    omega.
+Qed.
+
 Theorem span_usage_split : forall (t : task) (ts : list task) (start : Z) (sz : nat) (theta : asg),
   span_usage (cons t ts) start sz theta =
     plus (span_usage (cons t nil) start sz theta) (span_usage ts start sz theta).
@@ -195,12 +214,10 @@ Proof.
     rewrite inj_Zabs_nat; rewrite Zabs_eq. omega. omega.
   rewrite H2 at 2; rewrite H1, H0.
   repeat (rewrite <- task_usageZ_eq).
-  Check task_usage_split.
   repeat (rewrite inj_Zabs_nat).
   repeat (rewrite Zabs_eq).
   repeat (rewrite Zplus_minus).
   rewrite H0 at 2.
-  Check task_usage_split.
   assert (Zabs_nat (ub - lb) = (Zabs_nat (mid - lb)) + (Zabs_nat (ub - mid))).
   omega.
   rewrite H3.
@@ -221,7 +238,6 @@ Proof.
   unfold task_bracketed; intros.
   destruct H as [Hs He].
   unfold eval_end in He.
-  Check task_usageZ_split.
   rewrite <- task_usageZ_split with (mid := (eval_start t theta)).
   rewrite plus_comm.
   apply le_plus_trans.
@@ -241,25 +257,13 @@ Proof.
   omega.
 Qed.
   
-(*
-Theorem task_duration_usage : forall (t : task) (start sz : nat) (theta : asg),
-  (Z_ge (Z_of_nat start) (eval_ivar t.(svar) theta) /\
-    (Z_of_nat (start + sz)) = (Zplus (eval_ivar t.(svar) theta) (Z_of_nat t.(duration)))) ->
-      task_usage t start sz theta = sz*t.(resource).
-Proof.
-  intros; induction sz.
-    unfold task_usage; trivial.
-
-    unfold task_usage; fold task_usage.
-*)
-
-Fixpoint span_usage_transp (ts : list task) (start : nat) (sz : nat) (theta : asg) :=
+Fixpoint span_usage_transp (ts : list task) (start : Z) (sz : nat) (theta : asg) :=
   match ts with
   | nil => 0%nat
   | cons t ts' => plus (task_usage t start sz theta) (span_usage_transp ts' start sz theta)
   end.
 
-Theorem span_usage_eq_transp : forall (ts : list task) (start sz : nat) (theta : asg),
+Theorem span_usage_eq_transp : forall (ts : list task) (start : Z) (sz : nat) (theta : asg),
   span_usage ts start sz theta = span_usage_transp ts start sz theta.
 Proof.
   intros; induction ts.
@@ -278,59 +282,220 @@ Proof.
     trivial.
 Qed.
 
-Definition task_bracketed (t : task) (start sz : nat) (theta : asg) :=
-  Zle (Z_of_nat start) (eval_ivar t.(svar) theta)
-    /\ Zlt (eval_end t theta) (Z_of_nat (start + sz)).
+(* Check whether the ~cl -> [| s[t] >= lb |] /\ [| s[t]+d[t] <= ub |]. *)
+Definition negcl_bracketed (t : task) (lb ub : Z) (cl : clause) :=
+  db_contained (db_from_negclause t.(svar) cl)
+    lb (Zpred (Zminus ub (Z_of_nat t.(duration)))).
 
-(*
-Theorem task_cover_usage :
-    forall (c : cumul) (t : task) (start sz : nat) (theta : asg),
-  eval_cumul c theta ->
-    Zle (eval_start t theta) (Z_of_nat start)
-    /\ Zlt (Z_of_nat (plus start sz)) (eval_end t theta) ->
-      task_usage t start sz theta = mult sz t.(resource).
-Proof.
-  intros; destruct H0 as [Hl Hu]; induction sz.
-    unfold task_usage; omega.
-    
-    unfold task_usage; fold task_usage. 
-    unfold task_at_time.
+Definition negcl_bracketedb (t : task) (lb ub : Z) (cl : clause) :=
+  db_containedb (db_from_negclause t.(svar) cl)
+    lb (Zpred (Zminus ub (Z_of_nat t.(duration)))).
 
-Theorem task_bracket_usage :
-    forall (c : cumul) (t : task) (start : nat) (sz : nat) (theta : asg),
-  eval_cumul c theta ->
-    task_bracketed t start sz theta -> task_usage t start sz theta = mult t.(duration) t.(resource).
+Theorem negcl_bracketed_valid :
+  forall (t : task) (lb ub : Z) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta ->
+        negcl_bracketed t lb ub cl -> task_bracketed t lb ub theta.
 Proof.
-  unfold task_bracketed, eval_start, eval_end; intros.
-  destruct H0 as [Hl Hu].
+  unfold negcl_bracketed, task_bracketed; intros.
+  unfold eval_start, eval_end.
+  apply db_contained_impl_inbounds with
+    (k := eval_ivar t.(svar) theta) in H0.
+  split.
+    omega.
+
+    rewrite Zlt_plus_swap.
+    destruct H0 as [_ Hub];
+    rewrite Zsucc_pred;
+    apply Zle_lt_succ; exact Hub.
+
+    apply db_from_negclause_valid; exact H.
+Qed.
+Theorem negcl_bracketedb_iff : forall (t : task) (lb ub : Z) (cl : clause),
+  negcl_bracketedb t lb ub cl = true <-> negcl_bracketed t lb ub cl.
+Proof.
+  unfold negcl_bracketed, negcl_bracketedb; intros.
+  rewrite db_containedb_iff_contained. tauto.
+Qed.
   
-  induction sz.
-    unfold task_usage.
-    assert (le (duration t) 0).
-    apply (plus_le_reg_l (duration t) (0) (start)).
-    apply inj_le_iff.
-*)
+Fixpoint negcl_usage (ts : list task) (cl : clause) (lb ub : Z) :=
+  match ts with
+  | nil => O
+  | cons t ts' =>
+    if negcl_bracketedb t lb ub cl then
+      mult t.(resource) t.(duration) + (negcl_usage ts' cl lb ub)
+    else
+      negcl_usage ts' cl lb ub
+  end.
+  
+Theorem negcl_usage_le_span_usage :
+  forall (ts : list task) (cl : clause) (lb ub : Z) (theta : asg),
+    ~ eval_clause cl theta /\ Zle lb ub ->
+        negcl_usage ts cl lb ub <= span_usageZ ts lb ub theta.
+Proof.
+  intros.
+  unfold span_usageZ.
+  destruct H as [H Hlt].
+  destruct Z_le_dec.
+  (* assert (Zle 0 (ub - lb)). omega. *)
+  rewrite span_usage_eq_transp.
+  induction ts.
+    unfold negcl_usage, span_usage_transp; omega.
 
-(* Check whether the ~cl -> [| s[t] >= lb |] /\ [| s[t]+d[t] < ub |]. *)
+    unfold negcl_usage, span_usage_transp;
+      fold negcl_usage; fold span_usage_transp.
+    assert (negcl_bracketedb a lb ub cl = true <-> negcl_bracketed a lb ub cl) as Hbrak_iff.
+      apply negcl_bracketedb_iff.
+    destruct negcl_bracketedb.
+      assert (negcl_bracketed a lb ub cl) as Hbrak. rewrite <- Hbrak_iff; trivial.
+    clear Hbrak_iff.
+    apply plus_le_compat.
+    assert (task_bracketed a lb ub theta).
+      apply negcl_bracketed_valid with (cl := cl).
+      exact H. exact Hbrak.
+    rewrite task_usageZ_eq.
+    rewrite inj_Zabs_nat.
+    rewrite Zabs_eq.
+    rewrite Zplus_minus.
+    apply task_bracketed_usageZ. exact H0. omega.
+    exact IHts.
+    rewrite plus_comm; apply le_plus_trans.
+    exact IHts.
+    omega.
+Qed.
 
 (*
-Fixpoint span_area (ts : list task) (cl : clause) (lb ub : Z) :=
-  match ts with
-  | nil => 0%Z
-  | cons t ts' =>
-     if containedb t cl lb ub = true then 
-       t.(resource)*t.(duration) + (span_area ts' cl lb ub)
-     else
-       span_area ts' cl lb ub
-  end.
-*)
-
 Definition check_cumul (c : cumul) (cl : clause) : bool := false.
+*)
+Definition check_cumul_pair (c : cumul) (tx ty : task) (cl : clause) :=
+  match fst (db_from_negclause tx.(svar) cl) with
+  | Unbounded => false
+  | Bounded lb =>
+    match snd (db_from_negclause ty.(svar) cl) with
+    | Unbounded => false
+    | Bounded ub_y =>
+      let ub := (Zplus ub_y (Z_of_nat ty.(duration))) in
+      (* Clause is trivial. *)
+      (Z_leb lb ub) &&
+        (Compare_dec.leb
+          (S (mult c.(limit) (Zabs_nat (ub - lb))))
+          (negcl_usage c.(tasks) cl lb ub))
+    end
+  end.
+Theorem check_cumul_pair_true_impl_negcl :
+  forall (c : cumul) (tx ty : task) (cl : clause) (theta : asg),
+    check_cumul_pair c tx ty cl = true ->
+      ~ eval_clause cl theta -> ~ eval_cumul c theta.
+Proof.
+  unfold check_cumul_pair.
+  intros c tx ty cl theta.
+  assert (eval_cumul c theta \/ ~ eval_cumul c theta).
+    tauto.
+  generalize (fst (db_from_negclause (svar tx) cl)).
+  generalize (snd (db_from_negclause (svar ty) cl)).
+  intros b b0; destruct b, b0.
+    intros; discriminate. 
+    intros; discriminate.
+    intros; discriminate.
+    generalize (Zplus z (Z_of_nat (duration ty))); intro.
+    rewrite andb_true_iff.
+    rewrite Z_leb_iff_le.
+    rewrite Compare_dec.leb_iff.
+    intro H'. destruct H' as [Hlu Hlim].
+    assert (limit c * (Zabs_nat (z1 - z0)) <= negcl_usage (tasks c) cl z0 z1) as Hlim'.
+      omega.
+    intro Hnotcl.
+    destruct H.
+      assert (Hbound := H).
+      assert (span_usageZ (tasks c) z0 z1 theta <= (limit c)*(Zabs_nat (Zminus z1 z0))).
+        apply span_usageZ_lim.
+        split.
+          exact Hlu.
+          exact H.
+      assert (negcl_usage (tasks c) cl z0 z1 <= span_usageZ (tasks c) z0 z1 theta).
+        apply negcl_usage_le_span_usage.
+        split.
+          exact Hnotcl.
+          exact Hlu.
+      omega.
+      exact H.
+Qed.
+
+Theorem check_cumul_pair_valid :
+  forall (c : cumul) (tx ty : task) (cl : clause) (theta : asg),
+    check_cumul_pair c tx ty cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta).
+    tauto.
+  destruct H1.
+    exact H1.
+    apply check_cumul_pair_true_impl_negcl with
+      (theta := theta) in H.
+    tauto.
+
+    exact H1.
+Qed.
+
+Fixpoint check_cumul_pairs
+  (c : cumul) (tx : task) (tail : list task) (cl : clause) :=
+  match tail with
+  | nil => false
+  | cons ty tail' =>
+      (check_cumul_pair c tx ty cl) || (check_cumul_pairs c tx tail' cl)
+  end.
+Theorem check_cumul_pairs_valid :
+  forall (c : cumul) (tx : task) (tail : list task)
+    (cl : clause) (theta : asg),
+    check_cumul_pairs c tx tail cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros; induction tail.
+    unfold check_cumul_pairs in H.
+    discriminate.
+
+    unfold check_cumul_pairs in H; fold check_cumul_pairs in H.
+    apply orb_true_iff in H.
+    destruct H.
+      apply check_cumul_pair_valid with (theta := theta) in H.
+      exact H.
+      exact H0.
+
+      apply IHtail in H.
+      exact H.
+Qed.
+    
+Fixpoint check_cumul_rec (c : cumul) (tail : list task) (cl : clause) :=
+  match tail with
+  | nil => false
+  | cons t tail' =>
+      (check_cumul_pairs c t c.(tasks) cl) || (check_cumul_rec c tail' cl)
+  end.
+Theorem check_cumul_rec_valid :
+  forall (c : cumul) (tail : list task) (cl : clause) (theta : asg),
+    check_cumul_rec c tail cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros; induction tail.
+    unfold check_cumul_rec in H; discriminate.
+    unfold check_cumul_rec in H; fold check_cumul_rec in H.
+    apply orb_true_iff in H.
+    destruct H.
+      apply check_cumul_pairs_valid with (theta := theta) in H.
+      exact H. exact H0.
+
+      apply IHtail in H. exact H.
+Qed.
+
+Definition check_cumul (c : cumul) (cl : clause) :=
+  check_cumul_rec c c.(tasks) cl.
 
 Theorem check_cumul_valid : forall (c : cumul) (cl : clause),
   check_cumul c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  unfold check_cumul. intros. discriminate.
+  unfold implies, check_cumul. intros.
+  apply check_cumul_rec_valid with (c := c) (tail := tasks c).
+  exact H. exact H0.
 Qed.
 
 Definition CumulConstraint (C : Constraint) : Constraint :=
