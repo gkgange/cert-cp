@@ -113,7 +113,8 @@ VFILES:=bounds.v\
   linear.v\
   prim.v\
   reif.v\
-  zset.v
+  zset.v\
+  checker_impl.v
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))
 GLOBFILES:=$(VFILES:.v=.glob)
@@ -122,14 +123,15 @@ GFILES:=$(VFILES:.v=.g)
 HTMLFILES:=$(VFILES:.v=.html)
 GHTMLFILES:=$(VFILES:.v=.g.html)
 MLFILES:=\
-	cOption.ml\
-	mTypes.ml\
-	spec.ml\
-	checker.ml\
-	model.ml\
-	registry.ml\
-	parse.ml\
-	builtins.ml\
+  cOption.ml\
+  mTypes.ml\
+  spec.ml\
+  checker.ml\
+  model.ml\
+  registry.ml\
+  parse.ml\
+  checker_impl.ml\
+  builtins.ml\
   main.ml\
 
 CMOFILES:=$(MLFILES:.ml=.cmo)

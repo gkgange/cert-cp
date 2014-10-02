@@ -69,14 +69,14 @@ Qed.
 Definition eval_lincon lincon (theta : asg) :=
   (eval_linsum (fst lincon) theta) <= (snd lincon).
   
-Definition lincon_implies (lincon : lin_leq) (cl : clause) : bool :=
+Definition check_lincon (lincon : lin_leq) (cl : clause) : bool :=
   negb (satb_lb (fst (linsum_db_from_negclause (fst lincon) cl)) (snd lincon)).
 
-Theorem lincon_implies_valid : forall (lincon : lin_leq) (cl : clause),
-  lincon_implies lincon cl = true ->
+Theorem check_lincon_valid : forall (lincon : lin_leq) (cl : clause),
+  check_lincon lincon cl = true ->
     implies (eval_lincon lincon) (eval_clause cl).
 Proof.
-  unfold implies, lincon_implies, eval_lincon.
+  unfold implies, check_lincon, eval_lincon.
   intros lincon cl.
   destruct lincon; simpl.
   rewrite negb_true_iff.

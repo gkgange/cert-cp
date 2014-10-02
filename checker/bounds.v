@@ -630,7 +630,6 @@ Theorem inbounds_negcl_false_impl_cl :
     eval_clause cl theta.
 Proof.
   unfold inbounds_negcl; intros.
-  Check notdb_negclause_impl_clause.
   rewrite satb_db_false_iff_notdb in H.
   apply notdb_negclause_impl_clause with
     (x := x); exact H.
