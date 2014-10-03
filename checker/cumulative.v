@@ -373,7 +373,7 @@ Definition check_cumul_pair (c : cumul) (tx ty : task) (cl : clause) :=
     match snd (db_from_negclause ty.(svar) cl) with
     | Unbounded => false
     | Bounded ub_y =>
-      let ub := (Zplus ub_y (Z_of_nat ty.(duration))) in
+      let ub := (Zplus ub_y (Z_of_nat (S ty.(duration)))) in
       (* Clause is trivial. *)
       (Z_leb lb ub) &&
         (Compare_dec.leb
@@ -396,7 +396,8 @@ Proof.
     intros; discriminate. 
     intros; discriminate.
     intros; discriminate.
-    generalize (Zplus z (Z_of_nat (duration ty))); intro.
+    (* generalize (Zplus z (Z_of_nat (duration ty))); intro. *)
+    generalize (Zplus z (Z_of_nat (S (duration ty)))); intro.
     rewrite andb_true_iff.
     rewrite Z_leb_iff_le.
     rewrite Compare_dec.leb_iff.
@@ -487,6 +488,7 @@ Proof.
       apply IHtail in H. exact H.
 Qed.
 
+  
 Definition check_cumul (c : cumul) (cl : clause) :=
   check_cumul_rec c c.(tasks) cl.
 

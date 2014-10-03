@@ -38,10 +38,13 @@ let check_inference model ident clause =
       false
     end
 
-(* Check a set of inferences; will continue checking
- * after a failure. *)
+(* Check a set of inferences; terminates after the
+ * first failure. *)
 let check_inferences model infs =
   L.fold_left (fun b (id, cl) -> b && check_inference model id cl) true infs
+
+let check_inferences model infs =
+  L.fold_left (fun b (id, cl) -> check_inference model id cl && b) true infs
   
 (* Parsing code for definitions. *)
 let parse_defn spec = parser

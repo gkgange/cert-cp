@@ -4,7 +4,7 @@ open Genlex
 
 type 'a spec = (token S.t -> 'a)
 
-let keywords = ["(*";"*)";"(";")";";";",";":=";"|-";"<=";"<";"=";"~";"[";"]"]
+let keywords = ["(*";"*)";"(";")";";";",";":=";"|-";"<=";"<";"=";"-";"~";"[";"]"]
 
 let rec drop_comments stream =
   let rec kill = parser
@@ -26,6 +26,7 @@ let lexer stream =
 let ident = parser
   | [< 'Ident s >] -> s
 let intconst = parser
+  | [< 'Kwd "-" ; 'Int n >] -> (-n)
   | [< 'Int n >] -> n
 let boolconst = parser
   | [< 'Ident s >] -> bool_of_string s
