@@ -193,6 +193,8 @@ Record Constraint : Type := mkConstraint
       forall (x : T) (cl : clause),
       check x cl = true -> implies (eval x) (eval_clause cl) }.
 
+Definition check_inf (C : Constraint) (x : C.(T)) (cl : clause) := C.(check) x cl.
+
 Definition vprop_leqb (u : vprop) (v : vprop) :=
   match u with
   | ILeq x kx =>
@@ -297,21 +299,21 @@ Proof.
   right. apply IHcl; exact H3.
 Qed.
 
-Fixpoint clause_impl (cl_x cl_y : clause) : bool :=
+Fixpoint check_clause (cl_x cl_y : clause) : bool :=
   match cl_x with
   | nil => true
-  | cons l ls => lit_impl_clause l cl_y && clause_impl ls cl_y
+  | cons l ls => lit_impl_clause l cl_y && check_clause ls cl_y
   end.
 
-Theorem clause_impl_clause_valid : forall (cl_x cl_y : clause),
-  clause_impl cl_x cl_y = true -> implies (eval_clause cl_x) (eval_clause cl_y).
+Theorem check_clause_valid : forall (cl_x cl_y : clause),
+  check_clause cl_x cl_y = true -> implies (eval_clause cl_x) (eval_clause cl_y).
 Proof.
   intros ; unfold implies; intros.
   induction cl_x.
   unfold eval_clause in H0; tauto.
   unfold eval_clause in *; fold eval_clause in *;
-  unfold clause_impl in H; fold clause_impl in H.
-  assert (lit_impl_clause a cl_y = true /\ clause_impl cl_x cl_y = true).
+  unfold check_clause in H; fold check_clause in H.
+  assert (lit_impl_clause a cl_y = true /\ check_clause cl_x cl_y = true).
   apply andb_true_iff; exact H.
   destruct H1.
   assert ((eval_lit a theta) -> (eval_clause cl_y theta)).
@@ -322,3 +324,5 @@ Proof.
   apply H3; exact H0.
   apply H4; exact H0.
 Qed.
+
+Definition CheckClause := mkConstraint clause eval_clause check_clause.

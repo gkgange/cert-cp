@@ -58,7 +58,7 @@ let check_clause model =
     {
       C.repr = repr;
       C.check = (fun cl ->
-         C_impl.clause_impl
+         C_impl.check_clause
            (impl_clause_of_clause cl0)
            (impl_clause_of_clause cl))
     }

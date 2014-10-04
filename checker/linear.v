@@ -89,3 +89,6 @@ Proof.
   exact H0.
   exact H.
 Qed.
+
+Definition CheckLinear := mkConstraint lin_leq eval_lincon check_lincon.
+(* Check CheckLinear. *)

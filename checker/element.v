@@ -41,6 +41,10 @@ Fixpoint check_element_rec x i ys cl :=
     negb
       ((satb_dom (dom_from_negclause i cl) k)
         && (satb_dom (dom_from_negclause x cl) y))
+      (*
+      ((satb_dbound (db_from_negclause i cl) k)
+        && (satb_dbound (db_from_negclause x cl) y))
+      *)
       && check_element_rec x i ys' cl
   end.
 Definition check_element elem cl :=
@@ -48,7 +52,6 @@ Definition check_element elem cl :=
   | Elem x i ys => check_element_rec x i (augment Z ys) cl
   end.
 
-(*
 Theorem check_element_valid :
   forall (elem : element) (cl : clause) (theta : asg),
     check_element elem cl = true ->
@@ -64,11 +67,32 @@ Proof.
   destruct a; simpl.
   rewrite andb_true_iff, negb_true_iff, andb_false_iff.
   intros.
-  destruct H as [ Hf Hrec ].
-  apply IHl0. exact Hrec.
-  destruct H0.
-*)
+  assert (eval_clause cl theta \/ ~eval_clause cl theta) as Hdec.
+    tauto.
+  destruct Hdec.
+    exact H1.
+
+    destruct H as [ Hf Hrec ].
+    apply IHl0. exact Hrec.
+    destruct H0.
+    destruct H as [Hi0 Hi].
+    rewrite satb_dom_false_iff_notdom in Hf.
+    rewrite satb_dom_false_iff_notdom in Hf.
+    destruct Hf.
+        apply dom_from_negclause_valid with
+          (x := i0) in H1.
+        rewrite Hi0 in H1.
+        tauto.
+
+        apply dom_from_negclause_valid with
+          (x := i) in H1.
+        rewrite Hi in H1.
+        tauto.
+        exact H.
+Qed.
+
 (*
+
 Theorem check_element_valid :
   forall (elt : element) (cl : clause),
   check_element elt cl = true ->

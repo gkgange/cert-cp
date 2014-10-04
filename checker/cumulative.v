@@ -228,7 +228,7 @@ Qed.
   
 Definition task_bracketed (t : task) (lb ub : Z) (theta : asg) :=
   Zle lb (eval_start t theta)
-    /\ Zlt (eval_end t theta) ub.
+    /\ Zle (eval_end t theta) ub.
 
 Theorem task_bracketed_usageZ :
   forall (t : task) (lb ub : Z) (theta : asg),
@@ -285,11 +285,11 @@ Qed.
 (* Check whether the ~cl -> [| s[t] >= lb |] /\ [| s[t]+d[t] <= ub |]. *)
 Definition negcl_bracketed (t : task) (lb ub : Z) (cl : clause) :=
   db_contained (db_from_negclause t.(svar) cl)
-    lb (Zpred (Zminus ub (Z_of_nat t.(duration)))).
+    lb (Zminus ub (Z_of_nat t.(duration))).
 
 Definition negcl_bracketedb (t : task) (lb ub : Z) (cl : clause) :=
   db_containedb (db_from_negclause t.(svar) cl)
-    lb (Zpred (Zminus ub (Z_of_nat t.(duration)))).
+    lb (Zminus ub (Z_of_nat t.(duration))).
 
 Theorem negcl_bracketed_valid :
   forall (t : task) (lb ub : Z) (cl : clause) (theta : asg),
@@ -303,10 +303,9 @@ Proof.
   split.
     omega.
 
-    rewrite Zlt_plus_swap.
+    rewrite Zle_plus_swap.
     destruct H0 as [_ Hub];
-    rewrite Zsucc_pred;
-    apply Zle_lt_succ; exact Hub.
+    exact Hub.
 
     apply db_from_negclause_valid; exact H.
 Qed.

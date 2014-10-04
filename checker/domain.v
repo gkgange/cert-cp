@@ -43,6 +43,34 @@ Proof.
       apply not_true_is_false; exact Hm.
 Qed.
 
+Theorem decidable_sat_dom : forall (db : dom) (k : Z),
+  sat_dom db k \/ ~ sat_dom db k.
+Proof.
+  intros.
+  rewrite <- satb_dom_true_iff_dom.
+  tauto.
+  Qed.
+
+Theorem satb_dom_false_iff_notdom : forall (db : dom) (k : Z),
+  satb_dom db k = false <-> ~ sat_dom db k.
+Proof.
+  intros.
+  assert (sat_dom db k \/ ~sat_dom db k). apply decidable_sat_dom.
+  destruct H.
+  assert (satb_dom db k = true). apply satb_dom_true_iff_dom. exact H.
+  rewrite H0.
+  split. discriminate.
+  intro. assert False. tauto. tauto.
+ 
+  split.
+  assert (sat_dom db k -> satb_dom db k = true). apply satb_dom_true_iff_dom.
+  intro. tauto.
+  
+  intro.
+  apply not_true_is_false.
+  rewrite satb_dom_true_iff_dom. exact H.
+Qed.
+
 Definition dom_meet (dx dy : dom) :=
   (db_meet (fst dx) (fst dy), union (snd dx) (snd dy)).
 Theorem dom_meet_iff : forall (dx dy : dom) (k : Z),

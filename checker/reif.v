@@ -8,7 +8,7 @@ Definition eval_reif (C : Constraint) (r : reified C) (theta : asg) :=
   (eval_lit (neglit (fst r)) theta) \/ C.(eval) (snd r) theta.
 
 Definition check_reif (C : Constraint) (r : reified C) (cl : clause) : bool :=
-  andb (clause_impl (cons (neglit (fst r)) nil) cl) (C.(check) (snd r) cl).
+  andb (check_clause (cons (neglit (fst r)) nil) cl) (C.(check) (snd r) cl).
 Theorem check_reif_valid : forall (C : Constraint) (r : reified C) (cl : clause),
   check_reif C r cl = true -> implies (eval_reif C r) (eval_clause cl).
 Proof.
@@ -18,7 +18,7 @@ Proof.
   destruct H.
   destruct H0 as [Hnr | Hc].
   assert (implies (eval_clause (cons (neglit (fst r)) nil)) (eval_clause cl)).
-  apply clause_impl_clause_valid ; exact H.
+  apply check_clause_valid ; exact H.
   unfold implies in H0.
   apply H0.
   unfold eval_clause. tauto.
