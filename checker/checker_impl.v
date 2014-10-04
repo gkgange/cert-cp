@@ -1,6 +1,7 @@
 (* Extraction of the implemented checkers. *)
 Require Import ExtrOcamlIntConv.
 Require Import ExtrOcamlZInt.
+Require prim.
 Require bounds.
 Require linear.
 Require cumulative.
@@ -9,6 +10,7 @@ Require element.
 
 Set Extraction Optimize.
 Extraction "checker_impl.ml"
+  prim.clause_impl
   cumulative.check_cumul reif.check_reif linear.check_lincon
   element.check_element
   nat_of_int int_of_nat.

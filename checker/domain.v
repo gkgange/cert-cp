@@ -156,7 +156,6 @@ Proof.
 Qed.
 *)  
 
-(*
 Theorem dom_from_negclause_valid : forall (x : ivar) (cl : clause) (theta : asg),
  ~eval_clause cl theta -> sat_dom (dom_from_negclause x cl) (eval_ivar x theta).
 Proof.
@@ -173,12 +172,12 @@ Proof.
   apply neglit_not_lit. exact H0.
   assert (sat_dom (dom_from_lit x (neglit a)) (eval_ivar x theta)).
   apply dom_from_lit_valid; exact H2.
-  assert (sat_dbound (db_from_negclause x cl) (eval_ivar x theta)).
+  assert (sat_dom (dom_from_negclause x cl) (eval_ivar x theta)).
   apply IHcl; exact H1.
-  apply db_sat_impl_meet. split. exact H3. exact H4.
+  apply dom_meet_iff. split. exact H3. exact H4.
 Qed.
 
-Theorem notdb_negclause_impl_clause : forall (x : ivar) (cl : clause) (theta : asg),
+Theorem notdom_negclause_impl_clause : forall (x : ivar) (cl : clause) (theta : asg),
   ~ sat_dbound (db_from_negclause x cl) (eval_ivar x theta) -> eval_clause cl theta.
 Proof.
   intros.
@@ -203,4 +202,3 @@ Theorem notsat_lb_impl_notdb : forall (db : dbound) (k : Z),
 Proof.
   unfold sat_dbound; destruct db; simpl; intros. tauto.
 Qed.
-*)

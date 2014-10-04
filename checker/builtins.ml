@@ -50,6 +50,19 @@ let check_linear_le model =
       C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl))
 }
 
+let check_clause model =
+  fun tokens ->
+    let cl0 = P.parse_clause model tokens in
+    let repr = Format.sprintf "clause(%s)"
+      (M.string_of_clause model cl0) in
+    {
+      C.repr = repr;
+      C.check = (fun cl ->
+         C_impl.clause_impl
+           (impl_clause_of_clause cl0)
+           (impl_clause_of_clause cl))
+    }
+
 let check_element model =
   fun tokens ->
     let (x, (i, ys)) =
@@ -101,7 +114,8 @@ let check_cumul model =
 let register () =
   R.add "linear_le" check_linear_le ;
   R.add "element" check_element ;
-  R.add "cumulative" check_cumul
+  R.add "cumulative" check_cumul ;
+  R.add "clause" check_clause
 (*
   R.add "clause" R.null_checker ;
   R.add "linear_le" R.null_checker
