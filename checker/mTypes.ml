@@ -13,4 +13,8 @@ type lit =
 | Pos of vprop
 | Neg of vprop
 
+let negate = function
+  | Pos vp -> Neg vp
+  | Neg vp -> Pos vp
+
 type clause = lit list

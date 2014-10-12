@@ -11,32 +11,7 @@ Require Import Decidable.
 
 Open Scope Z_scope.
 
-(* Variable types *)
-Definition ivar : Type := nat.
-Definition bvar : Type := nat.
-
-(* Type of assignments.
- *  Not currently considering scope. *)
-Definition asg : Type := ((ivar -> Z)*(bvar -> bool))%type.
-
-(* Evaluating a variable under an assignment. *)
-Definition eval_ivar (iv : ivar) (theta : asg) := (fst theta) iv.
-Definition eval_bvar (bv : bvar) (theta : asg) := (snd theta) bv.
-
-(* Primitive propositions. *)
-Inductive vprop : Type :=
-  | ILeq : ivar -> Z -> vprop
-  | IEq : ivar -> Z -> vprop
-  | BTrue : bvar -> vprop.
-
-(* A literal is either a positive
- * or negative proposition. *)
-Inductive lit : Type :=
-  | Pos : vprop -> lit
-  | Neg : vprop -> lit.
-
-(* A convenience function, since the implementation
- * seems to be missing from this version. *)
+(* Some convenience Z-handling functions. *)
 Definition Z_leb (x y : Z) : bool :=
   if Z_le_dec x y then true else false.
 
@@ -83,6 +58,46 @@ Proof.
   destruct Z_eq_dec. tauto. discriminate.
   intros. destruct Z_eq_dec. trivial. tauto.
 Qed.
+
+(* Variable types *)
+Definition ivar : Type := Z.
+Definition bvar : Type := Z.
+
+Definition ivar_eqb x x' := Z_eqb x x'.
+Theorem ivar_eqb_iff_eq : forall (x x' : ivar),
+  ivar_eqb x x' = true <-> x = x'.
+Proof.
+  unfold ivar_eqb. intros.
+  apply Z_eqb_iff_eq.
+Qed.
+
+Definition bvar_eqb x x' := Z_eqb x x'.
+Theorem bvar_eqb_iff_eq : forall (x x' : bvar),
+  bvar_eqb x x' = true <-> x = x'.
+Proof.
+  unfold ivar_eqb. intros.
+  apply Z_eqb_iff_eq.
+Qed.
+
+(* Type of assignments.
+ *  Not currently considering scope. *)
+Definition asg : Type := ((ivar -> Z)*(bvar -> bool))%type.
+
+(* Evaluating a variable under an assignment. *)
+Definition eval_ivar (iv : ivar) (theta : asg) := (fst theta) iv.
+Definition eval_bvar (bv : bvar) (theta : asg) := (snd theta) bv.
+
+(* Primitive propositions. *)
+Inductive vprop : Type :=
+  | ILeq : ivar -> Z -> vprop
+  | IEq : ivar -> Z -> vprop
+  | BTrue : bvar -> vprop.
+
+(* A literal is either a positive
+ * or negative proposition. *)
+Inductive lit : Type :=
+  | Pos : vprop -> lit
+  | Neg : vprop -> lit.
 
 (* Evaluate a proposition under an assignment. *)
 Definition eval_vprop
@@ -199,18 +214,18 @@ Definition vprop_leqb (u : vprop) (v : vprop) :=
   match u with
   | ILeq x kx =>
     match v with
-    | ILeq y ky => (beq_nat x y) && (Z_leb kx ky)
+    | ILeq y ky => (ivar_eqb x y) && (Z_leb kx ky)
     | _ => false
     end
   | IEq x kx =>
     match v with
-    | ILeq y ky => (beq_nat x y) && (Z_leb kx ky)
-    | IEq y ky => (beq_nat x y) && (Z_eqb kx ky)
+    | ILeq y ky => (ivar_eqb x y) && (Z_leb kx ky)
+    | IEq y ky => (ivar_eqb x y) && (Z_eqb kx ky)
     | _ => false
     end
   | BTrue x =>
     match v with
-    | BTrue y => beq_nat x y
+    | BTrue y => bvar_eqb x y
     | _ => false
     end
   end.
@@ -221,24 +236,24 @@ Proof.
   intros. unfold implies. intros.
   unfold vprop_leqb in H.
   unfold eval_vprop in H0. unfold eval_vprop. destruct u, v.
-  assert (beq_nat i i0 = true /\ Z_leb z z0 = true).
+  assert (ivar_eqb i i0 = true /\ Z_leb z z0 = true).
   apply andb_true_iff; exact H. destruct H1.
-  assert (i = i0). apply beq_nat_true; exact H1.
+  assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
   assert (z <= z0). apply Z_leb_iff_le; exact H2.
   rewrite <- H3. omega.
   discriminate. discriminate.
-  assert (beq_nat i i0 = true /\ Z_leb z z0 = true).
+  assert (ivar_eqb i i0 = true /\ Z_leb z z0 = true).
   apply andb_true_iff; exact H. destruct H1.
-  assert (i = i0). apply beq_nat_true; exact H1.
+  assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
   assert (z <= z0). apply Z_leb_iff_le; exact H2.
   rewrite <- H3. omega.
-  assert (beq_nat i i0 = true /\ Z_eqb z z0 = true).
+  assert (ivar_eqb i i0 = true /\ Z_eqb z z0 = true).
   apply andb_true_iff; exact H. destruct H1.
-  assert (i = i0). apply beq_nat_true; exact H1.
+  assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
   assert (z = z0). apply Z_eqb_iff_eq; exact H2.
   rewrite <- H3; rewrite <- H4; exact H0.
   discriminate. discriminate. discriminate.
-  assert (b = b0). apply beq_nat_true; exact H.
+  assert (b = b0). apply ivar_eqb_iff_eq; exact H.
   rewrite <- H1; exact H0.
 Qed.
 

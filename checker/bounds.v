@@ -517,11 +517,11 @@ Qed.
 Definition db_from_lit (x : ivar) (l : lit) :=
   match l with
   | Pos (IEq x' k) =>
-      if beq_nat x x' then (Bounded k, Bounded k) else (Unbounded, Unbounded)
+      if ivar_eqb x x' then (Bounded k, Bounded k) else (Unbounded, Unbounded)
   | Pos (ILeq x' k) =>
-      if beq_nat x x' then (Unbounded, Bounded k) else (Unbounded, Unbounded)
+      if ivar_eqb x x' then (Unbounded, Bounded k) else (Unbounded, Unbounded)
   | Neg (ILeq x' k) =>
-      if beq_nat x x' then (Bounded (k+1), Unbounded) else (Unbounded, Unbounded)
+      if ivar_eqb x x' then (Bounded (k+1), Unbounded) else (Unbounded, Unbounded)
   | _ => (Unbounded, Unbounded)
   end.
 Theorem db_from_lit_valid : forall (x : ivar) (l : lit) (theta : asg),
@@ -534,16 +534,16 @@ Proof.
   unfold eval_lit in H. unfold eval_vprop in H.
   induction v.
 
-  assert (beq_nat x i = true <-> x = i).
-  apply beq_nat_true_iff.
-  destruct (beq_nat x i). simpl.
+  assert (ivar_eqb x i = true <-> x = i).
+  apply ivar_eqb_iff_eq.
+  destruct (ivar_eqb x i). simpl.
   assert (x = i). apply H0. trivial.
   split. trivial. rewrite H1. exact H.
 
   simpl. tauto.
 
-  assert (beq_nat x i = true <-> x = i). apply beq_nat_true_iff.
-  destruct (beq_nat x i).
+  assert (ivar_eqb x i = true <-> x = i). apply ivar_eqb_iff_eq.
+  destruct (ivar_eqb x i).
 
   simpl. assert (x = i). apply H0; trivial.
   rewrite H1; rewrite H. eauto with zarith.
@@ -554,9 +554,9 @@ Proof.
 
   unfold eval_lit in H; unfold eval_vprop in H; induction v.
 
-  assert (beq_nat x i = true <-> x = i).
-  apply beq_nat_true_iff.
-  destruct (beq_nat x i).
+  assert (ivar_eqb x i = true <-> x = i).
+  apply ivar_eqb_iff_eq.
+  destruct (ivar_eqb x i).
 
   simpl. assert (x = i). apply H0; trivial.
   rewrite H1. split.

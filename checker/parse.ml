@@ -9,15 +9,17 @@ let parse_ivar model tokens = M.get_ivar model (S.ident tokens)
 let parse_bvar model tokens = M.get_bvar model (S.ident tokens)
 let parse_vprop model =
   let aux ivar = parser
-  | [< 'GL.Kwd "<=" ; 'GL.Int k >] -> MT.ILe (ivar, k)
-  | [< 'GL.Kwd "=" ; 'GL.Int k >] -> MT.IEq (ivar, k)
+  | [< 'GL.Kwd "<=" ; 'GL.Int k >] -> MT.Pos (MT.ILe (ivar, k))
+  | [< 'GL.Kwd "=" ; 'GL.Int k >] -> MT.Pos (MT.IEq (ivar, k))
+  | [< 'GL.Kwd ">=" ; 'GL.Int k >] -> MT.Neg (MT.ILe (ivar, k-1))
+  | [< 'GL.Kwd "!=" ; 'GL.Int k >] -> MT.Neg (MT.IEq (ivar, k))
   in parser
   | [< 'GL.Ident x ; prop = aux (M.get_ivar model x) >] -> prop
 
 let parse_lit model = parser
   | [< 'GL.Kwd "~" ; 'GL.Ident id >] ->
-      MT.Neg (M.get_vprop model id)
+      MT.negate (M.get_lit model id)
   | [< 'GL.Ident id >] ->
-      MT.Pos (M.get_vprop model id)
+      (M.get_lit model id)
 
 let parse_clause model = S.listof (parse_lit model)

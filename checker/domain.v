@@ -97,13 +97,13 @@ Qed.
 Definition dom_from_lit (x : ivar) (l : lit) :=
   match l with
   | Pos (IEq x' k) =>
-     if beq_nat x x' then dom_const k else dom_unconstrained
+     if ivar_eqb x x' then dom_const k else dom_unconstrained
   | Neg (IEq x' k) =>
-     if beq_nat x x' then dom_neq k else dom_unconstrained
+     if ivar_eqb x x' then dom_neq k else dom_unconstrained
   | Pos (ILeq x' k) =>
-     if beq_nat x x' then dom_le k else dom_unconstrained
+     if ivar_eqb x x' then dom_le k else dom_unconstrained
   | Neg (ILeq x' k) =>
-     if beq_nat x x' then dom_ge (k+1) else dom_unconstrained
+     if ivar_eqb x x' then dom_ge (k+1) else dom_unconstrained
   | _ => dom_unconstrained
   end.
 
@@ -115,16 +115,16 @@ Proof.
   destruct l. destruct v.
 
   unfold dom_le, dom_unconstrained.
-  assert (beq_nat x i = true <-> x = i) as Hxiff. apply beq_nat_true_iff.
-  destruct beq_nat; simpl in *.
+  assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
+  destruct ivar_eqb; simpl in *.
     assert (x = i) as Hxi. apply Hxiff; trivial.
     clear Hxiff.
     rewrite Hxi.
     tauto.
     tauto.
 
-  assert (beq_nat x i = true <-> x = i) as Hxiff. apply beq_nat_true_iff.
-  destruct beq_nat; simpl in *.
+  assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
+  destruct ivar_eqb; simpl in *.
   assert (x = i) as Hxi. rewrite <- Hxiff; trivial.
   clear Hxiff.
   rewrite Hxi; omega.
@@ -134,8 +134,8 @@ Proof.
 
   unfold dom_ge, dom_unconstrained, dom_neq;
   destruct v.
-  assert (beq_nat x i = true <-> x = i) as Hxiff. apply beq_nat_true_iff.
-  destruct beq_nat; simpl in *.
+  assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
+  destruct ivar_eqb; simpl in *.
     assert (x = i) as Hxi. rewrite <- Hxiff; trivial.
     clear Hxiff.
     rewrite Hxi; split.
@@ -145,8 +145,8 @@ Proof.
       tauto.
     tauto.
     
-  assert (beq_nat x i = true <-> x = i) as Hxiff. apply beq_nat_true_iff.
-  destruct beq_nat; simpl in *.
+  assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
+  destruct ivar_eqb; simpl in *.
     assert (x = i) as Hxi. rewrite <- Hxiff; trivial.
     clear Hxiff.
     rewrite Hxi; split.

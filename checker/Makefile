@@ -84,13 +84,13 @@ COQDOC:=$(COQBIN)coqdoc
 COQMKTOP:=$(COQBIN)coqmktop
 CAMLLIB:=$(shell $(CAMLBIN)ocamlc.opt -where)
 #CAMLC:=$(CAMLBIN)ocamlc.opt -c -rectypes
-CAMLC:=$(OCAMLFIND) ocamlc -c -rectypes
+CAMLC:=$(OCAMLFIND) ocamlc -c -rectypes -g
 #CAMLOPTC:=$(CAMLBIN)ocamlopt.opt -c -rectypes
-CAMLOPTC:=$(OCAMLFIND) ocamlopt -c -rectypes
+CAMLOPTC:=$(OCAMLFIND) ocamlopt -g -c -rectypes
 #CAMLLINK:=$(CAMLBIN)ocamlc.opt -rectypes
-CAMLLINK:=$(OCAMLFIND) ocamlc -rectypes
+CAMLLINK:=$(OCAMLFIND) ocamlc -rectypes -g
 #CAMLOPTLINK:=$(CAMLBIN)ocamlopt.opt -rectypes
-CAMLOPTLINK:=$(OCAMLFIND) ocamlopt -rectypes
+CAMLOPTLINK:=$(OCAMLFIND) ocamlopt -rectypes -g
 GRAMMARS:=grammar.cma
 CAMLP4EXTEND:=pa_extend.cmo pa_macro.cmo q_MLast.cmo
 CAMLP4OPTIONS:=
@@ -182,6 +182,9 @@ all-gal.pdf: $(VFILES)
 check-cp : $(CMXFILES)
 	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
 
+check-cp.byte : $(CMOFILES)
+	$(CAMLLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
+  
 %.cmi: %.mli
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PKG_FLAGS) $<
 

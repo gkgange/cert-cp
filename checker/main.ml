@@ -65,7 +65,7 @@ let term_defn model id =
   | "prop" ->
       begin parser
         | [< prop = P.parse_vprop model >] ->
-            M.add_vprop model id prop
+            M.add_lit model id prop
       end
   | _ -> let pcon = (Registry.find key) model in
     begin parser
@@ -85,8 +85,27 @@ let parse_clause model =
   in S.listof parse_lit
   *)
 
-let parse_model =
+let chomp tokens token =
+  let next = Stream.next tokens in
+  if next <> token then
+    failwith "Parse error."
+
+let parse_model tokens =
   let model = M.create () in
+  chomp tokens (GL.Kwd "[") ;
+  if Stream.peek tokens <> (Some (GL.Kwd "]")) then
+    begin
+      parse_defn (term_defn model) tokens ;
+      while Stream.peek tokens = Some (GL.Kwd ",") 
+      do
+        Stream.junk tokens ;
+        parse_defn (term_defn model) tokens 
+      done
+    end ;
+  chomp tokens (GL.Kwd "]") ;
+  model
+
+  (*
   parser
     | [< _ = S.listof (parse_defn (term_defn model)) >] -> model
     (*
@@ -96,8 +115,9 @@ let parse_model =
   in parser
     | [< 'GL.Kwd "[" ; _ = aux ; 'GL.Kwd "]" >] -> model
     *)
+    *)
 
-
+  (*
 let parse_inferences model =
   let parse_inf = parser
     | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = P.parse_clause model >] -> (id, cl)
@@ -105,6 +125,18 @@ let parse_inferences model =
     | [< inf = parse_inf ; tail = aux >] -> inf :: tail
     | [< >] -> []
   in aux
+  *)
+
+let parse_inferences model tokens =
+  let parse_inf = parser
+    | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = P.parse_clause model >] -> (id, cl)
+  in
+  let rec aux tl tokens =
+    match Stream.peek tokens with
+    | None -> List.rev tl
+    | _ -> aux (parse_inf tokens :: tl) tokens
+  in aux [] tokens
+
 (*
 let parse_inferences = parser
   | [< 'Ident id ; 'Kwd "|-" ; cl = (S.listof parse_lit) >] ->

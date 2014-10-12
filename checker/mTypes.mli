@@ -13,4 +13,6 @@ type lit =
 | Pos of vprop
 | Neg of vprop
 
+val negate : lit -> lit
+
 type clause = lit list

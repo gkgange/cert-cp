@@ -22,7 +22,7 @@ type model = {
   bvars : ident A.t ;
   ivars : (ident * ((int*int) option)) A.t ;
   constraints : (ident * C.t) A.t;
-  vprops : (ident * MT.vprop) A.t
+  vprops : (ident * MT.lit) A.t
 }
 
 type t = model
@@ -47,7 +47,7 @@ let add_bvar model ident =
   Hashtbl.add model.symbols ident (IdBool, idx) ;
   A.add model.bvars ident
 
-let add_vprop model ident prop =
+let add_lit model ident prop =
   let idx = A.length model.vprops in
   Hashtbl.add model.symbols ident (IdProp, idx) ;
   A.add model.vprops (ident, prop)
@@ -78,12 +78,12 @@ let get_bvar (model : t) ident =
   with Not_found ->
     error (Format.sprintf "Error: symbol not found - %s." ident)
 
-let get_vprop (model : t) ident =
+let get_lit (model : t) ident =
   try
     let (kind, idx) = Hashtbl.find model.symbols ident in
     match kind with
     | IdProp -> snd (A.get model.vprops idx)
-    | IdBool -> MT.BTrue idx
+    | IdBool -> MT.Pos (MT.BTrue idx)
     | _ -> failwith (Format.sprintf "Error: symbol %s not a proposition." ident)
   with Not_found ->
     failwith (Format.sprintf "Error: symbol not found - %s." ident)

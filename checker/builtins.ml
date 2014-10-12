@@ -11,9 +11,9 @@ module C_impl = Checker_impl
 
 (* Conversion between internal types, and Coq-extracted types. *)
 let impl_vprop_of_vprop = function
-| MT.ILe (x, k) -> C_impl.ILeq (C_impl.nat_of_int x, k)
-| MT.IEq (x, k) -> C_impl.IEq (C_impl.nat_of_int x, k)
-| MT.BTrue x -> C_impl.BTrue (C_impl.nat_of_int x)
+| MT.ILe (x, k) -> C_impl.ILeq (x, k)
+| MT.IEq (x, k) -> C_impl.IEq (x, k)
+| MT.BTrue x -> C_impl.BTrue (x)
 
 let impl_lit_of_lit = function
 | MT.Pos vp -> C_impl.Pos (impl_vprop_of_vprop vp)
@@ -40,7 +40,7 @@ let check_linear_le model =
  fun tokens ->
    let (coeffs, (vars, k)) =
      (S.cons int_list (S.cons (ivar_list model) S.intconst)) tokens in
-   let linterms = List.map2 (fun c v -> (c, C_impl.nat_of_int v)) coeffs vars in
+   let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
    let repr = Format.sprintf "linear_le(%s, %s, %d)"
      (string_of_ints coeffs) (string_of_ivars model vars) k in
 {
@@ -76,7 +76,7 @@ let check_element model =
     C.check =
       (fun cl ->
         C_impl.check_element
-          (C_impl.Elem (C_impl.nat_of_int x, C_impl.nat_of_int i, ys))
+          (C_impl.Elem (x, i, ys))
           (impl_clause_of_clause cl))
   }
 
@@ -86,7 +86,7 @@ let make_cumul xs durations resources lim =
     | (y :: yt) ->
         { C_impl.duration = C_impl.nat_of_int (List.hd ds) ;
           C_impl.resource = C_impl.nat_of_int (List.hd rs) ;
-          C_impl.svar = C_impl.nat_of_int y
+          C_impl.svar = y
         } :: (tasks yt (List.tl ds) (List.tl rs))
   in {
     C_impl.tasks = tasks xs durations resources ;

@@ -4,24 +4,26 @@ open Genlex
 
 type 'a spec = (token S.t -> 'a)
 
-let keywords = ["(*";"*)";"(";")";";";",";":=";"|-";"<=";"<";"=";"-";"~";"[";"]"]
+let keywords = ["(";")";";";",";":=";"|-";">=";"<=";"<";"=";"-";"~";"[";"]"]
 
-let rec drop_comments stream =
-  let rec kill = parser
-    | [< 'Kwd "*)" >] -> ()
-    | [< 'Kwd "(*" ; _ = kill ; _ = kill >] -> ()
-    | [< 'h ; _ = kill >] -> ()
-  and aux = parser
-    | [< 'Kwd "(*" ; _ = kill ; t = aux >] -> [< t >]
-    | [< 'h ; t = aux >] -> [< 'h ; t >]
-    | [< >] -> [< >]
-  in aux stream
-
+(* )
 let lexer stream = 
   let rec aux = parser
     | [< 'h; t=aux >] -> [< 'h; t >]
     | [< >] -> [< >] in
-    drop_comments (aux (make_lexer keywords stream))
+    (* drop_comments (aux (make_lexer keywords stream)) *)
+    aux (make_lexer keywords stream)
+( *)
+let lexer stream =
+  (*
+  let rec aux t = parser
+    | [< 'h; tl = aux (h :: t) >] -> tl
+    | [< >] -> List.rev t
+  in
+  Stream.of_list (aux [] (make_lexer keywords stream))
+  *)
+  make_lexer keywords stream
+(*  *)
 
 let ident = parser
   | [< 'Ident s >] -> s

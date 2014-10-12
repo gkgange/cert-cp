@@ -10,8 +10,9 @@ Require element.
 
 Set Extraction Optimize.
 Extraction "checker_impl.ml"
-  prim.check_inf prim.CheckClause prim.check_clause
-  cumulative.check_cumul reif.check_reif
-  linear.CheckLinear linear.check_lincon
+  prim.check_inf prim.check_clause
+  cumulative.check_cumul
+  reif.check_reif
+  linear.check_lincon
   element.check_element
   nat_of_int int_of_nat.
