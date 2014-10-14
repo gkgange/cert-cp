@@ -15,6 +15,8 @@ let parse_vprop model =
   | [< 'GL.Kwd "!=" ; 'GL.Int k >] -> MT.Neg (MT.IEq (ivar, k))
   in parser
   | [< 'GL.Ident x ; prop = aux (M.get_ivar model x) >] -> prop
+  | [< 'GL.Int k1 ; 'GL.Kwd "=" ; 'GL.Int k2 >] ->
+      if k1 = k2 then MT.Pos MT.CTrue else MT.Neg MT.CTrue
 
 let parse_lit model = parser
   | [< 'GL.Kwd "~" ; 'GL.Ident id >] ->

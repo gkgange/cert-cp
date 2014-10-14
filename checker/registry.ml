@@ -19,7 +19,7 @@ let null_checker model =
       drop_args tokens;
       {
         C.repr = "null-checker" ;
-        C.check = (fun cl -> false)
+        C.check = (fun _ _ -> false)
       }
     end
 

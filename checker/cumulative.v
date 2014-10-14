@@ -362,6 +362,169 @@ Proof.
     omega.
 Qed.
 
+(* ~cl -> task t covers time. *)
+Definition negcl_compulsory (t : task) (time : Z) (cl : clause) :=
+  match db_from_negclause t.(svar) cl with
+  | (Unbounded, Unbounded) => False
+  | (Unbounded, Bounded _) => False
+  | (Bounded _, Unbounded) => False
+  | (Bounded lb, Bounded ub) =>
+    Zlt time (lb + (Z_of_nat t.(duration))) /\ Zle ub time
+  end.
+
+(* ~cl -> task t covers time. *)
+Definition negcl_compulsoryb (t : task) (time : Z) (cl : clause) :=
+  match db_from_negclause t.(svar) cl with
+  | (Unbounded, Unbounded) => false
+  | (Unbounded, Bounded _) => false
+  | (Bounded _, Unbounded) => false
+  | (Bounded lb, Bounded ub) =>
+    Z_ltb time (lb + (Z_of_nat t.(duration))) && Z_leb ub time
+  end.
+
+Theorem negcl_compulsoryb_true_iff : forall (t : task) (time : Z) (cl : clause),
+  negcl_compulsoryb t time cl = true <-> negcl_compulsory t time cl.
+Proof.
+  unfold negcl_compulsoryb, negcl_compulsory.
+  intros.
+  destruct db_from_negclause; destruct b, b0; simpl.
+    split.
+      intro; discriminate.
+      intro; tauto.
+    split.
+      intro; discriminate.
+      intro; tauto.
+    split.
+      intro; discriminate.
+      intro; tauto.
+    rewrite andb_true_iff.
+    rewrite Z_ltb_iff_lt; rewrite Z_leb_iff_le; tauto.
+Qed. 
+  
+Theorem negcl_compulsory_valid : forall (t : task) (time : Z) (cl : clause) (theta: asg),
+  negcl_compulsory t time cl /\ ~ eval_clause cl theta ->
+    Zle (eval_start t theta) time /\ Zlt time (eval_end t theta).
+Proof.
+  unfold negcl_compulsory; intros.
+  destruct H as [Hb Hcl].
+  assert (sat_dbound (db_from_negclause (svar t) cl) (eval_ivar t.(svar) theta)).
+  apply db_from_negclause_valid; exact Hcl.
+  unfold sat_dbound, sat_lb, sat_ub in H.
+  destruct db_from_negclause; simpl in *.
+  destruct b, b0; simpl in *.
+    tauto.
+    tauto.
+    tauto.
+    destruct Hb; unfold eval_start, eval_end; omega.
+Qed.
+
+Theorem negcl_compulsory_task_usage : forall (t : task) (time : Z) (cl : clause) (theta : asg),
+  negcl_compulsory t time cl /\ ~ eval_clause cl theta ->
+    task_at_time t time theta = t.(resource).
+Proof.
+  intros; destruct H as [Hb Hcl]; apply task_in_span.
+  unfold in_span. Hint Resolve negcl_compulsory_valid. eauto.
+Qed.
+  
+Fixpoint negcl_compulsory_usage' (ts : list task) (time : Z) (cl : clause) :=
+  match ts with
+  | nil => O
+  | cons t ts' =>
+    if negcl_compulsoryb t time cl then
+      plus t.(resource) (negcl_compulsory_usage' ts' time cl)
+    else
+      negcl_compulsory_usage' ts' time cl
+  end.
+
+Definition negcl_compulsory_usage (c : cumul) (time : Z) (cl : clause) :=
+  negcl_compulsory_usage' c.(tasks) time cl.
+Theorem negcl_compulsory_usage_bound :
+  forall (ts : list task) (time : Z) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta -> 
+      (negcl_compulsory_usage' ts time cl) <= (eval_usage ts time theta).
+Proof.
+  intros; induction ts.
+    unfold negcl_compulsory_usage', eval_usage; omega.
+    unfold negcl_compulsory_usage', eval_usage;
+      fold negcl_compulsory_usage'; fold eval_usage.
+    assert (negcl_compulsoryb a time cl = true <-> negcl_compulsory a time cl).
+      apply negcl_compulsoryb_true_iff.
+    destruct negcl_compulsoryb.
+      assert (negcl_compulsory a time cl). tauto.
+      apply plus_le_compat.
+        rewrite negcl_compulsory_task_usage with (cl := cl). clear H0; omega.
+        tauto.
+      exact IHts.
+      rewrite plus_comm; apply le_plus_trans; exact IHts.
+Qed.
+  
+Definition check_cumul_moment (c : cumul) (cl : clause) (t : Z) :=
+  negb (Compare_dec.leb (negcl_compulsory_usage c t cl) c.(limit)).
+Theorem check_cumul_moment_valid : forall (c : cumul) (cl : clause) (t : Z) (theta : asg),
+  check_cumul_moment c cl t = true -> eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros c cl t theta.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta). tauto.
+  destruct H.
+    tauto.
+  unfold check_cumul_moment. rewrite negb_true_iff.
+  intros. apply leb_iff_conv in H0.
+  unfold eval_cumul in H1. 
+  assert (negcl_compulsory_usage c t cl <= (eval_usage (tasks c) t theta)).
+    apply negcl_compulsory_usage_bound; exact H.
+  assert (eval_usage (tasks c) t theta <= limit c).
+    apply H1.
+  assert False.
+    omega.
+  tauto.
+Qed.
+  
+(* Check the beginning of the (possibly empty) compulsory region for t. *)
+Definition check_cumul_tt_start (c : cumul) (cl : clause) (t : task) :=
+  match db_from_negclause t.(svar) cl with
+  | (Bounded lb, Bounded ub) =>
+      Z_ltb ub (lb + (Z_of_nat t.(duration))) && check_cumul_moment c cl ub
+  | _ => false
+  end.
+Theorem check_cumul_tt_start_valid : forall (c : cumul) (cl : clause) (t : task) (theta : asg),
+  check_cumul_tt_start c cl t = true -> eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  unfold check_cumul_tt_start. intros c cl t theta; generalize (db_from_negclause (svar t) cl).
+  intro p; destruct p. destruct b, b0.
+    intros; discriminate.
+    intros; discriminate.
+    intros; discriminate.
+    rewrite andb_true_iff.
+    intros; destruct H as [_ H].
+    apply check_cumul_moment_valid with (c := c) (t := z0).
+    exact H. exact H0.
+Qed.
+  
+
+Fixpoint check_cumul_timetable (c : cumul) (cl : clause) (ts : list task) :=
+  match ts with
+  | nil => false
+  | cons t ts' =>
+    check_cumul_tt_start c cl t || check_cumul_timetable c cl ts'
+  end.
+Theorem check_cumul_timetable_valid : forall (c : cumul) (cl : clause) (ts : list task) (theta : asg),
+  check_cumul_timetable c cl ts = true ->
+    eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros c cl ts theta; induction ts.
+    unfold check_cumul_timetable, eval_cumul. intros; discriminate.
+
+    unfold check_cumul_timetable; fold check_cumul_timetable.
+    rewrite orb_true_iff; intros. destruct H.
+    apply check_cumul_tt_start_valid with (c := c) (t := a).
+    exact H.
+    exact H0.
+
+    apply IHts.
+      exact H.
+      exact H0.
+Qed.
+
 (*
 Definition check_cumul (c : cumul) (cl : clause) : bool := false.
 *)
@@ -499,5 +662,28 @@ Proof.
   exact H. exact H0.
 Qed.
 
+Definition check_cumul_tt (c : cumul) (cl : clause) :=
+  (* check_cumul c cl || check_cumul_timetable c cl c.(tasks). *)
+  check_cumul_timetable c cl c.(tasks) || check_cumul c cl.
+Theorem check_cumul_tt_valid : forall (c : cumul) (cl : clause),
+  check_cumul_tt c cl = true -> implies (eval_cumul c) (eval_clause cl).
+Proof.
+  unfold check_cumul_tt; intros c cl; rewrite orb_true_iff.
+  intro. destruct H.
+
+    unfold implies. intros.
+    apply check_cumul_timetable_valid with (c := c) (ts := tasks c).
+    exact H. exact H0.
+
+    apply check_cumul_valid; exact H.
+Qed.
+  
+(*
 Definition CumulConstraint (C : Constraint) : Constraint :=
   mkConstraint (cumul) (eval_cumul) (check_cumul) (check_cumul_valid).
+  *)
+Definition CumulConstraint : Constraint :=
+  mkConstraint (cumul) (eval_cumul) (check_cumul_tt) (check_cumul_tt_valid).
+
+Definition check_cumul_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (BoundedConstraint CumulConstraint).(check) (bs, c) cl.

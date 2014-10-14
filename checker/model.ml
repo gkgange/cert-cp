@@ -113,3 +113,13 @@ let string_of_clause model cl =
   | (x :: xs) -> (string_of_lit model x) ^ ", " ^ (aux xs)
   in
   "[" ^ (aux cl) ^ "]"
+
+let get_bounds model =
+  let bnd = ref [] in
+  begin
+    A.iteri (fun i (_, xb) ->
+     match xb with
+     | None -> ()
+     | Some (lb, ub) -> bnd := ((i, lb), ub) :: !bnd) model.ivars;
+    !bnd
+  end

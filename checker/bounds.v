@@ -5,6 +5,7 @@ Require Import ZArith.
 Require Import Compare_dec.
 Require Import Omega.
 Require Import Decidable.
+Require Import List.
 (*
 Require Import Logic.
 Require Import Classical_Prop.
@@ -552,6 +553,8 @@ Proof.
 
   simpl. tauto.
 
+  simpl. tauto.
+
   unfold eval_lit in H; unfold eval_vprop in H; induction v.
 
   assert (ivar_eqb x i = true <-> x = i).
@@ -566,6 +569,8 @@ Proof.
 
   simpl. tauto.
  
+  simpl. tauto.
+
   simpl. tauto.
 Qed.
   
@@ -720,3 +725,81 @@ Proof.
       tauto.
       unfold sat_lb, sat_ub; intros; omega.
 Qed.
+
+Definition eval_bound (b : (ivar * Z * Z)) (theta : asg) :=
+  match b with
+  | (x, lb, ub) => Zle lb (eval_ivar x theta) /\ Zle (eval_ivar x theta) ub
+  end.
+Fixpoint eval_bounds (bs : list (ivar * Z * Z)) (theta : asg) :=
+  match bs with
+  | nil => True
+  | cons b bs' => (eval_bound b theta) /\ (eval_bounds bs' theta)
+  end.
+
+Definition negclause_of_bound (b : (ivar * Z * Z)) :=
+  match b with
+  | (x, lb, ub) => 
+    cons (Pos (ILeq x (lb - 1))) (cons (Neg (ILeq x ub)) nil)
+  end.
+Theorem negclause_of_bound_valid : forall (b : (ivar * Z * Z)) (theta : asg),
+  eval_bound b theta <-> ~ eval_clause (negclause_of_bound b) theta.
+Proof.
+  intros b theta.
+  unfold eval_bound, negclause_of_bound, eval_clause; destruct b; destruct p; simpl.
+  omega.
+Qed.
+
+Fixpoint negclause_of_bounds (bs : list (ivar * Z * Z)) :=
+  match bs with
+  | nil => nil
+  | cons b bs' => app (negclause_of_bound b) (negclause_of_bounds bs') 
+  end.
+Theorem negclause_of_bounds_valid : forall (bs : list (ivar * Z * Z)) (theta : asg),
+  eval_bounds bs theta <-> ~ eval_clause (negclause_of_bounds bs) theta.
+Proof.
+  intros.
+  induction bs.
+    unfold eval_bounds, negclause_of_bounds, eval_clause; tauto.
+
+    unfold negclause_of_bounds; fold negclause_of_bounds.
+    rewrite notapp_clause_iff.
+    unfold eval_bounds; fold eval_bounds.
+    unfold negclause_of_bound, eval_bound; unfold eval_clause at 1.
+    destruct a; destruct p; simpl.
+    rewrite <- IHbs.
+    split.
+      intros.
+      destruct H.
+      split.
+        clear IHbs H0; omega.
+        exact H0.
+      intros. destruct H.
+      split.
+        clear IHbs H0; omega.
+        exact H0.
+Qed.
+     
+Definition bounded (C : Constraint) : Type :=
+  ((list (ivar*Z*Z)) * C.(T))%type.
+Definition bounded_eval (C : Constraint) (x : bounded C) (theta : asg) :=
+  eval_bounds (fst x) theta /\ C.(eval) (snd x) theta.
+Definition bounded_check (C : Constraint) (x : bounded C) (cl : clause) :=
+  C.(check) (snd x) (negclause_of_bounds (fst x) ++ cl).
+Theorem bounded_check_valid : forall (C : Constraint) (x : bounded C) (cl : clause),
+  bounded_check C x cl = true -> implies (bounded_eval C x) (eval_clause cl).
+Proof.
+  unfold implies, bounded_eval; intros.
+    destruct H0.
+    apply C.(check_valid) in H.
+    unfold implies in H.
+    assert (eval_clause (negclause_of_bounds (fst x) ++ cl) theta).
+      apply H. exact H1.
+    apply app_clause_or in H2.
+    rewrite negclause_of_bounds_valid in H0.
+    destruct H2.
+      tauto.
+      exact H2.
+Qed.
+
+Definition BoundedConstraint (C : Constraint) : Constraint :=
+  mkConstraint (bounded C) (bounded_eval C) (bounded_check C) (bounded_check_valid C).

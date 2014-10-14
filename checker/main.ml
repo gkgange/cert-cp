@@ -25,12 +25,15 @@ let log info args =
 
 (* Find the checker corresponding to a specified
  * constraint name, call it on the given clause. *)
-let check_inference model ident clause =
+let check_inference model bounds ident clause =
   try
     let checker = M.get_checker model ident in
-    let okay = checker.C.check clause in
+    let okay = checker.C.check bounds clause in
     if !COption.verbosity > 0 && not okay then
       log_failure model checker clause ;
+    if !COption.verbosity > 1 && okay then
+      Format.fprintf fmt "Inference okay: %s |- %s.@."
+        (checker.C.repr) (M.string_of_clause model clause) ;
     okay
   with Not_found ->
     begin
@@ -40,11 +43,13 @@ let check_inference model ident clause =
 
 (* Check a set of inferences; terminates after the
  * first failure. *)
-let check_inferences model infs =
-  L.fold_left (fun b (id, cl) -> b && check_inference model id cl) true infs
+(*
+let check_inferences model bounds infs =
+  L.fold_left (fun b (id, cl) -> b && check_inference model bounds id cl) true infs
+  *)
 
-let check_inferences model infs =
-  L.fold_left (fun b (id, cl) -> check_inference model id cl && b) true infs
+let check_inferences model bounds infs =
+  L.fold_left (fun b (id, cl) -> check_inference model bounds id cl && b) true infs
   
 (* Parsing code for definitions. *)
 let parse_defn spec = parser
@@ -161,7 +166,7 @@ let main () =
   let tokens = Spec.lexer (Stream.of_channel input) in 
   let model = parse_model tokens in
   let infs = parse_inferences model tokens in
-  let okay = check_inferences model infs in
+  let okay = check_inferences model (M.get_bounds model) infs in
   if okay then
     Format.fprintf fmt "OKAY@."
   else

@@ -130,7 +130,7 @@ Proof.
   rewrite Hxi; omega.
   tauto.
 
-  unfold dom_unconstrained; simpl; tauto.
+  unfold dom_unconstrained; simpl; tauto. simpl; tauto.
 
   unfold dom_ge, dom_unconstrained, dom_neq;
   destruct v.
@@ -153,7 +153,7 @@ Proof.
       tauto.
       omega.
     tauto.
-  simpl; tauto.
+  simpl; tauto. simpl; tauto.
 Qed.
 
 Fixpoint dom_from_negclause (x : ivar) (cl : clause) :=

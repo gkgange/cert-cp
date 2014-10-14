@@ -8,6 +8,7 @@ Require Import Logic.
 Require Import Classical_Prop.
 Require Import ClassicalFacts.
 Require Import Decidable.
+Require Import List.
 
 Open Scope Z_scope.
 
@@ -91,7 +92,8 @@ Definition eval_bvar (bv : bvar) (theta : asg) := (snd theta) bv.
 Inductive vprop : Type :=
   | ILeq : ivar -> Z -> vprop
   | IEq : ivar -> Z -> vprop
-  | BTrue : bvar -> vprop.
+  | BTrue : bvar -> vprop
+  | CTrue : vprop.
 
 (* A literal is either a positive
  * or negative proposition. *)
@@ -106,6 +108,7 @@ Definition eval_vprop
   | ILeq iv k => (eval_ivar iv theta) <= k
   | IEq iv k => (eval_ivar iv theta) = k
   | BTrue bv => (eval_bvar bv theta) = true
+  | CTrue => True
   end.
 
 (* Evaluate a literal under an assignment. *)
@@ -122,7 +125,7 @@ Proof.
   intros. unfold decidable.
   unfold eval_lit. destruct l.
   unfold eval_vprop. destruct v.
-  omega. omega. tauto. tauto.
+  omega. omega. tauto. tauto. tauto.
 Qed.
 
 Definition neglit (l : lit) : lit :=
@@ -141,8 +144,9 @@ Proof.
   omega.
   omega.
   tauto.
+  tauto.
   unfold eval_lit; unfold eval_vprop; destruct v.
-  omega. omega. tauto.
+  omega. omega. tauto. tauto.
 Qed.
 
 Definition clause : Type := list lit.
@@ -167,6 +171,43 @@ Proof.
   tauto.
 Qed.
 
+Theorem app_clause_or : forall (cx cy : clause) (theta : asg),
+  eval_clause (cx ++ cy) theta <-> eval_clause cx theta \/ eval_clause cy theta.
+Proof.
+  intros; induction cx.
+    unfold eval_clause; simpl; fold eval_clause. tauto.
+
+    unfold eval_clause; simpl; fold eval_clause. rewrite IHcx. tauto.
+Qed.
+
+Theorem notapp_clause_iff : forall (cx cy : clause) (theta : asg),
+  ~ eval_clause (cx ++ cy) theta <-> ~ eval_clause cx theta /\ ~ eval_clause cy theta.
+Proof.
+  intros; split.
+    intros.
+      split.
+        assert (~eval_clause cx theta \/ eval_clause cx theta).
+          tauto.
+        destruct H0.
+          exact H0.
+          apply or_introl with (B := eval_clause cy theta) in H0.
+          apply app_clause_or in H0. tauto.
+
+        assert (~eval_clause cy theta \/ eval_clause cy theta).
+          tauto.
+        destruct H0.
+          exact H0.
+          apply or_intror with (A := eval_clause cx theta) in H0.
+          apply app_clause_or in H0. tauto.
+
+        intros; destruct H.
+        assert (~ eval_clause (cx ++ cy) theta \/ eval_clause (cx ++ cy) theta).
+          tauto.
+        destruct H1.
+          exact H1.
+          apply app_clause_or in H1. tauto.
+Qed.
+  
 Fixpoint neg_clause
   (ls : clause) : prod :=
   match ls with
@@ -228,6 +269,11 @@ Definition vprop_leqb (u : vprop) (v : vprop) :=
     | BTrue y => bvar_eqb x y
     | _ => false
     end
+  | CTrue =>
+    match v with
+    | CTrue => true
+    | _ => false
+    end
   end.
 
 Theorem vprop_leqb_valid : forall (u v : vprop),
@@ -241,7 +287,7 @@ Proof.
   assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
   assert (z <= z0). apply Z_leb_iff_le; exact H2.
   rewrite <- H3. omega.
-  discriminate. discriminate.
+  discriminate. discriminate. tauto.
   assert (ivar_eqb i i0 = true /\ Z_leb z z0 = true).
   apply andb_true_iff; exact H. destruct H1.
   assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
@@ -252,9 +298,10 @@ Proof.
   assert (i = i0). apply ivar_eqb_iff_eq; exact H1.
   assert (z = z0). apply Z_eqb_iff_eq; exact H2.
   rewrite <- H3; rewrite <- H4; exact H0.
-  discriminate. discriminate. discriminate.
+  discriminate. discriminate. discriminate. discriminate.
   assert (b = b0). apply ivar_eqb_iff_eq; exact H.
-  rewrite <- H1; exact H0.
+  rewrite <- H1; exact H0. tauto.
+  discriminate. discriminate. discriminate. tauto.
 Qed.
 
 (* FIXME: extend this to handle x = k -> x > (k-1), etc. *)

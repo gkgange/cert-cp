@@ -53,13 +53,14 @@ Definition check_element elem cl :=
   end.
 
 Theorem check_element_valid :
-  forall (elem : element) (cl : clause) (theta : asg),
+  forall (elem : element) (cl : clause),
     check_element elem cl = true ->
-      eval_element elem theta -> eval_clause cl theta.
+      implies (eval_element elem) (eval_clause cl).
 Proof.
+  unfold implies.
   unfold eval_element, check_element. destruct elem.
   generalize (augment Z l).
-  intros l0 cl theta; induction l0.
+  intros l0 cl; induction l0.
   unfold eval_element_rec; tauto.
 
   unfold check_element_rec, eval_element_rec;
@@ -91,6 +92,10 @@ Proof.
         exact H.
 Qed.
 
+Definition ElemConstraint : Constraint :=
+  mkConstraint (element) (eval_element) (check_element) (check_element_valid).
+Definition check_element_bnd (x : element) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (BoundedConstraint ElemConstraint).(check) (bs, x) cl.
 (*
 
 Theorem check_element_valid :

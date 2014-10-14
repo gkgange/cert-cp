@@ -14,6 +14,7 @@ let impl_vprop_of_vprop = function
 | MT.ILe (x, k) -> C_impl.ILeq (x, k)
 | MT.IEq (x, k) -> C_impl.IEq (x, k)
 | MT.BTrue x -> C_impl.BTrue (x)
+| MT.CTrue -> C_impl.CTrue
 
 let impl_lit_of_lit = function
 | MT.Pos vp -> C_impl.Pos (impl_vprop_of_vprop vp)
@@ -46,8 +47,10 @@ let check_linear_le model =
 {
   C.repr = repr ;
   C.check =
-    (fun cl ->
-      C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl))
+    (fun  bnd cl ->
+      C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl)
+      || C_impl.check_linear_bnd (linterms, k) bnd (impl_clause_of_clause cl)
+    )
 }
 
 let check_clause model =
@@ -57,7 +60,7 @@ let check_clause model =
       (M.string_of_clause model cl0) in
     {
       C.repr = repr;
-      C.check = (fun cl ->
+      C.check = (fun _ cl ->
          C_impl.check_clause
            (impl_clause_of_clause cl0)
            (impl_clause_of_clause cl))
@@ -74,7 +77,7 @@ let check_element model =
   {
     C.repr = repr ;
     C.check =
-      (fun cl ->
+      (fun _ cl ->
         C_impl.check_element
           (C_impl.Elem (x, i, ys))
           (impl_clause_of_clause cl))
@@ -108,8 +111,17 @@ let check_cumul model =
       (string_of_ints resources) lim in
     {
       C.repr = repr ;
-      C.check = (fun cl ->
-        C_impl.check_cumul cumul (impl_clause_of_clause cl))
+      C.check = (fun bnd cl ->
+        let icl = impl_clause_of_clause cl in
+        (* C_impl.check_cumul cumul (impl_clause_of_clause cl) *)
+        (* C_impl.check C_impl.cumulConstraint (Obj.magic cumul)
+          (impl_clause_of_clause cl) *)
+        (* C_impl.check_cumul_bnd cumul bnd (impl_clause_of_clause cl) *)
+        (*
+        C_impl.check_cumul cumul icl ||
+        *)
+        C_impl.check_cumul_bnd cumul bnd icl
+      )
     }
 let register () =
   R.add "linear_le" check_linear_le ;

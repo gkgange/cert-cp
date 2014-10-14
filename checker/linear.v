@@ -90,5 +90,7 @@ Proof.
   exact H.
 Qed.
 
-Definition CheckLinear := mkConstraint lin_leq eval_lincon check_lincon.
+Definition CheckLinear := mkConstraint lin_leq eval_lincon check_lincon check_lincon_valid.
+Definition check_linear_bnd (x : lin_leq) (bs : list (ivar*Z*Z)) (cl : clause) :=
+  (BoundedConstraint CheckLinear).(check) (bs, x) cl.
 (* Check CheckLinear. *)

@@ -4,7 +4,7 @@ type checker = {
   repr: string ;
   
   (* The actual check *)
-  check: MTypes.clause -> bool
+  check: MTypes.bounds -> MTypes.clause -> bool
 } 
 
 type t = checker
