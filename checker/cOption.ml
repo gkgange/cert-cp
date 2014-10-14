@@ -4,6 +4,8 @@ let modules = ref []
 
 let verbosity = ref 0
 
+let stream = ref false
+
 (* --------------------------------------------- *)
 (*       Specification list for options          *)
 (* --------------------------------------------- *)
@@ -18,5 +20,9 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
        "-load",
        Arg.String(fun m -> modules := m :: !modules),
        "<string> : additional checker module to load."
-     );
+     ) ;
+     ("-stream",
+      Arg.Unit(fun () -> stream := true),
+      " : avoid storing inferences; check them immediately on reading."
+     ) ;
     ]

@@ -132,14 +132,14 @@ let parse_inferences model =
   in aux
   *)
 
+let parse_inf model = parser
+  | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = P.parse_clause model >] -> (id, cl)
+
 let parse_inferences model tokens =
-  let parse_inf = parser
-    | [< 'GL.Ident id ; 'GL.Kwd "|-" ; cl = P.parse_clause model >] -> (id, cl)
-  in
   let rec aux tl tokens =
     match Stream.peek tokens with
     | None -> List.rev tl
-    | _ -> aux (parse_inf tokens :: tl) tokens
+    | _ -> aux ((parse_inf model tokens) :: tl) tokens
   in aux [] tokens
 
 (*
@@ -147,6 +147,16 @@ let parse_inferences = parser
   | [< 'Ident id ; 'Kwd "|-" ; cl = (S.listof parse_lit) >] ->
       (id, M.clause_of_model)
 *)
+
+let rec parse_and_check_inferences model bounds tokens =
+  match Stream.peek tokens with
+  | None -> true
+  | _ -> 
+     let (id, cl) = parse_inf model tokens in
+     if check_inference model bounds id cl then
+       parse_and_check_inferences model bounds tokens
+     else
+       false
 
 let main () =
   (* Parse the command-line arguments *)
@@ -165,8 +175,13 @@ let main () =
   List.iter (fun m -> DL.loadfile_private m) !COption.modules ;
   let tokens = Spec.lexer (Stream.of_channel input) in 
   let model = parse_model tokens in
-  let infs = parse_inferences model tokens in
-  let okay = check_inferences model (M.get_bounds model) infs in
+  let okay =
+    if !COption.stream then
+      parse_and_check_inferences model (M.get_bounds model) tokens
+    else
+      let infs = parse_inferences model tokens in
+      check_inferences model (M.get_bounds model) infs
+    in
   if okay then
     Format.fprintf fmt "OKAY@."
   else
