@@ -14,15 +14,15 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
     [(
       "-verbosity",
       Arg.Set_int(verbosity),
-      "<int> : verbosity level, from 0 to 2 (default:0)"
+      "<int> verbosity level, from 0 to 2 (default:0)"
      ) ;
      (
        "-load",
        Arg.String(fun m -> modules := m :: !modules),
-       "<string> : additional checker module to load."
+       "<string> additional checker module to load."
      ) ;
      ("-stream",
       Arg.Unit(fun () -> stream := true),
-      " : avoid storing inferences; check them immediately on reading."
+      " avoid storing inferences; check them immediately on reading."
      ) ;
     ]

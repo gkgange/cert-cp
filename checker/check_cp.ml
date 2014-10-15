@@ -72,11 +72,14 @@ let term_defn model id =
         | [< prop = P.parse_vprop model >] ->
             M.add_lit model id prop
       end
-  | _ -> let pcon = (Registry.find key) model in
-    begin parser
-      | [< 'GL.Kwd "(" ; checker = pcon ; 'GL.Kwd ")" >] ->
-          M.add_checker model id checker
-    end in
+  | _ ->
+    let pcon = (Registry.find key) model in
+    fun tokens ->
+      (* Indirection is to support (eventually) providing
+       * multiple checkers for a constraint. *)
+      let args = P.grab_args tokens in
+      M.add_checker model id (pcon (Stream.of_list args))
+    in
   parser
     | [< 'GL.Ident key ; v = aux key >] -> v
 

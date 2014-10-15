@@ -71,7 +71,7 @@ COQDOCLIBS:=
 
 OCAMLFIND = ocamlfind
 
-ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB) -I coq
+ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB)
 OPT:=
 COQFLAGS:=-q $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
 ifdef CAMLBIN
@@ -102,26 +102,24 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 #                                 #
 ###################################
 
-#VFILES:=
-#VOFILES:=$(VFILES:.v=.vo)
-#VOFILES0:=$(filter-out ,$(VOFILES))
-#GLOBFILES:=$(VFILES:.v=.glob)
-#VIFILES:=$(VFILES:.v=.vi)
-#GFILES:=$(VFILES:.v=.g)
-#HTMLFILES:=$(VFILES:.v=.html)
-#GHTMLFILES:=$(VFILES:.v=.g.html)
-MLFILES:=\
-  cOption.ml\
-  mTypes.ml\
-  spec.ml\
-  checker.ml\
-  model.ml\
-  registry.ml\
-  parse.ml\
-  checker_impl.ml\
-  builtins.ml
-
+VFILES:=bounds.v\
+  cumulative.v\
+  domain.v\
+  element.v\
+  linear.v\
+  prim.v\
+  reif.v\
+  zset.v\
+  checker_impl.v
+VOFILES:=$(VFILES:.v=.vo)
+VOFILES0:=$(filter-out ,$(VOFILES))
+GLOBFILES:=$(VFILES:.v=.glob)
+VIFILES:=$(VFILES:.v=.vi)
+GFILES:=$(VFILES:.v=.g)
+HTMLFILES:=$(VFILES:.v=.html)
+GHTMLFILES:=$(VFILES:.v=.g.html)
 AUTO_MLFILES:=checker_impl.ml
+MLFILES:=#$(AUTO_MLFILES)
 
 CMOFILES:=$(MLFILES:.ml=.cmo)
 CMOFILES0:=$(filter-out ,$(CMOFILES))
@@ -132,32 +130,32 @@ CMXSFILES:=$(MLFILES:.ml=.cmxs)
 CMXSFILES0:=$(filter-out ,$(CMXSFILES))
 OFILES:=$(MLFILES:.ml=.o)
 
-TARGETS:=check_cp
-# all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
-all: $(TARGETS)
+TARGETS:=
+all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 spec: $(VIFILES)
 
-#gallina: $(GFILES)
-#
-#html: $(GLOBFILES) $(VFILES)
-#	- mkdir -p html
-#	$(COQDOC) -toc -html $(COQDOCLIBS) -d html $(VFILES)
-#
-#gallinahtml: $(GLOBFILES) $(VFILES)
-#	- mkdir -p html
-#	$(COQDOC) -toc -html -g $(COQDOCLIBS) -d html $(VFILES)
-#
-#all.ps: $(VFILES)
-#	$(COQDOC) -toc -ps $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
-#
-#all-gal.ps: $(VFILES)
-#	$(COQDOC) -toc -ps -g $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
-#
-#all.pdf: $(VFILES)
-#	$(COQDOC) -toc -pdf $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
-#
-#all-gal.pdf: $(VFILES)
-#	$(COQDOC) -toc -pdf -g $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
+gallina: $(GFILES)
+
+html: $(GLOBFILES) $(VFILES)
+	- mkdir -p html
+	$(COQDOC) -toc -html $(COQDOCLIBS) -d html $(VFILES)
+
+gallinahtml: $(GLOBFILES) $(VFILES)
+	- mkdir -p html
+	$(COQDOC) -toc -html -g $(COQDOCLIBS) -d html $(VFILES)
+
+all.ps: $(VFILES)
+	$(COQDOC) -toc -ps $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
+
+all-gal.ps: $(VFILES)
+	$(COQDOC) -toc -ps -g $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
+
+all.pdf: $(VFILES)
+	$(COQDOC) -toc -pdf $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
+
+all-gal.pdf: $(VFILES)
+	$(COQDOC) -toc -pdf -g $(COQDOCLIBS) -o $@ `$(COQDEP) -sort -suffix .v $(VFILES)`
+
 
 
 ####################
@@ -166,15 +164,8 @@ spec: $(VIFILES)
 #                  #
 ####################
 
-.PHONY: all opt byte archclean clean install depend html coqlib
+.PHONY: all opt byte archclean clean install depend html
 
-
-$(TARGETS) : % : $(CMXFILES) %.cmx
-	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $@.mli $^ $(LINKPKG_FLAGS)
-
-#check-cp.byte : $(CMOFILES)
-#	$(CAMLLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
-  
 %.cmi: %.mli
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PKG_FLAGS) $<
 
@@ -199,29 +190,29 @@ $(TARGETS) : % : $(CMXFILES) %.cmx
 %.ml.d: %.ml
 	$(CAMLBIN)ocamldep -slash $(OCAMLLIBS) $(PP) "$<" > "$@"
 
-#%.vo %.glob: %.v
-#	$(COQC) $(COQDEBUG) $(COQFLAGS) $*
-#
-#%.vi: %.v
-#	$(COQC) -i $(COQDEBUG) $(COQFLAGS) $*
-#
-#%.g: %.v
-#	$(GALLINA) $<
-#
-#%.tex: %.v
-#	$(COQDOC) -latex $< -o $@
-#
-#%.html: %.v %.glob
-#	$(COQDOC) -html $< -o $@
-#
-#%.g.tex: %.v
-#	$(COQDOC) -latex -g $< -o $@
-#
-#%.g.html: %.v %.glob
-#	$(COQDOC) -html -g $< -o $@
-#
-#%.v.d: %.v
-#	$(COQDEP) -slash $(COQLIBS) "$<" > "$@" || ( RV=$$?; rm -f "$@"; exit $${RV} )
+%.vo %.glob: %.v
+	$(COQC) $(COQDEBUG) $(COQFLAGS) $*
+
+%.vi: %.v
+	$(COQC) -i $(COQDEBUG) $(COQFLAGS) $*
+
+%.g: %.v
+	$(GALLINA) $<
+
+%.tex: %.v
+	$(COQDOC) -latex $< -o $@
+
+%.html: %.v %.glob
+	$(COQDOC) -html $< -o $@
+
+%.g.tex: %.v
+	$(COQDOC) -latex -g $< -o $@
+
+%.g.html: %.v %.glob
+	$(COQDOC) -html -g $< -o $@
+
+%.v.d: %.v
+	$(COQDEP) -slash $(COQLIBS) "$<" > "$@" || ( RV=$$?; rm -f "$@"; exit $${RV} )
 
 byte:
 	$(MAKE) all "OPT:=-byte"
@@ -229,39 +220,30 @@ byte:
 opt:
 	$(MAKE) all "OPT:=-opt"
 
-#install:
-#	mkdir -p $(COQLIB)/user-contrib
-#	(for i in $(VOFILES0); do \
-#	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
-#	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
-#	 done)
-#	(for i in $(CMOFILES0); do \
-#	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
-#	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
-#	 done)
-#	(for i in $(CMIFILES0); do \
-#	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
-#	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
-#	 done)
-#	(for i in $(CMXSFILES0); do \
-#	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
-#	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
-#	 done)
-
-checker_impl.ml checker_impl.mli : coqlib
-	cp coq/checker_impl.ml checker_impl.ml
-	cp coq/checker_impl.mli checker_impl.mli
-
-coqlib :
-	cd coq && $(MAKE)
+install:
+	mkdir -p $(COQLIB)/user-contrib
+	(for i in $(VOFILES0); do \
+	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
+	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
+	 done)
+	(for i in $(CMOFILES0); do \
+	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
+	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
+	 done)
+	(for i in $(CMIFILES0); do \
+	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
+	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
+	 done)
+	(for i in $(CMXSFILES0); do \
+	 install -d `dirname $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i`; \
+	 install $$i $(COQLIB)/user-contrib/$(INSTALLDEFAULTROOT)/$$i; \
+	 done)
 
 clean:
-	cd coq && $(MAKE) clean
 	rm -f $(CMOFILES) $(CMIFILES) $(CMXFILES) $(CMXSFILES) $(OFILES) $(VOFILES) $(VIFILES) $(GFILES) $(MLFILES:.ml=.cmo) $(MLFILES:.ml=.cmx) *~
 	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(HTMLFILES) $(GHTMLFILES) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) $(VFILES:.v=.v.d)
 	rm -f $(CMOFILES) $(MLFILES:.ml=.cmi) $(MLFILES:.ml=.ml.d) $(MLFILES:.ml=.cmx) $(MLFILES:.ml=.o)
-	rm -f $(TARGETS:%=%.cmo) $(TARGETS:%=%.cmx) $(TARGETS:%=%.o)
-	rm -f $(AUTO_MLFILES) $(AUTO_MLFILES:%=%.mli)
+	rm -f $(AUTO_MLFILES) $(AUTO_MLFILES:.ml=.mli)
 	- rm -rf html
 
 archclean:
