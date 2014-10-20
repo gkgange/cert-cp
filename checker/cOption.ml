@@ -1,6 +1,7 @@
 (* Option handling *)
 let infile = ref None
 let modules = ref []
+let tracefile = ref None
 
 let verbosity = ref 0
 
@@ -25,4 +26,8 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
       Arg.Unit(fun () -> stream := true),
       " avoid storing inferences; check them immediately on reading."
      ) ;
+     ("-trace",
+      Arg.String(fun f -> tracefile := Some f),
+      " resolution proof trace to attempt to justify."
+     );
     ]

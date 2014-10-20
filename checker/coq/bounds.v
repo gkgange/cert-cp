@@ -99,6 +99,18 @@ Proof.
   omega.
 Qed.
 
+Definition unsat_db (db : dbound) :=
+  forall (k : Z), ~ sat_dbound db k.
+
+Definition unsatb_db (db : dbound) :=
+  match (fst db) with
+  | Unbounded => false
+  | Bounded k =>
+      match (snd db) with
+      | Unbounded => false
+      | Bounded k' => Z_ltb k' k
+      end
+  end.
 Theorem Zle_satub_trans : forall (b : bound) (k k' : Z),
   Zle k k' -> sat_ub b k' -> sat_ub b k.
 Proof.
@@ -167,6 +179,63 @@ Proof.
   intro.
   apply not_true_is_false.
   rewrite satb_dbound_iff_db. exact H.
+Qed.
+
+Theorem unsatb_db_true_iff : forall (db : dbound),
+  unsatb_db db = true <-> unsat_db db.
+Proof.
+  intro; destruct db; simpl.
+  unfold unsat_db.
+  split.
+    intros.
+    rewrite <- satb_db_false_iff_notdb.
+    unfold unsatb_db in H; unfold satb_dbound, satb_lb, satb_ub.
+    destruct b, b0.
+    simpl; intros; discriminate.
+    simpl; intros; discriminate.
+    simpl; intros; discriminate.
+
+    simpl; intros. simpl in H.
+    rewrite andb_false_iff;
+    rewrite Z_ltb_iff_lt in H;
+    rewrite Z_leb_false_iff_notle;
+    rewrite Z_leb_false_iff_notle;
+    omega.
+
+    intros.
+    unfold unsatb_db.
+    destruct b, b0.
+      assert (~ sat_dbound (Unbounded, Unbounded) 0) as Huz.
+        apply H.
+      apply satb_db_false_iff_notdb in Huz.
+        discriminate.
+
+      assert (~ sat_dbound (Unbounded, Bounded z) z) as Huz.
+        apply H.
+      apply satb_db_false_iff_notdb in Huz.
+      unfold satb_dbound, satb_lb, satb_ub in Huz; simpl in Huz.
+      apply Z_leb_false_iff_notle in Huz.
+      assert False. omega. tauto.
+      
+      assert (~ sat_dbound (Bounded z, Unbounded) z) as Huz.
+        apply H.
+      apply satb_db_false_iff_notdb in Huz.
+      unfold satb_dbound, satb_lb, satb_ub in Huz; simpl in Huz.
+      apply andb_false_iff in Huz.
+      destruct Huz as [Huz | Huz].
+        apply Z_leb_false_iff_notle in Huz.
+        assert False. omega. tauto.
+        discriminate.
+
+      assert (~ sat_dbound (Bounded z, Bounded z0) z) as Huz.
+        apply H.
+      rewrite <- satb_db_false_iff_notdb in Huz.
+      unfold satb_dbound, satb_lb, satb_ub in Huz; simpl in Huz.
+      apply andb_false_iff in Huz.
+      simpl.
+      repeat (rewrite Z_leb_false_iff_notle in Huz).
+      rewrite Z_ltb_iff_lt.
+      omega.
 Qed.
 
 Definition eval_dbound (x : ivar) (db : dbound) (theta : asg) :=
@@ -803,3 +872,109 @@ Qed.
 
 Definition BoundedConstraint (C : Constraint) : Constraint :=
   mkConstraint (bounded C) (bounded_eval C) (bounded_check C) (bounded_check_valid C).
+
+Definition eval_tauto (tt : unit) (theta : asg) := True.
+
+Definition check_tauto_var (cl : clause) (v : ivar) :=
+  unsatb_db (db_from_negclause v cl).
+Theorem check_tauto_var_valid : forall (cl : clause) (v : ivar) (theta : asg),
+  check_tauto_var cl v = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_var.
+  intros cl v theta.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta) as Hcl.
+    tauto.
+  destruct Hcl as [Hcl | Hncl].
+    intros; assumption.
+  apply db_from_negclause_valid with (x := v) (cl := cl) in Hncl.
+  intros.
+  rewrite unsatb_db_true_iff in H.
+  unfold unsat_db in H.
+  assert (~ sat_dbound (db_from_negclause v cl) (eval_ivar v theta)) as Hnk.
+    apply H.
+  tauto.
+Qed.
+    
+Definition check_tauto_vprop (cl : clause) (vp : vprop) :=
+  match vp with
+  | ILeq x k => check_tauto_var cl x
+  | IEq x k => check_tauto_var cl x
+  | _ => false
+  end.
+Theorem check_tauto_vprop_valid : forall (cl : clause) (vp : vprop) (theta : asg),
+  check_tauto_vprop cl vp = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_vprop; intros; destruct vp.
+  apply check_tauto_var_valid with (v := i); assumption.
+  apply check_tauto_var_valid with (v := i); assumption.
+  discriminate.
+  discriminate.
+Qed.
+
+Definition check_tauto_lit (cl : clause) (l : lit) :=
+  match l with
+  | Pos vp =>
+    match vp with
+    | CTrue => true
+    | _ => check_tauto_vprop cl vp
+    end
+  | Neg vp => check_tauto_vprop cl vp
+  end.
+Theorem check_tauto_lit_valid : forall (cl : clause) (l : lit) (theta : asg),
+  (eval_lit l theta -> eval_clause cl theta) ->
+    check_tauto_lit cl l = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_lit; intros; destruct l. destruct v.
+
+  apply check_tauto_vprop_valid with (vp := (ILeq i z)) (theta := theta); assumption.
+  apply check_tauto_vprop_valid with (vp := (IEq i z)) (theta := theta); assumption.
+  apply check_tauto_vprop_valid with (vp := (BTrue b)) (theta := theta); assumption.
+  unfold eval_lit in H; unfold eval_vprop in H.
+  apply H; trivial.
+
+  apply check_tauto_vprop_valid with (vp := v); assumption.
+Qed.
+
+Fixpoint check_tauto_rec (cl : clause) (ls : list lit) :=
+  match ls with
+  | nil => false
+  | cons l ls' => check_tauto_lit cl l || check_tauto_rec cl ls'
+  end.
+
+Theorem check_tauto_rec_valid : forall (cl : clause) (ls : clause) (theta : asg),
+  (eval_clause ls theta -> eval_clause cl theta) ->
+    check_tauto_rec cl ls = true -> eval_tauto tt theta -> eval_clause cl theta.
+Proof.
+  unfold implies, eval_tauto.
+  intros cl ls theta; induction ls.
+    unfold check_tauto_rec; intros; discriminate.
+
+    unfold check_tauto_rec; fold check_tauto_rec.
+    rewrite orb_true_iff.
+    intros.
+    destruct H0 as [Ha | Hcl].
+    unfold eval_clause in H; fold eval_clause in H.
+      apply check_tauto_lit_valid with (theta := theta) in Ha.
+      assumption.
+
+      intro; apply H; left; assumption.
+      
+      unfold eval_clause in H; fold eval_clause in H.
+      tauto.
+Qed.
+
+Definition check_tauto (tt : unit) (cl : clause) := check_tauto_rec cl cl.
+Theorem check_tauto_valid : forall (tt : unit) (cl : clause),
+  check_tauto tt cl = true -> implies (eval_tauto tt) (eval_clause cl).
+Proof.
+  unfold check_tauto; intros.
+  unfold implies; intro theta.
+  assert (eval_clause cl theta -> eval_clause cl theta). tauto.
+  apply check_tauto_rec_valid with (cl := cl) (ls := cl); assumption.
+Qed.
+
+Definition Tauto : Constraint :=
+  mkConstraint (unit) (eval_tauto) (check_tauto) (check_tauto_valid). 
+
+Definition check_tauto_bnd (bnd : list (ivar*Z*Z)) (cl : clause) :=
+  (BoundedConstraint Tauto).(check) (bnd, tt) cl.

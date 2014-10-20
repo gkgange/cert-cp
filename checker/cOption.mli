@@ -1,5 +1,6 @@
 (** Options and command-line parsing **)
 val infile : string option ref
+val tracefile : string option ref
 val modules : string list ref
 val verbosity : int ref
 val stream : bool ref

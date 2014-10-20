@@ -71,7 +71,7 @@ COQDOCLIBS:=
 
 OCAMLFIND = ocamlfind
 
-ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB) -I coq
+ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB) -I coq # -w A
 OPT:=
 COQFLAGS:=-q $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
 ifdef CAMLBIN
@@ -119,7 +119,8 @@ MLFILES:=\
   registry.ml\
   parse.ml\
   checker_impl.ml\
-  builtins.ml
+  builtins.ml\
+  corresp.ml
 
 AUTO_MLFILES:=checker_impl.ml
 

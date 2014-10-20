@@ -25,3 +25,5 @@ val string_of_lit : t -> MTypes.lit -> string
 val string_of_clause : t -> MTypes.clause -> string
 
 val get_bounds : t -> MTypes.bounds
+
+val lits_iteri : (int -> MTypes.ident -> MTypes.lit -> unit) -> t -> unit

@@ -161,6 +161,14 @@ let rec parse_and_check_inferences model bounds tokens =
      else
        false
 
+let check_corresp model clauses =
+  match !COption.tracefile with
+  | None -> true
+  | Some tfile ->
+      let tchannel = open_in tfile in
+      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
+      Corresp.check model clauses ttoks
+
 let main () =
   (* Parse the command-line arguments *)
   Arg.parse
@@ -184,6 +192,7 @@ let main () =
     else
       let infs = parse_inferences model tokens in
       check_inferences model (M.get_bounds model) infs
+        && check_corresp model (L.map (fun (i, cl) -> cl) infs)
     in
   if okay then
     Format.fprintf fmt "OKAY@."

@@ -88,6 +88,8 @@ let get_lit (model : t) ident =
   with Not_found ->
     failwith (Format.sprintf "Error: symbol not found - %s." ident)
 
+let lits_iteri f model = A.iteri (fun i (id, lit) -> f i id lit) model.vprops
+
 let get_checker model ident =
   try
     let (kind, idx) = Hashtbl.find model.symbols ident in
@@ -101,6 +103,7 @@ let string_of_vprop model = function
 | MT.ILe (x, k) -> (ivar_name model x) ^ "<=" ^ (string_of_int k)
 | MT.IEq (x, k) -> (ivar_name model x) ^ "=" ^ (string_of_int k)
 | MT.BTrue x -> bvar_name model x
+| MT.CTrue -> "T"
 
 let string_of_lit model = function
 | MT.Pos vp -> string_of_vprop model vp

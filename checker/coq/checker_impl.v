@@ -11,6 +11,8 @@ Require element.
 Set Extraction Optimize.
 Extraction "checker_impl.ml"
   prim.check_inf prim.check_clause
+  bounds.check_tauto
+  bounds.check_tauto_bnd
   cumulative.check_cumul
   cumulative.check_cumul_tt
   cumulative.check_cumul_bnd

@@ -36,6 +36,10 @@ let string_of_list f ls =
 let string_of_ints = string_of_list string_of_int
 let string_of_ivars model = string_of_list (M.ivar_name model)
 
+(* Checker for a tautological clause. *)
+let tauto bnd cl =
+  C_impl.check_tauto_bnd bnd (impl_clause_of_clause cl)
+
 (* Build the linear checker. *)
 let check_linear_le model =
  fun tokens ->
