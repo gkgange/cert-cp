@@ -99,6 +99,9 @@ let get_checker model ident =
   with Not_found ->
     failwith (Format.sprintf "Error: symbol not found - %s." ident)
 
+let get_all_checkers model =
+  A.fold_left (fun cs (_, check) -> check :: cs) [] model.constraints
+
 let string_of_vprop model = function
 | MT.ILe (x, k) -> (ivar_name model x) ^ "<=" ^ (string_of_int k)
 | MT.IEq (x, k) -> (ivar_name model x) ^ "=" ^ (string_of_int k)

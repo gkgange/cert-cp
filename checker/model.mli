@@ -19,6 +19,7 @@ val bvar_name : t -> MTypes.bvar -> MTypes.ident
 val get_lit : t -> MTypes.ident -> MTypes.lit
 
 val get_checker : t -> MTypes.ident -> Checker.t
+val get_all_checkers : t -> Checker.t list
 
 val string_of_vprop : t -> MTypes.vprop -> string
 val string_of_lit : t -> MTypes.lit -> string

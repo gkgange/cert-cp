@@ -117,14 +117,8 @@ let check_cumul model =
       C.repr = repr ;
       C.check = (fun bnd cl ->
         let icl = impl_clause_of_clause cl in
-        (* C_impl.check_cumul cumul (impl_clause_of_clause cl) *)
-        (* C_impl.check C_impl.cumulConstraint (Obj.magic cumul)
-          (impl_clause_of_clause cl) *)
-        (* C_impl.check_cumul_bnd cumul bnd (impl_clause_of_clause cl) *)
-        (*
-        C_impl.check_cumul cumul icl ||
-        *)
-        C_impl.check_cumul_bnd cumul bnd icl
+        (* C_impl.check_cumul_bnd cumul bnd icl *)
+        C_impl.check_cumul_tt_bnd cumul bnd icl
       )
     }
 let register () =

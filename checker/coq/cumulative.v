@@ -651,20 +651,20 @@ Proof.
 Qed.
 
   
-Definition check_cumul (c : cumul) (cl : clause) :=
+Definition check_cumul_e (c : cumul) (cl : clause) :=
   check_cumul_rec c c.(tasks) cl.
 
-Theorem check_cumul_valid : forall (c : cumul) (cl : clause),
-  check_cumul c cl = true -> implies (eval_cumul c) (eval_clause cl).
+Theorem check_cumul_e_valid : forall (c : cumul) (cl : clause),
+  check_cumul_e c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  unfold implies, check_cumul. intros.
+  unfold implies, check_cumul_e. intros.
   apply check_cumul_rec_valid with (c := c) (tail := tasks c).
   exact H. exact H0.
 Qed.
 
 Definition check_cumul_tt (c : cumul) (cl : clause) :=
   (* check_cumul c cl || check_cumul_timetable c cl c.(tasks). *)
-  check_cumul_timetable c cl c.(tasks) || check_cumul c cl.
+  check_cumul_timetable c cl c.(tasks) || check_cumul_e c cl.
 Theorem check_cumul_tt_valid : forall (c : cumul) (cl : clause),
   check_cumul_tt c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
@@ -675,9 +675,18 @@ Proof.
     apply check_cumul_timetable_valid with (c := c) (ts := tasks c).
     exact H. exact H0.
 
-    apply check_cumul_valid; exact H.
+    apply check_cumul_e_valid; exact H.
 Qed.
   
+Definition check_cumul_ttonly (c : cumul) (cl : clause) :=
+  check_cumul_timetable c cl c.(tasks).
+Theorem check_cumul_ttonly_valid : forall (c : cumul) (cl : clause),
+  check_cumul_ttonly c cl = true -> implies (eval_cumul c) (eval_clause cl).
+Proof.
+  unfold check_cumul_ttonly, implies; intros.
+  apply check_cumul_timetable_valid with (c := c) (ts := tasks c).
+  assumption. assumption.
+Qed.
 (*
 Definition CumulConstraint (C : Constraint) : Constraint :=
   mkConstraint (cumul) (eval_cumul) (check_cumul) (check_cumul_valid).
@@ -687,3 +696,8 @@ Definition CumulConstraint : Constraint :=
 
 Definition check_cumul_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
   (BoundedConstraint CumulConstraint).(check) (bs, c) cl.
+
+Definition CumulTTConstraint : Constraint :=
+  mkConstraint (cumul) (eval_cumul) (check_cumul_ttonly) (check_cumul_ttonly_valid).
+Definition check_cumul_tt_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (BoundedConstraint CumulTTConstraint).(check) (bs, c) cl.

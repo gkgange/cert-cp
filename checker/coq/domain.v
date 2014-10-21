@@ -29,7 +29,7 @@ Proof.
   rewrite andb_true_iff.
   rewrite satb_dbound_iff_db.
   rewrite negb_true_iff.
-  rewrite <- memb_true_iff_mem.
+  rewrite <- memb_iff_mem.
   split.
     intro; destruct H as [Hs Hm].
     rewrite Hm.
@@ -79,7 +79,7 @@ Proof.
   unfold sat_dom, dom_meet; intros.
   destruct dx, dy; simpl.
   rewrite mem_union_iff.
-  repeat (rewrite <- memb_true_iff_mem).
+  repeat (rewrite <- memb_iff_mem).
   split.
     intros; destruct H as [Hd Hm].
     apply db_satmeet in Hd.
@@ -120,17 +120,18 @@ Proof.
     assert (x = i) as Hxi. apply Hxiff; trivial.
     clear Hxiff.
     rewrite Hxi.
-    tauto.
-    tauto.
+    split. tauto. apply notmem_empty.
+    split. tauto. apply notmem_empty.
 
   assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
   destruct ivar_eqb; simpl in *.
   assert (x = i) as Hxi. rewrite <- Hxiff; trivial.
   clear Hxiff.
-  rewrite Hxi; omega.
-  tauto.
+  rewrite Hxi; split. omega. apply notmem_empty.
+  split. tauto. apply notmem_empty.
 
-  unfold dom_unconstrained; simpl; tauto. simpl; tauto.
+  unfold dom_unconstrained; simpl; split. tauto. apply notmem_empty.
+  simpl; split. tauto. apply notmem_empty.
 
   unfold dom_ge, dom_unconstrained, dom_neq;
   destruct v.
@@ -142,8 +143,8 @@ Proof.
       split.
         omega.
         tauto.
-      tauto.
-    tauto.
+        apply notmem_empty.
+      split. tauto. apply notmem_empty.
     
   assert (ivar_eqb x i = true <-> x = i) as Hxiff. apply ivar_eqb_iff_eq.
   destruct ivar_eqb; simpl in *.
@@ -151,9 +152,14 @@ Proof.
     clear Hxiff.
     rewrite Hxi; split.
       tauto.
-      omega.
-    tauto.
-  simpl; tauto. simpl; tauto.
+      unfold mem, add. rewrite ZSets.add_spec.
+      assert (~ mem empty (eval_ivar i theta)). apply notmem_empty.
+      unfold mem in H0.
+      tauto.
+      split.
+        tauto. apply notmem_empty.
+      simpl; split. tauto. apply notmem_empty.
+      tauto.
 Qed.
 
 Fixpoint dom_from_negclause (x : ivar) (cl : clause) :=
@@ -190,7 +196,7 @@ Proof.
   intros.
   induction cl.
   unfold dom_from_negclause, dom_unconstrained;
-  unfold sat_dom, sat_dbound; simpl. tauto.
+  unfold sat_dom, sat_dbound; simpl. split. tauto. apply notmem_empty.
 
   unfold eval_clause in H; fold eval_clause in H.
   unfold dom_from_negclause; fold dom_from_negclause.
@@ -218,6 +224,117 @@ Proof.
   tauto.
 Qed.
 
+Definition dom_unsatb (d : dom) :=
+  match d with
+  | (db, holes) =>
+    match (fst db) with
+    | Unbounded => false
+    | Bounded lb =>
+      match (snd db) with
+      | Unbounded => false
+      | Bounded ub =>
+        zset_covers holes lb ub
+      end
+    end
+  end.
+Theorem dom_unsatb_unsat : forall (d : dom),
+  dom_unsatb d = true <-> forall (k : Z), ~ sat_dom d k.
+Proof.
+  unfold dom_unsatb; intros; destruct d as (db, z); destruct db as (l, u); simpl.
+
+  destruct l, u; simpl.
+
+  split.
+    discriminate. intros Hun.
+    assert (~ sat_dom (Unbounded, Unbounded, z) (Zpred (zset_min_lb z 0))).
+      apply Hun.
+    rewrite <- satb_dom_false_iff_notdom in H.
+    unfold satb_dom in H. simpl in H.
+    
+    apply negb_false_iff in H.
+    rewrite memb_iff_mem in H.
+    apply lt_min_notin_zset with (k := 0) in H. tauto.
+    apply Zlt_pred.
+
+  split.
+    discriminate. intros Hun.
+    assert (~ sat_dom (Unbounded, Bounded z0, z) (Zpred (zset_min_lb z z0))).
+      apply Hun.
+    rewrite <- satb_dom_false_iff_notdom in H.
+    unfold satb_dom in H; apply andb_false_iff in H; simpl in H.
+    destruct H.
+      unfold satb_dbound, satb_lb, satb_ub in H; simpl in H.
+      apply Z_leb_false_iff_notle in H.
+      assert (zset_min_lb z z0 <= z0).
+        apply zset_min_lb_le.
+      assert False.
+      assert (Zpred (zset_min_lb z z0) < zset_min_lb z z0).
+        apply Zlt_pred.
+      omega. tauto.
+
+    apply negb_false_iff in H.
+    rewrite memb_iff_mem in H.
+    apply lt_min_notin_zset with (k := z0) in H. tauto.
+    apply Zlt_pred.
+
+  split.
+    discriminate. intros Hun.
+    assert (~ sat_dom (Bounded z0, Unbounded, z) (Zsucc (zset_max_ub z z0))).
+      apply Hun.
+    rewrite <- satb_dom_false_iff_notdom in H.
+    unfold satb_dom in H; apply andb_false_iff in H; simpl in H.
+    destruct H.
+      unfold satb_dbound, satb_lb, satb_ub in H; simpl in H.
+      rewrite andb_false_iff in H; simpl in H.
+      destruct H.
+      apply Z_leb_false_iff_notle in H.
+      assert (z0 <= zset_max_ub z z0).
+        apply zset_max_ub_lb.
+      assert False.
+      assert (zset_max_ub z z0 < Zsucc (zset_max_ub z z0)).
+        apply Zlt_succ.
+      omega. tauto. discriminate.
+
+    apply negb_false_iff in H.
+    rewrite memb_iff_mem in H.
+    apply max_lt_notin_zset with (k := z0) in H. tauto.
+    apply Zlt_succ.
+
+    split.
+      intros; apply satb_dom_false_iff_notdom.
+      unfold satb_dom; apply andb_false_iff.
+      assert (k < z0 \/ z1 < k \/ (z0 <= k <= z1)).
+        omega.
+      simpl.
+      destruct H0.
+        left. unfold satb_dbound, satb_lb, satb_ub; simpl.
+        rewrite andb_false_iff; left.
+        rewrite Z_leb_false_iff_notle. omega.
+
+        destruct H0.
+          left. unfold satb_dbound, satb_lb, satb_ub; simpl.
+          rewrite andb_false_iff; right.
+          rewrite Z_leb_false_iff_notle. omega.
+          
+        right. apply negb_false_iff; apply memb_iff_mem.
+        rewrite zset_covers_spec in H; apply H. omega.
+    
+    intros; apply zset_covers_spec; intros.
+    assert (~ sat_dom (Bounded z0, Bounded z1, z) k) as Hnd.
+      apply H.
+    apply satb_dom_false_iff_notdom in Hnd.
+    unfold satb_dom in Hnd; apply andb_false_iff in Hnd.
+    destruct Hnd as [Hnd | Hnd].
+      unfold satb_dbound, satb_lb, satb_ub in Hnd; simpl in Hnd.
+      apply andb_false_iff in Hnd.
+      repeat (rewrite Z_leb_false_iff_notle in Hnd).
+      assert False. omega. tauto.
+
+      rewrite negb_false_iff in Hnd; simpl in Hnd.
+      rewrite memb_iff_mem in Hnd; assumption.
+Qed.
+
+(*
 Theorem notsat_ub_impl_notdb : forall (db : dbound) (k : Z),
   ~ sat_ub (snd db) k -> ~ sat_dbound db k.
 Proof.
@@ -230,3 +347,106 @@ Theorem notsat_lb_impl_notdb : forall (db : dbound) (k : Z),
 Proof.
   unfold sat_dbound; destruct db; simpl; intros. tauto.
 Qed.
+*)
+Definition eval_tauto (tt : unit) (theta : asg) := True.
+
+Definition check_tauto_var (cl : clause) (v : ivar) :=
+  dom_unsatb (dom_from_negclause v cl).
+Theorem check_tauto_var_valid : forall (cl : clause) (v : ivar) (theta : asg),
+  check_tauto_var cl v = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_var.
+  intros cl v theta.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta) as Hcl.
+    tauto.
+  destruct Hcl as [Hcl | Hncl].
+    intros; assumption.
+  apply dom_from_negclause_valid with (x := v) (cl := cl) in Hncl.
+  intros.
+  rewrite dom_unsatb_unsat in H.
+  apply H in Hncl. tauto.
+Qed.
+    
+Definition check_tauto_vprop (cl : clause) (vp : vprop) :=
+  match vp with
+  | ILeq x k => check_tauto_var cl x
+  | IEq x k => check_tauto_var cl x
+  | _ => false
+  end.
+Theorem check_tauto_vprop_valid : forall (cl : clause) (vp : vprop) (theta : asg),
+  check_tauto_vprop cl vp = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_vprop; intros; destruct vp.
+  apply check_tauto_var_valid with (v := i); assumption.
+  apply check_tauto_var_valid with (v := i); assumption.
+  discriminate.
+  discriminate.
+Qed.
+
+Definition check_tauto_lit (cl : clause) (l : lit) :=
+  match l with
+  | Pos vp =>
+    match vp with
+    | CTrue => true
+    | _ => check_tauto_vprop cl vp
+    end
+  | Neg vp => check_tauto_vprop cl vp
+  end.
+Theorem check_tauto_lit_valid : forall (cl : clause) (l : lit) (theta : asg),
+  (eval_lit l theta -> eval_clause cl theta) ->
+    check_tauto_lit cl l = true -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_lit; intros; destruct l. destruct v.
+
+  apply check_tauto_vprop_valid with (vp := (ILeq i z)) (theta := theta); assumption.
+  apply check_tauto_vprop_valid with (vp := (IEq i z)) (theta := theta); assumption.
+  apply check_tauto_vprop_valid with (vp := (BTrue b)) (theta := theta); assumption.
+  unfold eval_lit in H; unfold eval_vprop in H.
+  apply H; trivial.
+
+  apply check_tauto_vprop_valid with (vp := v); assumption.
+Qed.
+
+Fixpoint check_tauto_rec (cl : clause) (ls : list lit) :=
+  match ls with
+  | nil => false
+  | cons l ls' => check_tauto_lit cl l || check_tauto_rec cl ls'
+  end.
+
+Theorem check_tauto_rec_valid : forall (cl : clause) (ls : clause) (theta : asg),
+  (eval_clause ls theta -> eval_clause cl theta) ->
+    check_tauto_rec cl ls = true -> eval_tauto tt theta -> eval_clause cl theta.
+Proof.
+  unfold implies, eval_tauto.
+  intros cl ls theta; induction ls.
+    unfold check_tauto_rec; intros; discriminate.
+
+    unfold check_tauto_rec; fold check_tauto_rec.
+    rewrite orb_true_iff.
+    intros.
+    destruct H0 as [Ha | Hcl].
+    unfold eval_clause in H; fold eval_clause in H.
+      apply check_tauto_lit_valid with (theta := theta) in Ha.
+      assumption.
+
+      intro; apply H; left; assumption.
+      
+      unfold eval_clause in H; fold eval_clause in H.
+      tauto.
+Qed.
+
+Definition check_tauto (tt : unit) (cl : clause) := check_tauto_rec cl cl.
+Theorem check_tauto_valid : forall (tt : unit) (cl : clause),
+  check_tauto tt cl = true -> implies (eval_tauto tt) (eval_clause cl).
+Proof.
+  unfold check_tauto; intros.
+  unfold implies; intro theta.
+  assert (eval_clause cl theta -> eval_clause cl theta). tauto.
+  apply check_tauto_rec_valid with (cl := cl) (ls := cl); assumption.
+Qed.
+
+Definition Tauto : Constraint :=
+  mkConstraint (unit) (eval_tauto) (check_tauto) (check_tauto_valid). 
+
+Definition check_tauto_bnd (bnd : list (ivar*Z*Z)) (cl : clause) :=
+  (BoundedConstraint Tauto).(check) (bnd, tt) cl.
