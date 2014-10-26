@@ -63,6 +63,9 @@ COQSRCLIBS:=-I $(COQLIB)/kernel -I $(COQLIB)/lib \
 COQLIBS:=-I . 
 COQDOCLIBS:=
 
+PROF:=-ccopt -pg
+# PROF:=
+
 ##########################
 #                        #
 # Variables definitions. #
@@ -84,9 +87,9 @@ COQDOC:=$(COQBIN)coqdoc
 COQMKTOP:=$(COQBIN)coqmktop
 CAMLLIB:=$(shell $(CAMLBIN)ocamlc.opt -where)
 CAMLC:=$(OCAMLFIND) ocamlc -c -rectypes -g
-CAMLOPTC:=$(OCAMLFIND) ocamlopt -g -c -rectypes # -ccopt -pg
+CAMLOPTC:=$(OCAMLFIND) ocamlopt -g -c -rectypes $(PROF)
 CAMLLINK:=$(OCAMLFIND) ocamlc -rectypes -g
-CAMLOPTLINK:=$(OCAMLFIND) ocamlopt -rectypes -g # -ccopt -pg
+CAMLOPTLINK:=$(OCAMLFIND) ocamlopt -rectypes -g $(PROF)
 GRAMMARS:=grammar.cma
 CAMLP4EXTEND:=pa_extend.cmo pa_macro.cmo q_MLast.cmo
 CAMLP4OPTIONS:=
@@ -182,7 +185,7 @@ $(TARGETS) : % : $(CMXFILES) %.cmx
 %.cmo: %.ml
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
 
-%.cmx: %.ml
+%.cmx: %.ml %.cmi
 	$(CAMLOPTC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
 
 %.cmxs: %.ml
@@ -261,7 +264,7 @@ clean:
 	rm -f $(CMOFILES) $(CMIFILES) $(CMXFILES) $(CMXSFILES) $(OFILES) $(VOFILES) $(VIFILES) $(GFILES) $(MLFILES:.ml=.cmo) $(MLFILES:.ml=.cmx) *~
 	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(HTMLFILES) $(GHTMLFILES) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) $(VFILES:.v=.v.d)
 	rm -f $(CMOFILES) $(MLFILES:.ml=.cmi) $(MLFILES:.ml=.ml.d) $(MLFILES:.ml=.cmx) $(MLFILES:.ml=.o)
-	rm -f $(TARGETS:%=%.cmo) $(TARGETS:%=%.cmx) $(TARGETS:%=%.o)
+	rm -f $(TARGETS:%=%.cmo) $(TARGETS:%=%.cmi) $(TARGETS:%=%.cmx) $(TARGETS:%=%.o)
 	rm -f $(AUTO_MLFILES) $(AUTO_MLFILES:%=%.mli)
 	- rm -rf html
 

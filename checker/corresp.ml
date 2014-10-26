@@ -106,25 +106,20 @@ let fallback model =
       List.fold_left (fun b check -> b || check_with check cl)
       (Builtins.tauto bounds cl) all_checkers
 
+(*
+let tauto_check model = fallback model
+*)
+let tauto_check model = Builtins.tauto (M.get_bounds model)
+
 let check model clauses tokens =
   let lmap = lmap_of_model model
   and ctable = clause_table clauses in
-  (* *)
-  let bounds = M.get_bounds model in
-  let tauto_check = Builtins.tauto bounds in
-  (*
-  let tauto_check = fallback model in
-  *)
-  let rec check_aux tokens =
-    match Stream.peek tokens with
-    | None ->
-      (* Checked all entries in the resolution proof. *)
-      true
-    | _ ->
-      (* Get the next entry. *)
-      let entry = tentry lmap tokens in
-      (* check_entry model tauto_check ctable entry && check_aux tokens *)
-      let okay = check_entry model tauto_check ctable entry in
-      check_aux tokens && okay
-  in
-  check_aux tokens
+  let okay = ref true in
+  while Stream.peek tokens <> None
+  do
+    (* Get the next entry. *)
+    let entry = tentry lmap tokens in
+    (* check_entry model tauto_check ctable entry && check_aux tokens *)
+    okay := check_entry model (tauto_check model) ctable entry && !okay
+  done ;
+  !okay

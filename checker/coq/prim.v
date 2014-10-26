@@ -13,9 +13,9 @@ Require Import List.
 Open Scope Z_scope.
 
 (* Some convenience Z-handling functions. *)
+(*
 Definition Z_leb (x y : Z) : bool :=
   if Z_le_dec x y then true else false.
-
 Theorem Z_leb_iff_le : forall (x y : Z),
   Z_leb x y = true <-> x <= y.
 Proof.
@@ -35,7 +35,26 @@ Proof.
   split. intro. exact n.
   intro. trivial.
 Qed.
+  *)
 
+Definition Z_leb (x y : Z) : bool := Zle_bool x y.
+
+Theorem Z_leb_iff_le : forall (x y : Z),
+  Z_leb x y = true <-> x <= y.
+Proof.
+  unfold Z_leb; intros. symmetry; apply Zle_is_le_bool.
+Qed.
+
+Theorem Z_leb_false_iff_notle : forall (x y : Z),
+  Z_leb x y = false <-> ~ x <= y.
+Proof.
+  intros.
+  split; intro. intro.
+    apply Z_leb_iff_le in H0. congruence.
+    apply not_true_iff_false; intro.
+    apply Z_leb_iff_le in H0; tauto.
+Qed.
+    
 Definition Z_ltb (x y : Z) : bool :=
   if Z_lt_dec x y then true else false.
 
@@ -48,6 +67,7 @@ Proof.
   intros. destruct Z_lt_dec. trivial. tauto.
 Qed.
 
+(*
 Definition Z_eqb (x y : Z) : bool :=
   if Z_eq_dec x y then true else false.
 
@@ -58,6 +78,14 @@ Proof.
   split. intros.
   destruct Z_eq_dec. tauto. discriminate.
   intros. destruct Z_eq_dec. trivial. tauto.
+Qed.
+*)
+Definition Z_eqb (x y : Z) : bool := Zeq_bool x y.
+Theorem Z_eqb_iff_eq : forall (x y : Z),
+  Z_eqb x y = true <-> x = y.
+Proof.
+  unfold Z_eqb; intros; symmetry.
+  apply Zeq_is_eq_bool.
 Qed.
 
 (* Variable types *)
@@ -388,3 +416,31 @@ Proof.
 Qed.
 
 Definition CheckClause := mkConstraint clause eval_clause check_clause.
+
+(* Var reasoning. *)
+Definition vprop_ivar (vp : vprop) :=
+  match vp with
+  | ILeq x _ => Some x
+  | IEq x _ => Some x
+  | _ => None
+  end.
+
+Definition lit_ivar (l : lit) :=
+  match l with
+  | Pos vp => vprop_ivar vp
+  | Neg vp => vprop_ivar vp
+  end.
+
+Theorem neglit_ivar : forall (l : lit),
+  lit_ivar l = lit_ivar (neglit l).
+Proof.
+  unfold lit_ivar, neglit; destruct l; simpl.
+    trivial. trivial.
+Qed.
+  
+Fixpoint is_clausevar (cl : clause) (x : ivar) :=
+  match cl with
+  | nil => False
+  | cons l cl' => (lit_ivar l = Some x) \/ (is_clausevar cl' x)
+  end.
+  

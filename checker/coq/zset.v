@@ -88,6 +88,21 @@ Proof.
   intros. apply ZSets.mem_spec.
 Qed.
 
+Definition memb_false_iff_notmem : forall (s : zset) (k : Z),
+  memb s k = false <-> ~ mem s k.
+Proof.
+  intros; split; intros.
+  assert (~ mem s k \/ mem s k). tauto.
+  destruct H0. assumption.
+  apply memb_iff_mem in H0.
+  rewrite H in H0; discriminate.
+
+  assert (memb s k = true <-> mem s k).
+    apply memb_iff_mem.
+  destruct (memb s k).
+    tauto. trivial.
+Qed.
+
 Theorem notmem_empty : forall (k : Z),
   ~ mem empty k.
 Proof.
@@ -115,7 +130,21 @@ Proof.
   apply ZSets.add_spec in H.
   destruct H. eauto. eauto.
 Qed.
+Theorem notmem_add_if : forall (s : zset) (k k' : Z),
+  ~ mem (add s k) k' -> k <> k' /\ ~ mem s k'.
+Proof.
+  intros; split.
+  assert (k <> k' \/ k = k'). tauto.
+  destruct H0. assumption.
+  rewrite H0 in H.
+  assert (mem (add s k') k'). apply mem_k_addk.
+  tauto.
 
+  assert (~ mem s k' \/ mem s k'). tauto.
+  destruct H0. assumption.
+  now apply mem_mem_add with (k' := k) in H0.
+Qed.
+  
 (*
 Fixpoint rem (s : zset) (k : Z) := ZSets.remove k s.
 Theorem notmem_k_remk : forall (s : zset) (k : Z),
@@ -170,7 +199,6 @@ Theorem mem_union_iff : forall (xs ys : zset) (k : Z),
 Proof.
   unfold mem, union; apply ZSets.union_spec.
 Qed.
-
 Fixpoint zset_covers_nat (xs : zset) (k : Z) (sz : nat) :=
   match sz with
   | O => true

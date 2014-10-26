@@ -22,6 +22,9 @@ Definition sat_dom (d : dom) (k : Z) :=
 Definition satb_dom (d : dom) (k : Z) :=
   satb_dbound (fst d) k && negb (memb (snd d) k).
 
+Definition dom_equal (dx dy : dom) := forall k : Z,
+  sat_dom dx k <-> sat_dom dy k.
+
 Theorem satb_dom_true_iff_dom : forall (d : dom) (k : Z),
   satb_dom d k = true <-> sat_dom d k.
 Proof.
@@ -50,6 +53,62 @@ Proof.
   rewrite <- satb_dom_true_iff_dom.
   tauto.
   Qed.
+
+Definition dom_is_unconstrained (d : dom) := forall (k : Z),
+  sat_dom d k.
+Theorem dom_unconstrained_is_uncon : dom_is_unconstrained dom_unconstrained.
+Proof.
+  unfold dom_is_unconstrained, dom_unconstrained, sat_dom; simpl.
+  unfold sat_dbound, sat_lb, sat_ub; simpl; intros.
+  assert (~ mem empty k). apply notmem_empty. tauto.
+Qed.
+ 
+Theorem dom_const_not_uncon : forall (k : Z), ~ dom_is_unconstrained (dom_const k).
+Proof.
+  intros.
+    assert (~dom_is_unconstrained (dom_const k) \/ dom_is_unconstrained (dom_const k)). tauto.
+    destruct H. assumption.
+    unfold dom_is_unconstrained in H.
+    assert (~ sat_dom (dom_const k) (Zsucc k)).
+      unfold sat_dom, sat_dbound, sat_lb, sat_ub, dom_const; simpl. omega.
+    assert (sat_dom (dom_const k) (Zsucc k)). apply H. tauto.
+Qed.
+
+Theorem dom_neq_not_uncon : forall (k : Z), ~ dom_is_unconstrained (dom_neq k).
+Proof.
+  intros.
+    assert (~dom_is_unconstrained (dom_neq k) \/ dom_is_unconstrained (dom_neq k)). tauto.
+    destruct H. assumption.
+    unfold dom_is_unconstrained in H.
+    assert (~ sat_dom (dom_neq k) k).
+      unfold sat_dom, sat_dbound, sat_lb, sat_ub, dom_const; simpl.
+      assert (mem (add empty k) k). apply mem_k_addk.
+      tauto.
+    assert (sat_dom (dom_neq k) k). apply H. tauto.
+Qed.
+
+Theorem dom_le_not_uncon : forall (k : Z), ~ dom_is_unconstrained (dom_le k).
+Proof.
+  intros.
+    assert (~dom_is_unconstrained (dom_le k) \/ dom_is_unconstrained (dom_le k)). tauto.
+    destruct H. assumption.
+    unfold dom_is_unconstrained in H.
+    assert (~ sat_dom (dom_le k) (Zsucc k)).
+      unfold sat_dom, sat_dbound, sat_lb, sat_ub, dom_const; simpl. omega.
+    assert (sat_dom (dom_le k) (Zsucc k)). apply H. tauto.
+Qed.
+
+Theorem dom_ge_not_uncon : forall (k : Z), ~ dom_is_unconstrained (dom_ge k).
+Proof.
+  intros.
+    assert (~dom_is_unconstrained (dom_ge k) \/ dom_is_unconstrained (dom_ge k)). tauto.
+    destruct H. assumption.
+    unfold dom_is_unconstrained in H.
+    assert (~ sat_dom (dom_ge k) (Zpred k)).
+      unfold sat_dom, sat_dbound, sat_lb, sat_ub, dom_const; simpl.
+      assert (Zpred k < k). apply Zlt_pred. omega.
+    assert (sat_dom (dom_ge k) (Zpred k)). apply H. tauto.
+Qed.
 
 Theorem satb_dom_false_iff_notdom : forall (db : dom) (k : Z),
   satb_dom db k = false <-> ~ sat_dom db k.
@@ -94,6 +153,21 @@ Proof.
       apply db_sat_impl_meet. tauto. tauto.
 Qed.
 
+Theorem dom_meet_uncon_iff : forall (dx dy : dom),
+ dom_is_unconstrained (dom_meet dx dy)
+   <-> dom_is_unconstrained dx /\ dom_is_unconstrained dy.
+Proof.
+  intros; unfold dom_is_unconstrained.
+  split; intros.
+  assert (forall k : Z, sat_dom dx k /\ sat_dom dy k).
+    intros; apply dom_meet_iff; apply H.
+    split; intros.
+      apply H0. apply H0.
+  destruct H.
+    apply dom_meet_iff. split.
+      apply H. apply H0.
+Qed.
+  
 Definition dom_from_lit (x : ivar) (l : lit) :=
   match l with
   | Pos (IEq x' k) =>
@@ -162,6 +236,47 @@ Proof.
       tauto.
 Qed.
 
+Theorem not_litvar_iff_uncon : forall (x : ivar) (l : lit),
+  lit_ivar l <> (Some x) <-> dom_is_unconstrained (dom_from_lit x l).
+Proof.
+  intros; split.
+  unfold lit_ivar, vprop_ivar, dom_from_lit; destruct l; destruct v; simpl; intros.
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (x = i) as Hxi. now apply Hiff. congruence. apply dom_unconstrained_is_uncon.
+
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (x = i) as Hxi. now apply Hiff. congruence. apply dom_unconstrained_is_uncon.
+    apply dom_unconstrained_is_uncon. apply dom_unconstrained_is_uncon. 
+
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (x = i) as Hxi. now apply Hiff. congruence. apply dom_unconstrained_is_uncon.
+
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (x = i) as Hxi. now apply Hiff. congruence. apply dom_unconstrained_is_uncon.
+    apply dom_unconstrained_is_uncon. apply dom_unconstrained_is_uncon.
+
+  unfold dom_from_lit, lit_ivar, vprop_ivar;
+      destruct l; destruct v; simpl; intros. 
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+      assert (~ dom_is_unconstrained (dom_le z)). apply dom_le_not_uncon; tauto. tauto.
+    assert (x <> i). rewrite <- Hiff; apply diff_false_true; congruence. congruence.
+
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (~ dom_is_unconstrained (dom_const z)). apply dom_const_not_uncon; tauto. tauto.
+    assert (x <> i). rewrite <- Hiff; apply diff_false_true; congruence. congruence.
+
+    congruence. congruence.
+      
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (~ dom_is_unconstrained (dom_ge (z+1))). apply dom_ge_not_uncon; tauto. tauto.
+    assert (x <> i). rewrite <- Hiff; apply diff_false_true; congruence. congruence.
+
+    assert (ivar_eqb x i = true <-> x = i) as Hiff. apply ivar_eqb_iff_eq. destruct ivar_eqb.
+    assert (~ dom_is_unconstrained (dom_neq z)). apply dom_neq_not_uncon; tauto. tauto.
+    assert (x <> i). rewrite <- Hiff; apply diff_false_true; congruence. congruence.
+    congruence. congruence.
+Qed.
+
 Fixpoint dom_from_negclause (x : ivar) (cl : clause) :=
   match cl with
   | nil => dom_unconstrained
@@ -169,6 +284,25 @@ Fixpoint dom_from_negclause (x : ivar) (cl : clause) :=
       dom_meet (dom_from_lit x (neglit l)) (dom_from_negclause x ls)
   end.
 
+Theorem not_clausevar_iff_uncon : forall (x : ivar) (cl : clause),
+  ~ is_clausevar cl x <-> dom_is_unconstrained (dom_from_negclause x cl).
+Proof.
+  intros x cl; induction cl; simpl.
+    assert (dom_is_unconstrained dom_unconstrained). apply dom_unconstrained_is_uncon.
+    tauto.
+
+  split; intros.
+    assert (lit_ivar a <> Some x /\ ~is_clausevar cl x). tauto.
+    assert (dom_is_unconstrained (dom_from_lit x (neglit a))).
+      apply not_litvar_iff_uncon. rewrite <- neglit_ivar. tauto.
+    apply dom_meet_uncon_iff; split; simpl. assumption.
+      apply IHcl; apply H0.
+
+    apply dom_meet_uncon_iff in H. destruct H as [Hl Hcl].
+    assert (lit_ivar a <> Some x).
+      rewrite neglit_ivar; apply not_litvar_iff_uncon. assumption. tauto.
+Qed.
+        
 (*
 Theorem dom_from_lit_complete : forall (x : ivar) (l : lit) (k : Z),
   sat_dom (dom_from_lit x l) k ->

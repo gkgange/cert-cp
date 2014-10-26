@@ -110,6 +110,7 @@ VFILES:=bounds.v\
   prim.v\
   reif.v\
   zset.v\
+	map.v\
   checker_impl.v
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))
