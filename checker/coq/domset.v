@@ -1,10 +1,12 @@
 (* Computing domains/bounds from the complement of a clause. *)
+Require Import ZArith.
 Require Import Bool.
 Require Import List.
 Require Import FSets.FMapFacts.
 Require Import zset.
 Require Import map.
 Require Import prim.
+Require Import bounds.
 Require Import domain.
 
 Fixpoint clause_varset cl :=
@@ -249,10 +251,16 @@ Definition dom_from_domset (ds : domset) (x : ivar) :=
   | Some d => d
   end.
 
-Theorem dom_from_domset_equiv : forall (cl : clause) (x : ivar),
-  dom_equal (dom_from_negclause x cl) (dom_from_domset (negcl_domset cl) x).
+Definition is_negcl_domset (ds : domset) (cl : clause) :=
+  forall (x : ivar), dom_equal (dom_from_negclause x cl) (dom_from_domset ds x).
+
+Definition is_negcl_domset_db (ds : domset) (cl : clause) :=
+  forall x, (db_from_negclause x cl) = (fst (dom_from_domset ds x)).
+
+Theorem dom_from_domset_equiv : forall (cl : clause),
+  is_negcl_domset (negcl_domset cl) cl.
 Proof.
-  intros; unfold dom_from_domset, negcl_domset.
+  unfold is_negcl_domset; intros; unfold dom_from_domset, negcl_domset.
   remember (ZSets.elements (clause_varset cl)) as elts.
   remember (negcl_domset' cl elts) as dset.
   assert (~ mem (clause_varset cl) x \/ mem (clause_varset cl) x).
@@ -284,6 +292,107 @@ Proof.
   apply negcl_domset'_1 with (cl := cl) (s := d) in H.
   assumption.
   rewrite <- Heqelts. assumption.
+
+  apply not_clausevar_iff_uncon in H'.
+  tauto.
+
+  rewrite Heqdset in Heqdom_x.
+  symmetry in Heqdom_x; apply negcl_domset'_3 in Heqdom_x.
+  rewrite Heqelts in Heqdom_x.
+  apply ZSets.elements_spec1 in H. tauto.
+Qed.
+
+Theorem negcl_domset'_1db : forall (cl : clause) (xs : list ivar) (x : ivar),
+  InA eq x xs -> forall s, ZMaps.find x (negcl_domset' cl xs) = Some s ->
+    db_from_negclause x cl =  (fst s).
+Proof.
+  intros cl xs x; intro.
+  remember (dom_from_negclause x cl) as dom.
+  induction xs.
+    now unfold In in H.
+    apply InA_cons in H.
+
+    unfold negcl_domset'; fold negcl_domset'.
+    remember (negcl_domset' cl xs) as dset.
+    intros; destruct H.
+
+    assert (ZMaps.find x (ZMaps.add x dom dset) = Some dom).
+      apply ZMaps.find_1; now apply ZMaps.add_1.
+    rewrite <- H in H0. rewrite <- Heqdom in H0. rewrite H0 in H1.
+    inversion H1; rewrite Heqdom; now rewrite dom_from_negclause_db.
+    
+    assert (a = x \/ a <> x). tauto.
+    destruct H1.
+      rewrite H1 in H0; rewrite <- Heqdom in H0.
+      assert (ZMaps.find x (ZMaps.add x dom dset) = Some dom).
+        apply ZMaps.find_1; now apply ZMaps.add_1.
+      rewrite H0 in H2.
+      inversion H2.
+      rewrite Heqdom; now rewrite dom_from_negclause_db.
+
+      apply IHxs. assumption.
+      apply find_mapsto_iff.
+      apply find_mapsto_iff in H0.
+      apply ZMaps.add_3 with (x := a) (e' := (dom_from_negclause a cl)).
+        assumption. assumption.
+Qed.
+     
+Theorem dom_is_unconstrained_db : forall (d : dom),
+  dom_is_unconstrained d -> (fst d) = (Unbounded, Unbounded).
+Proof.
+  unfold dom_is_unconstrained; intros.
+  unfold sat_dom in H.
+  assert (forall k, sat_dbound (fst d) k).
+    apply H.
+  unfold sat_dbound, sat_lb, sat_ub in H0.
+  destruct d as (db, z); simpl; destruct db.
+  destruct b, b0; simpl in *; try tauto; try discriminate.
+  assert (Zle (Zsucc z0) z0).
+    apply H0.
+  assert False. omega. contradiction.
+
+  assert (Zle z0 (Zpred z0)).
+    apply H0.
+  assert (Zlt (Zpred z0) z0).
+    apply Zlt_pred.
+  assert False. omega. contradiction.
+
+  assert (Zle (Zsucc z1) z1).
+    apply H0.
+  assert False. omega. contradiction.
+Qed.
+  
+Theorem dom_from_domset_db : forall (cl : clause),
+  is_negcl_domset_db (negcl_domset cl) cl.
+Proof.
+  unfold is_negcl_domset_db; intros; unfold dom_from_domset, negcl_domset, dom_unconstrained.
+  remember (ZSets.elements (clause_varset cl)) as elts.
+  remember (negcl_domset' cl elts) as dset.
+  assert (~ mem (clause_varset cl) x \/ mem (clause_varset cl) x).
+    tauto.
+  destruct H.
+
+  assert (H' := H).
+  apply not_invars_uncon in H'.
+  apply dom_is_unconstrained_db in H'.
+  rewrite dom_from_negclause_db in H'.
+  unfold mem in H.
+  assert (ZMaps.find x dset = None).
+    rewrite Heqdset; apply negcl_domset'_2.
+  rewrite <- ZSets.elements_spec1 in H.
+  intro; apply In_InA with (eqA := eq) in H0. rewrite Heqelts in H0. tauto.
+  apply Z_as_OT.eq_equiv.
+  rewrite H0. now rewrite H'.
+  
+  assert (H' := H); apply in_varset_iff_invars in H'.
+  unfold mem in H.
+  remember (ZMaps.find x dset) as dom_x.
+  destruct dom_x.
+  rewrite Heqdset in Heqdom_x.
+  symmetry in Heqdom_x.
+  apply ZSets.elements_spec1 in H.
+  apply negcl_domset'_1db with (xs := elts).
+  now rewrite Heqelts. assumption.
 
   apply not_clausevar_iff_uncon in H'.
   tauto.

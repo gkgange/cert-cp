@@ -468,6 +468,34 @@ Proof.
       rewrite memb_iff_mem in Hnd; assumption.
 Qed.
 
+Theorem dom_from_lit_db : forall (l : lit) (x : ivar),
+  fst (dom_from_lit x l) = db_from_lit x l.
+Proof.
+  intros; unfold dom_from_lit, db_from_lit, dom_unconstrained, dom_ge, dom_le, dom_neq;
+    destruct l; destruct v;
+      try (remember (ivar_eqb x i) as xi; destruct xi; symmetry in Heqxi; try rewrite ivar_eqb_iff_eq in Heqxi); simpl;
+        try congruence.
+Qed.
+Theorem dom_from_negclause_db : forall (cl : clause) (x : ivar),
+  fst (dom_from_negclause x cl) = db_from_negclause x cl.
+Proof.
+  intros; induction cl; intros.
+
+  unfold dom_unconstrained; trivial.
+
+  unfold db_from_negclause; fold db_from_negclause.
+  unfold dom_from_negclause; fold dom_from_negclause.
+  unfold dom_meet.
+  repeat (rewrite dom_from_lit_db); simpl.
+  rewrite IHcl; trivial.
+Qed.
+
+Theorem dom_meet_db : forall (dx dy : dom) (x y : dbound),
+  fst dx = x /\ fst dy = y -> fst (dom_meet dx dy) = db_meet x y.
+Proof.
+  intros; unfold dom_meet; simpl.
+  destruct H; now rewrite <- H, <- H0.
+Qed.
 (*
 Theorem notsat_ub_impl_notdb : forall (db : dbound) (k : Z),
   ~ sat_ub (snd db) k -> ~ sat_dbound db k.

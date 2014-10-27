@@ -119,6 +119,7 @@ let check_cumul model =
         let icl = impl_clause_of_clause cl in
         (* C_impl.check_cumul_bnd cumul bnd icl *)
         C_impl.check_cumul_tt_bnd cumul bnd icl
+        (* C_impl.check_cumul_tt_dbnd cumul bnd icl *)
       )
     }
 let register () =

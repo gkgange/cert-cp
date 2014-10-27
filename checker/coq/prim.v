@@ -67,7 +67,7 @@ Proof.
   intros. destruct Z_lt_dec. trivial. tauto.
 Qed.
 
-(*
+(* )
 Definition Z_eqb (x y : Z) : bool :=
   if Z_eq_dec x y then true else false.
 
@@ -79,7 +79,7 @@ Proof.
   destruct Z_eq_dec. tauto. discriminate.
   intros. destruct Z_eq_dec. trivial. tauto.
 Qed.
-*)
+( *)
 Definition Z_eqb (x y : Z) : bool := Zeq_bool x y.
 Theorem Z_eqb_iff_eq : forall (x y : Z),
   Z_eqb x y = true <-> x = y.
@@ -87,6 +87,7 @@ Proof.
   unfold Z_eqb; intros; symmetry.
   apply Zeq_is_eq_bool.
 Qed.
+(* *)
 
 (* Variable types *)
 Definition ivar : Type := Z.

@@ -2,9 +2,7 @@ Require Import ZArith.
 Require Import Bool.
 Require Import bounds.
 Require Import prim.
-Require Import Program.
-Require Import Recdef.
-Require Import Program.Wf.
+Require Import domset.
 
 Local Open Scope nat_scope.
 
@@ -387,20 +385,24 @@ Theorem negcl_compulsoryb_true_iff : forall (t : task) (time : Z) (cl : clause),
 Proof.
   unfold negcl_compulsoryb, negcl_compulsory.
   intros.
-  destruct db_from_negclause; destruct b, b0; simpl.
-    split.
-      intro; discriminate.
-      intro; tauto.
-    split.
-      intro; discriminate.
-      intro; tauto.
-    split.
-      intro; discriminate.
-      intro; tauto.
-    rewrite andb_true_iff.
+  destruct db_from_negclause;
+  destruct b, b0; simpl; split; try discriminate; try tauto.
+  rewrite andb_true_iff;
+    rewrite Z_ltb_iff_lt; rewrite Z_leb_iff_le; tauto.
+  rewrite andb_true_iff;
     rewrite Z_ltb_iff_lt; rewrite Z_leb_iff_le; tauto.
 Qed. 
-  
+
+(*
+Theorem satdb_negcl_domset : forall (cl : clause) (ds : domset) (x : ivar) (k : Z),
+  is_negcl_domset_db ds cl ->
+    (sat_dbound (fst (dom_from_domset ds x)) k <-> sat_dbound (db_from_negclause x cl) k).
+Proof.
+  intros cl ds x k. intro; unfold is_negcl_domset_db in H.
+  rewrite H. tauto.
+Qed.
+*)
+
 Theorem negcl_compulsory_valid : forall (t : task) (time : Z) (cl : clause) (theta: asg),
   negcl_compulsory t time cl /\ ~ eval_clause cl theta ->
     Zle (eval_start t theta) time /\ Zlt time (eval_end t theta).
@@ -438,6 +440,8 @@ Fixpoint negcl_compulsory_usage' (ts : list task) (time : Z) (cl : clause) :=
 
 Definition negcl_compulsory_usage (c : cumul) (time : Z) (cl : clause) :=
   negcl_compulsory_usage' c.(tasks) time cl.
+
+    
 Theorem negcl_compulsory_usage_bound :
   forall (ts : list task) (time : Z) (cl : clause) (theta : asg),
     ~ eval_clause cl theta -> 
@@ -460,6 +464,7 @@ Qed.
   
 Definition check_cumul_moment (c : cumul) (cl : clause) (t : Z) :=
   negb (Compare_dec.leb (negcl_compulsory_usage c t cl) c.(limit)).
+
 Theorem check_cumul_moment_valid : forall (c : cumul) (cl : clause) (t : Z) (theta : asg),
   check_cumul_moment c cl t = true -> eval_cumul c theta -> eval_clause cl theta.
 Proof.
@@ -478,7 +483,7 @@ Proof.
     omega.
   tauto.
 Qed.
-  
+
 (* Check the beginning of the (possibly empty) compulsory region for t. *)
 Definition check_cumul_tt_start (c : cumul) (cl : clause) (t : task) :=
   match db_from_negclause t.(svar) cl with
@@ -500,7 +505,6 @@ Proof.
     exact H. exact H0.
 Qed.
   
-
 Fixpoint check_cumul_timetable (c : cumul) (cl : clause) (ts : list task) :=
   match ts with
   | nil => false
@@ -525,9 +529,6 @@ Proof.
       exact H0.
 Qed.
 
-(*
-Definition check_cumul (c : cumul) (cl : clause) : bool := false.
-*)
 Definition check_cumul_pair (c : cumul) (tx ty : task) (cl : clause) :=
   match fst (db_from_negclause tx.(svar) cl) with
   | Unbounded => false
@@ -649,7 +650,6 @@ Proof.
 
       apply IHtail in H. exact H.
 Qed.
-
   
 Definition check_cumul_e (c : cumul) (cl : clause) :=
   check_cumul_rec c c.(tasks) cl.

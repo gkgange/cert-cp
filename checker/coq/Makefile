@@ -103,14 +103,16 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 ###################################
 
 VFILES:=bounds.v\
-  cumulative.v\
   domain.v\
+  zset.v\
+	map.v\
+	domset.v\
+  cumulative.v\
+	cumul_dset.v\
   element.v\
   linear.v\
   prim.v\
   reif.v\
-  zset.v\
-	map.v\
   checker_impl.v
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))

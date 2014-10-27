@@ -182,10 +182,10 @@ $(TARGETS) : % : $(CMXFILES) %.cmx
 %.cmi: %.mli
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PKG_FLAGS) $<
 
-%.cmo: %.ml
+%.cmo: %.ml %.cmi %.ml.d
 	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
 
-%.cmx: %.ml %.cmi
+%.cmx: %.ml %.cmi %.ml.d
 	$(CAMLOPTC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
 
 %.cmxs: %.ml

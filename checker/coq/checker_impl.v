@@ -5,8 +5,11 @@ Require prim.
 Require bounds.
 Require linear.
 Require cumulative.
+Require cumul_dset.
 Require reif.
 Require element.
+
+Extract Constant prim.Z_eqb => "(=)".
 
 Set Extraction Optimize.
 Extraction "checker_impl.ml"
@@ -19,6 +22,7 @@ Extraction "checker_impl.ml"
   *)
   cumulative.check_cumul_bnd
   cumulative.check_cumul_tt_bnd
+  cumul_dset.check_cumul_tt_dbnd
   reif.check_reif
   (* linear.check_lincon *)
   linear.check_linear_bnd
