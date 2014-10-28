@@ -7,16 +7,20 @@ module H = Hashtbl
 module A = DynArray
 module C = Checker
 
+(* Map integers to literals.
+ * Should add an option for a separate mapping. *)
 let lmap_of_model model =
   let lmap = H.create 3037 in
   M.lits_iteri (fun i _ lit -> H.add lmap (3+i) lit) model ;
   lmap
 
+(* Hash-table of pre-checked clauses. *)
 let clause_table clauses =
   let ctable = H.create 11437 in
   List.iter (fun cl -> H.add ctable (List.sort compare cl) ()) clauses ;
   ctable
   
+(* Look up a literal in the mapping. *)
 let get_lit lmap k =
   try
     H.find lmap k
@@ -24,6 +28,8 @@ let get_lit lmap k =
     failwith
       (Format.sprintf "Unidentified literal identifier %d." k)
 
+(* Convert a literal from the trace into a
+ * semantic literal. *)
 let tlit lmap = parser
   | [< 'GL.Kwd "-" ; 'GL.Int k >] ->
       MT.negate (get_lit lmap k)
@@ -34,6 +40,7 @@ let tlit lmap = parser
         get_lit lmap k
 
 
+(* Parse a clause from the trace. *)
 let tclause lmap tokens =
   let rec aux = parser
     | [< 'GL.Int 0 >] -> []
@@ -41,6 +48,7 @@ let tclause lmap tokens =
     | [< >] -> [] in
   aux tokens
 
+(* Grab the list of antecedent clauses. *)
 let rec tantecedents tokens = 
   let rec aux = parser
   | [< 'GL.Int 0 >] -> []
@@ -53,16 +61,20 @@ let tentry lmap = parser
 
 let check_clause model tauto_check cltable clause =
   begin
+    (* Debug logging. *)
     if !COption.verbosity > 1
     then
       let fmt = Format.std_formatter in
       Format.fprintf fmt "Checking %s@."
         (M.string_of_clause model clause)
   end ;
+  (* First, try looking up the clause in the table. *)
   try
     let _ = H.find cltable (List.sort compare clause) in
     true
   with Not_found ->
+    (* Otherwise, check if it's a tautology (under the
+     * model semantics). *)
     if tauto_check clause then
       true
     else
@@ -123,3 +135,31 @@ let check model clauses tokens =
     okay := check_entry model (tauto_check model) ctable entry && !okay
   done ;
   !okay
+
+let update_assumps clauses cl =
+  if List.exists (fun cl_y -> Builtins.clause_subsumes cl_y cl) clauses then
+    clauses
+  else
+    cl :: (List.filter (fun cl_y -> not (Builtins.clause_subsumes cl cl_y)) clauses)
+
+(* Should be tail recursive; we can switch to an iterative
+ * implementation if we have stack problems. *)
+let rec assumptions' model tcheck ctable lmap tokens assumps =
+  if Stream.peek tokens = None then
+    assumps
+  else
+    (* Get the next entry. *)
+    let entry = tentry lmap tokens in
+    if check_entry model tcheck ctable entry then
+      (* Current clause is implied by the model. *)
+      assumptions' model tcheck ctable lmap tokens assumps
+    else
+      (* Not implied; update the assumptions. *)
+      let (_, cl, _) = entry in
+      assumptions' model tcheck ctable lmap tokens
+        (update_assumps assumps cl)
+    
+let assumptions model clauses tokens =
+  let lmap = lmap_of_model model
+  and ctable = clause_table clauses in
+  assumptions' model (tauto_check model) ctable lmap tokens []

@@ -40,6 +40,9 @@ let string_of_ivars model = string_of_list (M.ivar_name model)
 let tauto bnd cl =
   C_impl.check_tauto_bnd bnd (impl_clause_of_clause cl)
 
+let clause_subsumes cl_x cl_y =
+  C_impl.check_clause (impl_clause_of_clause cl_x) (impl_clause_of_clause cl_y)
+
 (* Build the linear checker. *)
 let check_linear_le model =
  fun tokens ->

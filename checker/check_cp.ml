@@ -23,6 +23,16 @@ let log_failure model checker cl =
 let log info args =
   Format.fprintf fmt info args ; Format.fprintf fmt "@."
 
+let string_of_assumptions model clauses =
+  let rec aux clauses =
+    match clauses with
+    | [] -> ""
+    | [cl] -> M.string_of_clause model cl
+    | (cl :: cls) -> (M.string_of_clause model cl) ^ "," ^ (aux cls)
+  in
+  "{" ^ (aux clauses) ^ "}"
+
+
 (* Find the checker corresponding to a specified
  * constraint name, call it on the given clause. *)
 let check_inference model bounds ident clause =
@@ -169,6 +179,15 @@ let check_corresp model clauses =
       let ttoks = Spec.lexer (Stream.of_channel tchannel) in
       Corresp.check model clauses ttoks
 
+let get_assumptions model clauses =
+  match !COption.tracefile with
+  | None -> None
+  | Some tfile ->
+      let tchannel = open_in tfile in
+      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
+      Some (Corresp.assumptions model clauses ttoks)
+
+
 let main () =
   (* Parse the command-line arguments *)
   Arg.parse
@@ -186,6 +205,7 @@ let main () =
   List.iter (fun m -> DL.loadfile_private m) !COption.modules ;
   let tokens = Spec.lexer (Stream.of_channel input) in 
   let model = parse_model tokens in
+  (*
   let okay =
     if !COption.stream then
       parse_and_check_inferences model (M.get_bounds model) tokens
@@ -198,5 +218,19 @@ let main () =
     Format.fprintf fmt "OKAY@."
   else
     Format.fprintf fmt "FAILURE: invalid inference found.@." 
-
+    *)
+  let infs = parse_inferences model tokens in
+  if check_inferences model (M.get_bounds model) infs
+  then
+    let assumps =
+      get_assumptions model (L.map (fun (i, cl) -> cl) infs) in
+    match assumps with
+    | None -> Format.fprintf fmt "OKAY (no trace)@."
+    | Some [] -> Format.fprintf fmt "OKAY@."
+    | Some xs ->
+        Format.fprintf fmt "ASSUMPTIONS %s@."
+          (string_of_assumptions model xs)
+  else
+    Format.fprintf fmt "FAILURE: invalid clause logged.@."
+      
 let _ = main () 
