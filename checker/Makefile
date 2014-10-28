@@ -113,7 +113,7 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 #GFILES:=$(VFILES:.v=.g)
 #HTMLFILES:=$(VFILES:.v=.html)
 #GHTMLFILES:=$(VFILES:.v=.g.html)
-MLFILES:=\
+BASE_MLFILES:=\
   cOption.ml\
   mTypes.ml\
   spec.ml\
@@ -121,11 +121,12 @@ MLFILES:=\
   model.ml\
   registry.ml\
   parse.ml\
-  checker_impl.ml\
   builtins.ml\
   corresp.ml
 
 AUTO_MLFILES:=checker_impl.ml
+
+MLFILES:=$(AUTO_MLFILES) $(BASE_MLFILES)
 
 CMOFILES:=$(MLFILES:.ml=.cmo)
 CMOFILES0:=$(filter-out ,$(CMOFILES))
@@ -180,13 +181,13 @@ $(TARGETS) : % : $(CMXFILES) %.cmx
 #	$(CAMLLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
   
 %.cmi: %.mli
-	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PKG_FLAGS) $<
+	$(CAMLC) $(PKG_FLAGS) $(ZDEBUG) $(ZFLAGS) $<
 
-%.cmo: %.ml %.cmi %.ml.d
-	$(CAMLC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
+%.cmo: %.ml %.cmi
+	$(CAMLC) $(PKG_FLAGS) $(ZDEBUG) $(ZFLAGS) $(PP) $<
 
-%.cmx: %.ml %.cmi %.ml.d
-	$(CAMLOPTC) $(ZDEBUG) $(ZFLAGS) $(PP) $(PKG_FLAGS) $<
+%.cmx: %.ml %.cmi
+	$(CAMLOPTC) $(PKG_FLAGS) $(ZDEBUG) $(ZFLAGS) $(PP) $<
 
 %.cmxs: %.ml
 	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -shared -o $@ $(PP) $< $(LINKPKG_FLAGS)
@@ -280,8 +281,8 @@ printenv:
 -include $(VFILES:.v=.v.d)
 .SECONDARY: $(VFILES:.v=.v.d)
 
--include $(MLFILES:.ml=.ml.d)
-.SECONDARY: $(MLFILES:.ml=.ml.d)
+-include $(BASE_MLFILES:.ml=.ml.d)
+.SECONDARY: $(BASE_MLFILES:.ml=.ml.d)
 
 # WARNING
 #
