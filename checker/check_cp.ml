@@ -1,6 +1,7 @@
 (* Top-level checker code. *)
 module List = ExtLib.List
 module L = List
+module H = Hashtbl
 module GL = Genlex
 module MT = MTypes
 module C = Checker
@@ -187,6 +188,26 @@ let get_assumptions model clauses =
       let ttoks = Spec.lexer (Stream.of_channel tchannel) in
       Some (Corresp.assumptions model clauses ttoks)
 
+let trace_assumptions model lmap =
+  match !COption.tracefile with
+  | None -> None
+  | Some tfile ->
+      let tchannel = open_in tfile in
+      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
+      Some (CheckTrace.assumptions model lmap ttoks)
+
+let get_litsem model = parser
+  | [< 'GL.Int v ; 'GL.Kwd "[" ; l = Parse.parse_vprop model ; 'GL.Kwd "]" >]
+    -> (v, l)
+
+let parse_lmap model tokens =
+  let lmap = H.create 3037 in
+  while Stream.peek tokens <> None
+  do
+    let (v, l) = get_litsem model tokens in
+    H.add lmap v l
+  done ;
+  lmap
 
 let main () =
   (* Parse the command-line arguments *)
@@ -219,6 +240,7 @@ let main () =
   else
     Format.fprintf fmt "FAILURE: invalid inference found.@." 
     *)
+  (*
   let infs = parse_inferences model tokens in
   if check_inferences model (M.get_bounds model) infs
   then
@@ -232,5 +254,19 @@ let main () =
           (string_of_assumptions model xs)
   else
     Format.fprintf fmt "FAILURE: invalid clause logged.@."
+    *)
+  let lit_tokens = match !COption.litfile with
+    | None -> tokens
+    | Some lfile -> Spec.lexer (Stream.of_channel (open_in lfile))
+  in
+  let lmap = parse_lmap model lit_tokens in
+  let assumps =
+    trace_assumptions model lmap in
+  match assumps with
+  | None -> Format.fprintf fmt "ERROR: No trace specified@."
+  | Some [] -> Format.fprintf fmt "OKAY@."
+  | Some xs ->
+      Format.fprintf fmt "ASSUMPTIONS %s@."
+        (string_of_assumptions model xs)
       
 let _ = main () 

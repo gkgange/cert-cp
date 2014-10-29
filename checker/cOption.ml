@@ -2,6 +2,7 @@
 let infile = ref None
 let modules = ref []
 let tracefile = ref None
+let litfile = ref None
 
 let verbosity = ref 0
 
@@ -29,5 +30,9 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
      ("-trace",
       Arg.String(fun f -> tracefile := Some f),
       " resolution proof trace to attempt to justify."
+     );
+     ("-lits",
+      Arg.String(fun f -> litfile := Some f),
+      " mapping of trace literals to model semantics."
      );
     ]

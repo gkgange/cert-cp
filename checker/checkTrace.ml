@@ -7,19 +7,6 @@ module H = Hashtbl
 module A = DynArray
 module C = Checker
 
-(* Map integers to literals.
- * Should add an option for a separate mapping. *)
-let lmap_of_model model =
-  let lmap = H.create 3037 in
-  M.lits_iteri (fun i _ lit -> H.add lmap (3+i) lit) model ;
-  lmap
-
-(* Hash-table of pre-checked clauses. *)
-let clause_table clauses =
-  let ctable = H.create 11437 in
-  List.iter (fun cl -> H.add ctable (List.sort compare cl) ()) clauses ;
-  ctable
-  
 (* Look up a literal in the mapping. *)
 let get_lit lmap k =
   try
@@ -39,6 +26,19 @@ let tlit lmap = parser
       else
         get_lit lmap k
 
+(* Parse a checker hint from the trace. *)
+let parse_hint =
+  let haux = parser
+    | [< 'GL.Kwd "-" >] -> None
+    | [< 'GL.Ident ident >] -> Some ident
+  in parser
+  | [< 'GL.Ident "c" ; hint = haux >] -> hint
+
+let resolve_hint model hint =
+  match hint with
+  | None -> None
+  | Some ident ->
+      Some ((M.get_checker model ident).C.check (M.get_bounds model))
 
 (* Parse a clause from the trace. *)
 let tclause lmap tokens =
@@ -59,7 +59,7 @@ let tentry lmap = parser
   | [< 'GL.Int id ; cl = tclause lmap ; ants = tantecedents >] ->
       (id, cl, ants)
 
-let check_clause model tauto_check cltable clause =
+let check_clause model hint tauto_check clause =
   begin
     (* Debug logging. *)
     if !COption.verbosity > 1
@@ -69,30 +69,27 @@ let check_clause model tauto_check cltable clause =
         (M.string_of_clause model clause)
   end ;
   (* First, try looking up the clause in the table. *)
-  try
-    let _ = H.find cltable (List.sort compare clause) in
-    true
-  with Not_found ->
-    (* Otherwise, check if it's a tautology (under the
-     * model semantics). *)
-    if tauto_check clause then
+  let check = match hint with
+    | None -> tauto_check
+    | Some c -> c in
+  if check clause then
       true
-    else
-      begin
-        if !COption.verbosity > 0
-        then
-          let fmt = Format.err_formatter in
-          Format.fprintf fmt "Unjustified clause: %s@."
-            (M.string_of_clause model clause)
-        else
-          () ;
-        false
-      end
+  else
+    begin
+      if !COption.verbosity > 0
+      then
+        let fmt = Format.err_formatter in
+        Format.fprintf fmt "Unjustified clause: %s@."
+          (M.string_of_clause model clause)
+      else
+        () ;
+      false
+    end
 
-let check_entry model tauto_check cltable (id, cl, ants) =
+let check_entry model hint tauto_check (id, cl, ants) =
   match ants with
   | [] ->
-      let okay = check_clause model tauto_check cltable cl in
+      let okay = check_clause model hint tauto_check cl in
       if !COption.verbosity > 0 then
         begin
           if not okay then
@@ -123,19 +120,6 @@ let tauto_check model = fallback model
 *)
 let tauto_check model = Builtins.tauto (M.get_bounds model)
 
-let check model clauses tokens =
-  let lmap = lmap_of_model model
-  and ctable = clause_table clauses in
-  let okay = ref true in
-  while Stream.peek tokens <> None
-  do
-    (* Get the next entry. *)
-    let entry = tentry lmap tokens in
-    (* check_entry model tauto_check ctable entry && check_aux tokens *)
-    okay := check_entry model (tauto_check model) ctable entry && !okay
-  done ;
-  !okay
-
 let update_assumps clauses cl =
   if List.exists (fun cl_y -> Builtins.clause_subsumes cl_y cl) clauses then
     clauses
@@ -144,22 +128,23 @@ let update_assumps clauses cl =
 
 (* Should be tail recursive; we can switch to an iterative
  * implementation if we have stack problems. *)
-let rec assumptions' model tcheck ctable lmap tokens assumps =
+let rec assumptions' model hint tcheck lmap tokens assumps =
   if Stream.peek tokens = None then
     assumps
+  else if Stream.peek tokens = Some (GL.Ident "c") then
+    assumptions' model (resolve_hint model (parse_hint tokens))
+      tcheck lmap tokens assumps
   else
     (* Get the next entry. *)
     let entry = tentry lmap tokens in
-    if check_entry model tcheck ctable entry then
+    if check_entry model hint tcheck entry then
       (* Current clause is implied by the model. *)
-      assumptions' model tcheck ctable lmap tokens assumps
+      assumptions' model hint tcheck lmap tokens assumps
     else
       (* Not implied; update the assumptions. *)
       let (_, cl, _) = entry in
-      assumptions' model tcheck ctable lmap tokens
+      assumptions' model hint tcheck lmap tokens
         (update_assumps assumps cl)
     
-let assumptions model clauses tokens =
-  let lmap = lmap_of_model model
-  and ctable = clause_table clauses in
-  assumptions' model (tauto_check model) ctable lmap tokens []
+let assumptions model lmap tokens =
+  assumptions' model None (tauto_check model) lmap tokens []

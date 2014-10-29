@@ -402,3 +402,69 @@ Proof.
   rewrite Heqelts in Heqdom_x.
   apply ZSets.elements_spec1 in H. tauto.
 Qed.
+
+Definition domfun := ivar -> dom.
+Definition eval_domfun (f : domfun) (theta : asg) :=
+  forall x : ivar, sat_dom (f x) (eval_ivar x theta).
+
+Definition is_negcl_domfun (f : domfun) (cl : clause) :=
+  forall x : ivar, dom_equal (f x) (dom_from_negclause x cl).
+
+Definition meet_domfun (f : domfun) (g : domfun) (x : ivar) := dom_meet (f x) (g x).
+
+(*
+Record DomCheck : Type := mkDomCheck
+  { T : Type ;
+    eval : T -> asg -> Prop ;
+    check : T -> domfun -> bool ;
+    check_valid : 
+      forall (x : T) (f : domfun) (cl : clause),
+      is_negcl_domfun f cl /\ check x f = true ->
+        implies (eval x) (eval_clause cl) }.
+*)
+
+(*
+Definition dombounded (C : DomCheck) : Type :=
+  (domfun * C.(T))%type.
+Definition dombounded_eval (C : DomCheck) (x : dombounded C) (theta : asg) :=
+  eval_domfun (fst x) theta /\ C.(eval) (snd x) theta.
+Definition dombounded_check (C : DomCheck) (x : dombounded C) (f : domfun) :=
+  C.(check) (snd x) (fun v => dom_meet (f v) ((fst x) v)).
+Theorem dombounded_check_valid : forall (C : DomCheck) (x : dombounded C) (f : domfun) (cl : clause),
+  is_negcl_domfun f cl /\ dombounded_check C x f = true -> implies (dombounded_eval C x) (eval_clause cl).
+Proof.
+  intros.
+    destruct H.
+    unfold dombounded_check in H0.
+    remember (fun v : ivar => dom_meet (f v) (fst x v)) as g.
+    assert (C.(check) (snd x) f = true -> implies (eval C (snd x)) (eval_clause cl)).
+      intros; apply C.(check_valid) with (f := f); split; assumption.
+    unfold is_negcl_domfun in H.
+    unfold dombounded_eval, implies; intros.
+    destruct H2.
+    Check C.(check_valid).
+    unfold dombounded_eval.
+    apply C.(check_valid).
+    destruct H0.
+    apply C.(check_valid).
+    unfold implies in H.
+    assert (eval_clause (negclause_of_bounds (fst x) ++ cl) theta).
+      apply H. exact H1.
+    apply app_clause_or in H2.
+    rewrite negclause_of_bounds_valid in H0.
+    destruct H2.
+      tauto.
+      exact H2.
+Qed.
+
+
+Theorem eval_domfun_meet_iff : forall (f g : domfun) (theta : asg),
+  eval_domfun (fun x => dom_meet (f x) (g x)) theta <-> eval_domfun f theta /\ eval_domfun g theta.
+Proof.
+  unfold eval_domfun; intros; split; intros.
+  split; intros;
+    [apply dom_meet_iff with (dy := g x) | apply dom_meet_iff with (dx := f x)]; apply H.
+  destruct H as [Hf Hg]; rewrite dom_meet_iff; split; [apply Hf | apply Hg].
+Qed.
+
+*)

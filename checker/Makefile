@@ -122,7 +122,8 @@ BASE_MLFILES:=\
   registry.ml\
   parse.ml\
   builtins.ml\
-  corresp.ml
+  corresp.ml\
+	checkTrace.ml
 
 AUTO_MLFILES:=checker_impl.ml
 
@@ -138,6 +139,7 @@ CMXSFILES0:=$(filter-out ,$(CMXSFILES))
 OFILES:=$(MLFILES:.ml=.o)
 
 TARGETS:=check_cp
+BYTE_TARGETS:=$(addsuffix .byte,$(TARGETS))
 # all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 all: $(TARGETS)
 spec: $(VIFILES)
@@ -177,6 +179,8 @@ spec: $(VIFILES)
 $(TARGETS) : % : $(CMXFILES) %.cmx
 	$(CAMLOPTLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $@.mli $^ $(LINKPKG_FLAGS)
 
+$(TARGETS_BYTE) : % : $(CMOFILES) $(SUBST .byte,.cmo,%)
+	$(CAMLLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $@ $@.mli $^ $(LINKPKG_FLAGS)
 #check-cp.byte : $(CMOFILES)
 #	$(CAMLLINK) $(ZDEBUG) $(ZFLAGS) -o $@ $^ $(LINKPKG_FLAGS)
   
