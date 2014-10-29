@@ -612,3 +612,126 @@ Definition Tauto : Constraint :=
 
 Definition check_tauto_bnd (bnd : list (ivar*Z*Z)) (cl : clause) :=
   (BoundedConstraint Tauto).(check) (bnd, tt) cl.
+
+Definition domfun := ivar -> dom.
+Definition eval_domfun (f : domfun) (theta : asg) :=
+  forall x : ivar, sat_dom (f x) (eval_ivar x theta).
+
+Definition domfun_meet (f g : domfun) (x : ivar) :=
+  dom_meet (f x) (g x).
+
+Theorem domfun_meet_iff :
+  forall (f g : domfun) (x : ivar) (k : Z),
+    sat_dom ((domfun_meet f g) x) k <->
+      sat_dom (f x) k /\ sat_dom (g x) k.
+Proof.
+  intros; unfold domfun_meet.
+  now rewrite dom_meet_iff.
+Qed.
+
+
+Definition is_negcl_domfun (f : domfun) (cl : clause) :=
+  forall (x : ivar) (k : Z),
+    sat_dom (f x) k <-> sat_dom (dom_from_negclause x cl) k.
+  
+Theorem negcl_domfun_valid : forall x f cl,
+  is_negcl_domfun f cl ->
+    forall theta, ~ eval_clause cl theta -> sat_dom (f x) (eval_ivar x theta).
+Proof.
+  unfold is_negcl_domfun, dom_equal; intros.
+  rewrite H; now apply dom_from_negclause_valid.
+Qed.
+
+Definition is_negcl_domfun_db (f : domfun) (cl : clause) :=
+  forall (x : ivar),
+    (fst (f x)) = db_from_negclause x cl.
+
+Theorem bounded_negcl_domfun_valid : forall x f g cl theta,
+  eval_domfun f theta /\ is_negcl_domfun g cl ->
+    ~ eval_clause cl theta -> sat_dom ((domfun_meet f g) x) (eval_ivar x theta).
+Proof.
+  intros.
+    destruct H ; apply domfun_meet_iff; split.
+      apply H.
+      now apply negcl_domfun_valid with (cl := cl).
+Qed.
+
+(*
+Record DomCheck : Type := mkDomCheck
+  { T : Type ;
+    eval : T -> asg -> Prop ;
+    check : T -> domfun -> bool ;
+    check_valid : 
+      forall (x : T) (f : domfun) (cl : clause),
+      is_negcl_domfun f cl /\ check x f = true ->
+        implies (eval x) (eval_clause cl) }.
+
+Theorem dombounded_negcl_iff :
+  forall (f g : domfun) (cl : clause) (theta : asg),
+  eval_domfun f theta ->
+    (eval_domfun g theta -> eval_clause cl theta) ->
+    (eval_domfun (domfun_meet f g) theta -> eval_clause cl theta).
+Proof.
+  intros.
+  unfold eval_domfun in H1.
+  apply H0; unfold eval_domfun; intros.
+  now apply domfun_meet_iff with (f := f).
+Qed.
+     
+Definition dombounded (C : DomCheck) : Type :=
+  (domfun * C.(T))%type.
+Definition dombounded_eval (C : DomCheck) (x : dombounded C) (theta : asg) :=
+  eval_domfun (fst x) theta /\ C.(eval) (snd x) theta.
+Definition dombounded_check (C : DomCheck) (x : dombounded C) (f : domfun) :=
+  C.(check) (snd x) (domfun_meet f (fst x)).
+Theorem dombounded_check_valid : forall (C : DomCheck) (x : dombounded C) (f : domfun) (cl : clause),
+  is_negcl_domfun f cl /\ dombounded_check C x f = true -> implies (dombounded_eval C x) (eval_clause cl).
+Proof.
+  intros.
+    destruct H.
+    unfold dombounded_eval.
+    unfold implies; intros.
+    
+    assert (is_negcl_domfun f cl /\ C.(check) (snd x) f = true ->
+      implies (C.(eval) (snd x)) (eval_clause cl)) as Cvalid.
+      intros. apply C.(check_valid) with (f := f).
+      tauto.
+    destruct H1.
+    unfold implies in Cvalid.
+    apply Cvalid.
+    split.
+      assumption.
+      
+    apply C.(check_valid).
+    apply dombounded_negcl_iff with (f := f) (g := (fst x)).
+    unfold implies, dombounded_eval; intros.
+    destruct H1.
+      intros; apply C.(check_valid) with (f := f); split; assumption.
+    unfold is_negcl_domfun in H.
+    unfold dombounded_eval, implies; intros.
+    destruct H2.
+    Check C.(check_valid).
+    unfold dombounded_eval.
+    apply C.(check_valid).
+    destruct H0.
+    apply C.(check_valid).
+    unfold implies in H.
+    assert (eval_clause (negclause_of_bounds (fst x) ++ cl) theta).
+      apply H. exact H1.
+    apply app_clause_or in H2.
+    rewrite negclause_of_bounds_valid in H0.
+    destruct H2.
+      tauto.
+      exact H2.
+Qed.
+
+
+Theorem eval_domfun_meet_iff : forall (f g : domfun) (theta : asg),
+  eval_domfun (fun x => dom_meet (f x) (g x)) theta <-> eval_domfun f theta /\ eval_domfun g theta.
+Proof.
+  unfold eval_domfun; intros; split; intros.
+  split; intros;
+    [apply dom_meet_iff with (dy := g x) | apply dom_meet_iff with (dx := f x)]; apply H.
+  destruct H as [Hf Hg]; rewrite dom_meet_iff; split; [apply Hf | apply Hg].
+Qed.
+*)

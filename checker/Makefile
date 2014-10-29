@@ -63,8 +63,8 @@ COQSRCLIBS:=-I $(COQLIB)/kernel -I $(COQLIB)/lib \
 COQLIBS:=-I . 
 COQDOCLIBS:=
 
-PROF:=-ccopt -pg
-# PROF:=
+#PROF:=-ccopt -pg
+PROF:=
 
 ##########################
 #                        #
