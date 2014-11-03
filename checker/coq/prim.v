@@ -9,34 +9,11 @@ Require Import Classical_Prop.
 Require Import ClassicalFacts.
 Require Import Decidable.
 Require Import List.
+Require SetoidList.
 
 Open Scope Z_scope.
 
 (* Some convenience Z-handling functions. *)
-(*
-Definition Z_leb (x y : Z) : bool :=
-  if Z_le_dec x y then true else false.
-Theorem Z_leb_iff_le : forall (x y : Z),
-  Z_leb x y = true <-> x <= y.
-Proof.
-  unfold Z_leb. intros.
-  split. intros.
-  destruct Z_le_dec. tauto. discriminate.
-  intros. destruct Z_le_dec. trivial. tauto.
-Qed.
-
-Theorem Z_leb_false_iff_notle : forall (x y : Z),
-  Z_leb x y = false <-> ~ x <= y.
-Proof.
-  unfold Z_leb. intros.
-  destruct Z_le_dec.
-  split. intro; discriminate.
-  intro. assert False. omega. tauto.
-  split. intro. exact n.
-  intro. trivial.
-Qed.
-  *)
-
 Definition Z_leb (x y : Z) : bool := Zle_bool x y.
 
 Theorem Z_leb_iff_le : forall (x y : Z),
@@ -55,31 +32,14 @@ Proof.
     apply Z_leb_iff_le in H0; tauto.
 Qed.
     
-Definition Z_ltb (x y : Z) : bool :=
-  if Z_lt_dec x y then true else false.
+Definition Z_ltb (x y : Z) : bool := Zlt_bool x y.
 
 Theorem Z_ltb_iff_lt : forall (x y : Z),
   Z_ltb x y = true <-> x < y.
 Proof.
-  unfold Z_ltb. intros.
-  split. intros.
-  destruct Z_lt_dec. tauto. discriminate.
-  intros. destruct Z_lt_dec. trivial. tauto.
+  unfold Z_ltb. intros. symmetry; apply Zlt_is_lt_bool.
 Qed.
 
-(* )
-Definition Z_eqb (x y : Z) : bool :=
-  if Z_eq_dec x y then true else false.
-
-Theorem Z_eqb_iff_eq : forall (x y : Z),
-  Z_eqb x y = true <-> x = y.
-Proof.
-  unfold Z_eqb. intros.
-  split. intros.
-  destruct Z_eq_dec. tauto. discriminate.
-  intros. destruct Z_eq_dec. trivial. tauto.
-Qed.
-( *)
 Definition Z_eqb (x y : Z) : bool := Zeq_bool x y.
 Theorem Z_eqb_iff_eq : forall (x y : Z),
   Z_eqb x y = true <-> x = y.
@@ -87,7 +47,6 @@ Proof.
   unfold Z_eqb; intros; symmetry.
   apply Zeq_is_eq_bool.
 Qed.
-(* *)
 
 (* Variable types *)
 Definition ivar : Type := Z.
@@ -140,6 +99,16 @@ Definition eval_vprop
   | CTrue => True
   end.
 
+Definition sat_lit
+  (l : lit) (x : ivar) (k : Z) :=
+  match l with
+  | Pos (ILeq x' k') => x <> x' \/ k <= k'
+  | Neg (ILeq x' k') => x <> x' \/ k' < k
+  | Pos (IEq x' k') => x <> x' \/ k = k'
+  | Neg (IEq x' k') => x <> x' \/ k <> k'
+  | _ => True
+  end.
+  
 (* Evaluate a literal under an assignment. *)
 Definition eval_lit
   (l : lit) (theta : asg) : Prop :=
@@ -243,6 +212,23 @@ Fixpoint neg_clause
   | nil => nil
   | cons l ls' => cons (neglit l) (neg_clause ls')
   end.
+
+Fixpoint sat_negclause (cl : clause) (x : ivar) (k : Z) :=
+  match cl with
+  | nil => True
+  | cons l cl' =>
+      sat_lit (neglit l) x k /\ sat_negclause cl' x k
+  end.
+
+Theorem app_sat_negclause_and : forall (cx cy : clause) (x : ivar) (k : Z),
+  sat_negclause (List.app cx cy) x k <-> sat_negclause cx x k /\ sat_negclause cy x k.
+Proof.
+  intros; induction cx.
+  unfold sat_negclause; tauto.
+
+  unfold sat_negclause; simpl; fold sat_negclause.
+  rewrite IHcx; tauto.
+Qed.
 
 (* A product is true iff all literals are true. *)
 Fixpoint eval_prod (ls : list lit) (theta : asg) : Prop :=
@@ -445,3 +431,16 @@ Fixpoint is_clausevar (cl : clause) (x : ivar) :=
   | cons l cl' => (lit_ivar l = Some x) \/ (is_clausevar cl' x)
   end.
   
+Theorem InA_eq_iff_In : forall (A : Type) (xs : list A) (k : A),
+  SetoidList.InA eq k xs <-> In k xs.
+Proof.
+  intros.
+    induction xs.
+      rewrite SetoidList.InA_nil; now unfold In.
+      rewrite SetoidList.InA_cons.
+      split; intros.
+        destruct H; [rewrite H; apply in_eq | apply in_cons; now apply IHxs].
+
+      apply in_inv in H; rewrite IHxs.
+      destruct H; [left; now rewrite H | right ; tauto ].
+Qed.

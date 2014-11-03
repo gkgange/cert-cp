@@ -4,11 +4,12 @@ Require Import ZArith.
 Require Import Bool.
 Require Import bounds.
 Require Import prim.
+Require Import domain.
 Require Import domset.
 Require Import cumulative.
 
-Definition dset_compulsoryb (t : task) (time : Z) (ds : domset) :=
-  match fst (dom_from_domset ds t.(svar)) with
+Definition dset_compulsoryb (t : task) (time : Z) (f : domfun) :=
+  match fst (f t.(svar)) with
   | (Unbounded, Unbounded) => false
   | (Unbounded, Bounded _) => false
   | (Bounded _, Unbounded) => false
@@ -16,31 +17,32 @@ Definition dset_compulsoryb (t : task) (time : Z) (ds : domset) :=
     Z_ltb time (lb + (Z_of_nat t.(duration))) && Z_leb ub time
   end.
     
-Theorem dset_compulsoryb_eq : forall (t : task) (time : Z) (cl : clause) (dset: domset),
-  is_negcl_domset_db dset cl ->
-    dset_compulsoryb t time dset = negcl_compulsoryb t time cl.
+Theorem dset_compulsoryb_eq : forall (t : task) (time : Z) (cl : clause) (f: domfun),
+  is_negcl_domfun_db f cl ->
+    dset_compulsoryb t time f = negcl_compulsoryb t time cl.
 Proof.
-  unfold is_negcl_domset_db, dset_compulsoryb, negcl_compulsoryb; intros.
-  assert (db_from_negclause (svar t) cl = fst (dom_from_domset dset (svar t))).
-    apply H.
+  unfold is_negcl_domfun_db, dset_compulsoryb, negcl_compulsoryb; intros.
+  assert (db_from_negclause (svar t) cl = fst (f (svar t))).
+    symmetry; apply H with (x := svar t).
   repeat (rewrite H0). tauto.
 Qed.
- Fixpoint dset_compulsory_usage' (ts : list task) (time : Z) (dset : domset) :=
+
+Fixpoint dset_compulsory_usage' (ts : list task) (time : Z) (f : domfun) :=
   match ts with
   | nil => O
   | cons t ts' =>
-    if dset_compulsoryb t time dset then
-      plus t.(resource) (dset_compulsory_usage' ts' time dset)
+    if dset_compulsoryb t time f then
+      plus t.(resource) (dset_compulsory_usage' ts' time f)
     else
-      dset_compulsory_usage' ts' time dset
+      dset_compulsory_usage' ts' time f
   end.
 
-Definition dset_compulsory_usage (c : cumul) (time : Z) (dset : domset) :=
-  dset_compulsory_usage' c.(tasks) time dset.
+Definition dset_compulsory_usage (c : cumul) (time : Z) (f : domfun) :=
+  dset_compulsory_usage' c.(tasks) time f.
 
-Theorem dset_compulsory_usage'_eq : forall (ts : list task) (time : Z) (cl : clause) (dset : domset),
-  is_negcl_domset_db dset cl ->
-    (dset_compulsory_usage' ts time dset = negcl_compulsory_usage' ts time cl).
+Theorem dset_compulsory_usage'_eq : forall (ts : list task) (time : Z) (cl : clause) (f : domfun),
+  is_negcl_domfun_db f cl ->
+    (dset_compulsory_usage' ts time f = negcl_compulsory_usage' ts time cl).
 Proof.
   intros.
   induction ts; unfold dset_compulsory_usage', negcl_compulsory_usage';
@@ -51,20 +53,20 @@ Proof.
     rewrite H, IHts; congruence.
 Qed.
 
-Theorem dset_compulsory_usage_eq : forall (c : cumul) (time : Z) (cl : clause) (dset : domset),
-  is_negcl_domset_db dset cl ->
-    (dset_compulsory_usage c time dset = negcl_compulsory_usage c time cl).
+Theorem dset_compulsory_usage_eq : forall (c : cumul) (time : Z) (cl : clause) (f : domfun),
+  is_negcl_domfun_db f cl ->
+    (dset_compulsory_usage c time f = negcl_compulsory_usage c time cl).
 Proof.
   unfold dset_compulsory_usage, negcl_compulsory_usage; intros.
   apply dset_compulsory_usage'_eq with (ts := (tasks c)) (time := time) in H; now apply H.
 Qed.
 
-Definition dset_check_cumul_moment (c : cumul) (dset : domset) (t : Z) :=
-  negb (Compare_dec.leb (dset_compulsory_usage c t dset) c.(limit)).
+Definition dset_check_cumul_moment (c : cumul) (f : domfun) (t : Z) :=
+  negb (Compare_dec.leb (dset_compulsory_usage c t f) c.(limit)).
 
-Theorem dset_check_cumul_moment_eq : forall (c : cumul) (cl : clause) (dset : domset) (t : Z),
-  is_negcl_domset_db dset cl ->
-  dset_check_cumul_moment c dset t = check_cumul_moment c cl t.
+Theorem dset_check_cumul_moment_eq : forall (c : cumul) (cl : clause) (f : domfun) (t : Z),
+  is_negcl_domfun_db f cl ->
+  dset_check_cumul_moment c f t = check_cumul_moment c cl t.
 Proof.
   intros c cl dset t; intro.
   unfold dset_check_cumul_moment, check_cumul_moment.
@@ -73,36 +75,36 @@ Proof.
 Qed.
 
 (* Check the beginning of the (possibly empty) compulsory region for t. *)
-Definition dset_check_cumul_tt_start (c : cumul) (dset : domset) (t : task) :=
-  match fst (dom_from_domset dset t.(svar)) with
+Definition dset_check_cumul_tt_start (c : cumul) (f : domfun) (t : task) :=
+  match fst (f t.(svar)) with
   | (Bounded lb, Bounded ub) =>
-      Z_ltb ub (lb + (Z_of_nat t.(duration))) && dset_check_cumul_moment c dset ub
+      Z_ltb ub (lb + (Z_of_nat t.(duration))) && dset_check_cumul_moment c f ub
   | _ => false
   end.
-Theorem dset_check_cumul_tt_start_eq : forall (c : cumul) (cl : clause) (dset : domset) (t : task),
-  is_negcl_domset_db dset cl ->
-  dset_check_cumul_tt_start c dset t = check_cumul_tt_start c cl t.
+Theorem dset_check_cumul_tt_start_eq : forall (c : cumul) (cl : clause) (f : domfun) (t : task),
+  is_negcl_domfun_db f cl ->
+  dset_check_cumul_tt_start c f t = check_cumul_tt_start c cl t.
 Proof.
-  intros c cl dset t H.
-  assert (H' := H); unfold is_negcl_domset_db in H'.
-  assert (db_from_negclause (svar t) cl = fst (dom_from_domset dset (svar t))) as Heq.
-    apply H'.
+  intros c cl f t H.
+  assert (H' := H); unfold is_negcl_domfun_db in H'.
+  assert (db_from_negclause (svar t) cl = fst (f (svar t))) as Heq.
+    symmetry; apply H'.
   unfold dset_check_cumul_tt_start, check_cumul_tt_start.
   rewrite Heq.
-  destruct (fst (dom_from_domset dset (svar t))); destruct b, b0; simpl; try discriminate; try tauto.
+  destruct (fst (f (svar t))); destruct b, b0; simpl; try discriminate; try tauto.
   now rewrite dset_check_cumul_moment_eq with (t := z0) (c := c) (cl := cl).
 Qed.    
  
-Fixpoint dset_check_cumul_timetable (c : cumul) (dset : domset) (ts : list task) :=
+Fixpoint dset_check_cumul_timetable (c : cumul) (f : domfun) (ts : list task) :=
   match ts with
   | nil => false
   | cons t ts' =>
-    dset_check_cumul_tt_start c dset t || dset_check_cumul_timetable c dset ts'
+    dset_check_cumul_tt_start c f t || dset_check_cumul_timetable c f ts'
   end.
 
-Theorem dset_check_cumul_timetable_eq : forall (c : cumul) (cl : clause) (dset : domset) (ts : list task),
-  is_negcl_domset_db dset cl ->
-    dset_check_cumul_timetable c dset ts = check_cumul_timetable c cl ts.
+Theorem dset_check_cumul_timetable_eq : forall (c : cumul) (cl : clause) (f : domfun) (ts : list task),
+  is_negcl_domfun_db f cl ->
+    dset_check_cumul_timetable c f ts = check_cumul_timetable c cl ts.
 Proof.
   intros; induction ts;
     unfold dset_check_cumul_timetable, check_cumul_timetable; fold dset_check_cumul_timetable; fold check_cumul_timetable;
@@ -111,25 +113,34 @@ Proof.
     now rewrite H', IHts.
 Qed.
 
+Definition dset_check_cumul_tt (c : cumul) (f : domfun) :=
+  dset_check_cumul_timetable c f c.(tasks).
+(*
 Definition dset_check_cumul_tt (c : cumul) (cl : clause) :=
   dset_check_cumul_timetable c (negcl_domset cl) c.(tasks).
-Theorem dset_check_cumul_tt_eq : forall (c : cumul) (cl : clause),
-  dset_check_cumul_tt c cl = check_cumul_ttonly c cl.
+  *)
+Theorem dset_check_cumul_tt_eq : forall (c : cumul) (f : domfun) (cl : clause),
+  is_negcl_domfun_db f cl -> dset_check_cumul_tt c f = check_cumul_ttonly c cl.
 Proof.
   unfold dset_check_cumul_tt, check_cumul_ttonly; intros.
-  assert (is_negcl_domset_db (negcl_domset cl) cl).
-    apply dom_from_domset_db.
   apply dset_check_cumul_timetable_eq with (c := c) (ts := tasks c) in H.
   now rewrite H.
 Qed.
 
-Theorem dset_check_cumul_tt_valid : forall (c : cumul) (cl : clause),
-  dset_check_cumul_tt c cl = true -> implies (eval_cumul c) (eval_clause cl).
+Theorem dset_check_cumul_tt_valid : forall (c : cumul) (f : domfun) (cl : clause),
+  is_negcl_domfun_db f cl /\ dset_check_cumul_tt c f = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  intros c cl; rewrite dset_check_cumul_tt_eq; apply check_cumul_ttonly_valid.
+  intros; apply check_cumul_ttonly_valid.
+  destruct H; rewrite dset_check_cumul_tt_eq with (cl := cl) in H0.
+  assumption. assumption.
 Qed.
 
-Definition CumulTTDSet : Constraint :=
-  mkConstraint (cumul) (eval_cumul) (dset_check_cumul_tt) (dset_check_cumul_tt_valid).
-Definition check_cumul_tt_dbnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
-  (BoundedConstraint CumulTTDSet).(check) (bs, c) cl.
+Definition CumulTTDSet : DomDBCheck :=
+  mkDomDBCheck (cumul) (eval_cumul) (dset_check_cumul_tt) (dset_check_cumul_tt_valid).
+
+Definition CumulTTDCheck : Constraint :=
+  (CheckOfDomDBCheck (DomboundedDBCheck CumulTTDSet)). 
+
+Definition check_cumul_tt_dbnd (c : cumul) (bs : list (ivar*Z*Z)) :=
+  let check := fun cl => (CumulTTDCheck).(check) (bs, c) cl in
+  fun cl => check cl.

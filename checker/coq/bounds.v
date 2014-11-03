@@ -23,6 +23,8 @@ Inductive bound :=
 
 Definition dbound := (bound * bound)%type.
 
+Definition model_bound := (ivar * Z * Z)%type.
+
 (* Evaluating bounds under an assignment. *)
 Definition sat_lb (b : bound) (k : Z) :=
   match b with
@@ -441,6 +443,28 @@ Proof.
   tauto.
 Qed.
 
+Theorem bound_max_assoc : forall (x y z : bound),
+  bound_max (bound_max x y) z = bound_max x (bound_max y z).
+Proof.
+  intros; unfold bound_max; destruct x, y, z; try tauto; try apply f_equal.
+  symmetry; apply Zmax_assoc.
+Qed.
+
+Theorem bound_min_assoc : forall (x y z : bound),
+  bound_min (bound_min x y) z = bound_min x (bound_min y z).
+Proof.
+  intros; unfold bound_min; destruct x, y, z; try tauto; try apply f_equal.
+  symmetry; apply Zmin_assoc.
+Qed.
+  
+Theorem db_meet_assoc : forall (x y z : dbound),
+  db_meet (db_meet x y) z = db_meet x (db_meet y z).
+Proof.
+  intros.
+  unfold db_meet; destruct x, y, z; simpl.
+  rewrite bound_max_assoc, bound_min_assoc. congruence.
+Qed.
+
 Definition minus_bound (u : bound) :=
   match u with
   | Unbounded => Unbounded
@@ -795,22 +819,100 @@ Proof.
       unfold sat_lb, sat_ub; intros; omega.
 Qed.
 
-Definition eval_bound (b : (ivar * Z * Z)) (theta : asg) :=
+Definition sat_bound (b : model_bound) (x : ivar) (k : Z) :=
+  match b with
+  | (x', lb, ub) =>
+    x <> x' \/ (Zle lb k /\ Zle k ub)
+  end.
+    
+Definition eval_bound (b : model_bound) (theta : asg) :=
   match b with
   | (x, lb, ub) => Zle lb (eval_ivar x theta) /\ Zle (eval_ivar x theta) ub
   end.
-Fixpoint eval_bounds (bs : list (ivar * Z * Z)) (theta : asg) :=
+Fixpoint eval_bounds (bs : list model_bound) (theta : asg) :=
   match bs with
   | nil => True
   | cons b bs' => (eval_bound b theta) /\ (eval_bounds bs' theta)
   end.
 
-Definition negclause_of_bound (b : (ivar * Z * Z)) :=
+Definition negclause_of_lb (x : ivar) (b : bound) :=
+  match b with
+  | Unbounded => nil
+  | Bounded k => cons (Pos (ILeq x (k - 1))) nil
+  end.
+Theorem sat_negclause_lb_iff : forall (x x' : ivar) (b : bound) (k : Z),
+  (x <> x' \/ sat_lb b k) <-> sat_negclause (negclause_of_lb x b) x' k.
+Proof.
+  intros; assert (x = x' \/ x <> x'). tauto.
+  unfold sat_negclause, negclause_of_lb, sat_lit, neglit, sat_lb.
+  destruct H; split; intros;
+  try destruct H0; 
+  destruct b; simpl; try tauto.
+  split; [right; omega | tauto].
+    right. destruct H0.
+    destruct H0; [rewrite H in H0; tauto | omega].
+  split; [left ; congruence | tauto].
+  split; [left; congruence | tauto].
+Qed.
+  
+Theorem negclause_of_lb_valid : forall (x : ivar) (b : bound) (theta : asg),
+  sat_lb b (eval_ivar x theta) <-> ~ eval_clause (negclause_of_lb x b) theta.
+Proof.
+  unfold sat_lb, negclause_of_lb, eval_clause; intros; destruct b; simpl;
+    try tauto; try omega.
+Qed.
+Definition negclause_of_ub (x : ivar) (b : bound) :=
+  match b with
+  | Unbounded => nil
+  | Bounded k => cons (Neg (ILeq x k)) nil
+  end.
+
+Theorem sat_negclause_ub_iff : forall (x x' : ivar) (b : bound) (k : Z),
+  (x <> x' \/ sat_ub b k) <-> sat_negclause (negclause_of_ub x b) x' k.
+Proof.
+  intros; unfold sat_negclause, negclause_of_ub, sat_ub, neglit, sat_lit; destruct b; 
+    try tauto.
+  assert (x <> x' \/ x = x'). tauto.
+  destruct H; split; intros.
+
+  split; [left ; congruence | tauto].
+  tauto. tauto.
+  destruct H0; destruct H0; [congruence | tauto].
+Qed.
+
+Theorem negclause_of_ub_valid : forall (x : ivar) (b : bound) (theta : asg),
+  sat_ub b (eval_ivar x theta) <-> ~ eval_clause (negclause_of_ub x b) theta.
+Proof.
+  unfold sat_ub, negclause_of_ub, eval_clause; intros; destruct b; simpl;
+    try tauto; try omega.
+Qed.
+
+Definition negclause_of_dbound (x : ivar) (db : dbound) :=
+  List.app (negclause_of_lb x (fst db)) (negclause_of_ub x (snd db)).
+Theorem negclause_of_dbound_valid : forall (x : ivar) (db : dbound) (theta : asg),
+  sat_dbound db (eval_ivar x theta) <-> ~ eval_clause (negclause_of_dbound x db) theta.
+Proof.
+  intros; unfold negclause_of_dbound, sat_dbound; destruct db; simpl.
+  rewrite negclause_of_lb_valid, negclause_of_ub_valid.
+  now rewrite notapp_clause_iff.
+Qed.
+Definition sat_negclause_db_iff : forall (x x' : ivar) (db : dbound) (k : Z),
+  (x <> x' \/ sat_dbound db k) <-> sat_negclause (negclause_of_dbound x db) x' k.
+Proof.
+  intros.
+  unfold sat_negclause, sat_dbound, negclause_of_dbound;
+    simpl; fold sat_negclause.
+  rewrite app_sat_negclause_and.
+  rewrite <- sat_negclause_lb_iff, <- sat_negclause_ub_iff.
+  tauto.
+Qed.
+
+Definition negclause_of_bound (b : model_bound) :=
   match b with
   | (x, lb, ub) => 
     cons (Pos (ILeq x (lb - 1))) (cons (Neg (ILeq x ub)) nil)
   end.
-Theorem negclause_of_bound_valid : forall (b : (ivar * Z * Z)) (theta : asg),
+Theorem negclause_of_bound_valid : forall (b : model_bound) (theta : asg),
   eval_bound b theta <-> ~ eval_clause (negclause_of_bound b) theta.
 Proof.
   intros b theta.
@@ -818,12 +920,12 @@ Proof.
   omega.
 Qed.
 
-Fixpoint negclause_of_bounds (bs : list (ivar * Z * Z)) :=
+Fixpoint negclause_of_bounds (bs : list model_bound) :=
   match bs with
   | nil => nil
   | cons b bs' => app (negclause_of_bound b) (negclause_of_bounds bs') 
   end.
-Theorem negclause_of_bounds_valid : forall (bs : list (ivar * Z * Z)) (theta : asg),
+Theorem negclause_of_bounds_valid : forall (bs : list model_bound) (theta : asg),
   eval_bounds bs theta <-> ~ eval_clause (negclause_of_bounds bs) theta.
 Proof.
   intros.

@@ -116,13 +116,16 @@ let check_cumul model =
     let repr = Format.sprintf "cumulative(%s, %s, %s, %d)"
       (string_of_ivars model xs) (string_of_ints durations)
       (string_of_ints resources) lim in
+    let bnd = M.get_bounds model in
+    let check = C_impl.check_cumul_tt_dbnd cumul bnd in
     {
       C.repr = repr ;
-      C.check = (fun bnd cl ->
+      C.check = (fun _ cl ->
         let icl = impl_clause_of_clause cl in
         (* C_impl.check_cumul_bnd cumul bnd icl *)
         C_impl.check_cumul_tt_bnd cumul bnd icl
         (* C_impl.check_cumul_tt_dbnd cumul bnd icl *)
+        (* check icl *)
       )
     }
 let register () =
