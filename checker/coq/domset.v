@@ -18,6 +18,21 @@ Proof.
     repeat (rewrite InA_cons); now rewrite IHxs, H.
 Qed.
 
+Theorem not_InA_cons : forall (A : Type) eqA (a x : A) (xs : list A),
+  ~ InA eqA a (cons x xs) <-> ( ~ eqA a x) /\ ~ InA eqA a xs.
+Proof.
+  intros; simpl.
+
+  split; intros.
+  split; intro.
+  now apply InA_cons_hd with (eqA := eqA) (x := a) (y := x) (l := xs) in H0.
+  now apply InA_cons_tl with (eqA := eqA) (x := a) (y := x) (l := xs) in H0.
+  
+  destruct H.
+  intro. apply InA_cons in H1.
+  destruct H1; tauto.
+Qed.
+
 Theorem eq_key_elt_iff_eq : forall B a b, ZMaps.eq_key_elt (elt := B) a b <-> a = b.
 Proof.
   intros; unfold ZMaps.eq_key_elt, ZMaps.Raw.Proofs.PX.eqke; intros.
@@ -73,6 +88,7 @@ Definition var_dom (ds : domset) (x : ivar) :=
   | Some dom => dom
   end.
 
+Definition var_db (ds : domset) (x : ivar) := fst (var_dom ds x).
 Definition sat_domset (ds : domset) (x : ivar) (k : Z) :=
   sat_dom (var_dom ds x) k.
 
@@ -475,7 +491,6 @@ Qed.
 
 Definition bounds_domset (bs : list model_bound) :=
   negcl_domset (negclause_of_bounds bs).
-
  
 Theorem InA_eq_key_elt_iff_In : forall (B : Type) (xs : list (Z * B)) (y : (Z * B)),
   InA (ZMaps.eq_key_elt (elt := B)) y xs <-> In y xs.
@@ -563,7 +578,10 @@ Proof.
     rewrite app_dom_from_negclause_iff.
     rewrite IHds.
     apply and_iff_compat_r.
-    unfold negclause_of_dom.
+    assert (x <> i <-> i <> x) as Hsd. split; intros; congruence.
+    rewrite Hsd. rewrite sat_negclause_dom_iff.
+    now rewrite sat_dom_negclause_iff.
+Qed.
 
 Theorem negcl_of_domset_equiv : forall (ds : domset),
   is_negcl_domfun (var_dom ds) (negclause_of_domset ds).
@@ -571,23 +589,149 @@ Proof.
   intros.
     unfold is_negcl_domfun; intros.
     assert (H := sat_negclause_domset_iff ds x k).
-    rewrite sat_domset_alt in H.
-    SearchAbout dom_from_negclause.
-    Check sat_dom_from_negclause_iff.
-    rewrite sat_domset_iff_doms in H.
-    rewrite sat_doms_alt in H.
-    rewrite sat_negclause_domset_iff.
-    assert (sat_domset ds x k <-> sat_doms (ZMaps.elements ds) x k).
-      apply sat_domset_iff_doms.
-    assert (is_negcl_domfun (var_dom (negcl_domset (negclause_of_domset ds))) (negclause_of_domset ds)).
-      apply negcl_domset_is_negcl_domfun.
-    unfold is_negcl_domfun in H0; intros.
-    rewrite <- H.
-    SearchAbout sat_doms.
+    rewrite domain.sat_dom_negclause_iff.
+    now rewrite H.
+Qed.
+
+Theorem notin_eqkey_doms_uncon : forall (ds : list (ivar * dom)) (x : ivar) (d : dom),
+  ~ InA (ZMaps.eq_key (elt := dom)) (x, d) ds ->
+    db_of_doms x ds = (Unbounded, Unbounded).
+Proof.
+  intros.
+  induction ds.
+  unfold db_of_doms; now simpl.
+
+  unfold db_of_doms; simpl; fold db_of_doms.
+  assert (~ ZMaps.eq_key (x, d) a).
+    intro.
+    now apply InA_cons_hd with (l := ds) (x := (x, d)) (y := a) in H0.
+  assert (~ InA (ZMaps.eq_key (elt := dom)) (x, d) ds).
+    intro.
+    now apply InA_cons_tl with (l := ds) (x := (x, d)) (y := a) in H1.
+    destruct a; simpl.
+  apply IHds in H1.
+  rewrite H1.
+  unfold ZMaps.eq_key, ZMaps.Raw.Proofs.PX.eqk in H0; simpl in H0.
+  remember (ivar_eqb x i) as xi; symmetry in Heqxi; destruct xi.
+  now apply ivar_eqb_iff_eq in Heqxi. trivial.
+Qed.
+
+Lemma InA_eqkey_x_iff : forall (ds : list (ivar * dom)) (x : ivar) (d d' : dom),
+  InA (ZMaps.eq_key (elt := dom)) (x, d) ds <-> InA (ZMaps.eq_key (elt := dom)) (x, d') ds.
+Proof.
+  intros.
+  unfold ZMaps.eq_key, ZMaps.Raw.Proofs.PX.eqk; simpl.
+
+  induction ds.
+  now repeat (rewrite InA_nil).
+
+  repeat (rewrite InA_cons).
+  rewrite IHds.
+  apply or_iff_compat_r. simpl. tauto.
+Qed.
+    
+Theorem nodup_dom_of_doms_db_eq : forall (ds : list (ivar * dom)) (x : ivar) (d : dom),
+  NoDupA (ZMaps.eq_key (elt := dom)) ds ->
+    In (x, d) ds -> db_of_doms x ds = fst d.
+Proof.
+  intros.
+  induction ds.
+    now unfold In in H0.
+    apply in_inv in H0.
+    unfold db_of_doms; simpl; fold db_of_doms.
+    destruct a; simpl in *.
+    inversion H.
+    assert (db_of_doms i ds = (Unbounded, Unbounded)).
+      now apply notin_eqkey_doms_uncon with (d := d0).
+    remember (ivar_eqb x i) as xi; symmetry in Heqxi; destruct xi.
+    rewrite ivar_eqb_iff_eq in Heqxi.
+    rewrite <- Heqxi in *.
+    rewrite H5.
+    destruct H0.
+    inversion H0.
+    unfold db_meet, bound_max, bound_min; destruct d; destruct d; destruct b, b0; now simpl.
+    apply In_InA with (eqA := (ZMaps.eq_key (elt := dom))) in H0.
+    now apply InA_eqkey_x_iff with (d' := d0) in H0.
+    unfold ZMaps.eq_key; split; eauto.
+    assert (x <> i). intro; rewrite <- ivar_eqb_iff_eq in H6; congruence.
+    destruct H0; try congruence.
+    apply IHds. assumption. assumption.
+Qed.
+
+Theorem notin_eqk_iff_notin : forall (ds : list (ivar * dom)) (x : ivar) (d : dom),
+  ~ InA (ZMaps.eq_key (elt := dom)) (x, d) ds <-> (forall (d' : dom), ~ InA (ZMaps.eq_key_elt (elt := dom)) (x, d') ds).
+Proof.
+  intros.
+  induction ds.
+
+  split; intros; now rewrite InA_nil.
+  rewrite not_InA_cons.
+  split; intros.
+    rewrite not_InA_cons.
+    destruct H.
+    split.
+
+    destruct a; simpl.
+    unfold ZMaps.eq_key, ZMaps.Raw.Proofs.PX.eqk in H; simpl in H.
+    unfold ZMaps.eq_key_elt, ZMaps.Raw.Proofs.PX.eqke; simpl.
+    tauto.
+
+    now apply IHds.
+    assert (forall d', ~ (ZMaps.eq_key_elt (elt := dom)) (x, d') a /\ ~ InA (ZMaps.eq_key_elt (elt := dom)) (x, d') ds).
+      intros; now apply not_InA_cons.
+    apply forall_and in H0; destruct H0.
+    split.
+    unfold ZMaps.eq_key, ZMaps.Raw.Proofs.PX.eqk; simpl.
+    assert (H' := H0 (snd a)).
+    unfold ZMaps.eq_key_elt, ZMaps.Raw.Proofs.PX.eqke in H'; simpl in *.
+    tauto.
+    apply IHds. intros. apply H1.
+Qed.
+
+Theorem notin_notin_elts : forall (ds : domset) (x : ivar) (d : dom),
+  ~ ZMaps.In x ds -> ~ InA (ZMaps.eq_key (elt := dom)) (x, d) (ZMaps.elements ds).
+Proof.
+  intros.
+  apply notin_eqk_iff_notin.
+  intros.
+  intro.
+  apply ZMaps.elements_2 in H0.
+  rewrite not_find_in_iff in H.
+  apply ZMaps.find_1 in H0.
+  congruence.
+Qed.
+
+Theorem db_of_doms_domset_eq : forall (ds : domset) (x :ivar),
+  fst (var_dom ds x) = db_of_doms x (ZMaps.elements ds).
+Proof.
+  intros.
+    assert (Hnd := ZMaps.elements_3w ds).
+    assert (H := negcl_domset_is_negcl_domfun_db).
     unfold var_dom.
-    remember (ZMaps.find x ds) as fx.
-    split; intros.
-      
+    remember (ZMaps.find x ds) as fx; symmetry in Heqfx.
+
+    destruct fx.
+    apply ZMaps.find_2, ZMaps.elements_1 in Heqfx.
+    rewrite InA_InB_iff with (eqB := eq) in Heqfx; try apply eq_key_elt_iff_eq.
+    rewrite InA_eq_iff_In in Heqfx.
+    rewrite nodup_dom_of_doms_db_eq with (d := d); try trivial.
+
+    rewrite notin_eqkey_doms_uncon with (d := dom_unconstrained).
+    rewrite <- not_find_in_iff in Heqfx.
+    unfold dom_unconstrained; now simpl.
+    rewrite <- not_find_in_iff in Heqfx.
+    now apply notin_notin_elts.
+Qed.
+  
+Theorem negcl_of_domset_db_equiv : forall (ds : domset),
+  is_negcl_domfun_db (var_dom ds) (negclause_of_domset ds).
+Proof.
+  unfold is_negcl_domfun_db; intros.
+  unfold negclause_of_domset.
+  rewrite negclause_of_doms_db_eq.
+  apply db_of_doms_domset_eq.
+Qed.
+
 (*
 Record DomCheck : Type := mkDomCheck
   { T : Type ;
@@ -625,6 +769,8 @@ Definition dombounded_eval (T : Type) (eval : T -> asg -> Prop) (x : dombounded 
   eval_domset (fst x) theta /\ eval (snd x) theta.
 Definition dombounded_check (T : Type) (check : T -> domfun -> bool) (x : dombounded T) (f : domfun) :=
   check (snd x) (domfun_meet f (var_dom (fst x))).
+Definition dombounded_db_check (T : Type) (check : T -> dbfun -> bool) (x : dombounded T) (f : dbfun) :=
+  check (snd x) (dbfun_meet f (var_db (fst x))).
 Theorem dombounded_check_valid : forall (C : DomCheck) (x : dombounded C.(T)) (f : domfun) (cl : clause),
   is_negcl_domfun f cl /\ dombounded_check C.(T) C.(dc_check) x f = true -> implies (dombounded_eval C.(T) C.(dc_eval) x) (eval_clause cl).
 Proof.
@@ -640,49 +786,46 @@ Proof.
     assert (is_negcl_domfun fg (cl ++ bcl)).
       rewrite Heqfg, Heqbcl; apply app_negcl_domfun_if.
       split; try assumption.
-      unfold is_negcl_domfun. apply negcl_domset_is_negcl_domfun.
-    split; [assumption | rewrite <- Heqbcl; apply negcl_domset_is_negcl_domfun].
+    apply negcl_of_domset_equiv.
+    assert (implies (C.(dc_eval) t) (eval_clause (List.app cl bcl))).
+    apply C.(dc_check_valid) with (f := fg); split; assumption.
      
-    assert (is_negcl_domfun fg (List.app cl bcl) /\ C.(dc_check) (snd x) fg = true ->
-      implies (C.(dc_eval) (snd x)) (eval_clause (List.app cl bcl))) as Cvalid.
-      intros. apply C.(dc_check_valid) with (f := fg).
-      tauto.
-    destruct H1.
-    unfold implies in Cvalid.
-    assert (eval_clause (List.app cl bcl) theta).
-      apply Cvalid. tauto. assumption.
-    rewrite negclause_of_bounds_valid in H1.
-    rewrite <- Heqbcl in H1.
-    rewrite app_clause_or in H4.
-    tauto.
+    unfold implies in H4.
+    assert (Happ := H4 theta).
+    apply Happ in H2.
+    rewrite app_clause_or in H2.
+    destruct H2; [assumption | rewrite Heqbcl in H2; now apply negclause_of_domset_valid in H2].
 Qed.
 
-Theorem dombounded_db_check_valid : forall (C : DomDBCheck) (x : dombounded C.(Tb)) (f : domfun) (cl : clause),
-  is_negcl_domfun_db f cl /\ dombounded_check C.(Tb) C.(db_check) x f = true -> implies (dombounded_eval C.(Tb) C.(db_eval) x) (eval_clause cl).
+Theorem dombounded_db_check_valid : forall (C : DomDBCheck) (x : dombounded C.(Tb)) (f : dbfun) (cl : clause),
+  is_negcl_dbfun f cl /\ dombounded_db_check C.(Tb) C.(db_check) x f = true -> implies (dombounded_eval C.(Tb) C.(db_eval) x) (eval_clause cl).
 Proof.
   intros.
     destruct H.
     unfold dombounded_eval.
     unfold implies; intros.
-    unfold dombounded_check in H0.
-    remember (negclause_of_bounds (fst x)) as bcl.
-    remember (domfun_meet f (var_dom (negcl_domset bcl))) as fg.
-    assert (is_negcl_domfun_db fg (cl ++ bcl)).
-    rewrite Heqfg, Heqbcl; apply app_negcl_domfun_db_if.
-    split; [assumption | apply negcl_domset_is_negcl_domfun_db].
+    unfold dombounded_db_check in H0.
+    remember (negclause_of_domset (fst x)) as bcl.
+    assert (is_negcl_dbfun (var_db (fst x)) bcl).
+      rewrite Heqbcl. apply negcl_of_domset_db_equiv.
+    remember (dbfun_meet f (var_db (fst x))) as fg.
+    assert (is_negcl_dbfun fg (cl ++ bcl)).
+    rewrite Heqfg, Heqbcl; apply app_negcl_dbfun_if.
+    split. assumption. apply negcl_of_domset_db_equiv.
      
-    assert (is_negcl_domfun_db fg (List.app cl bcl) /\ C.(db_check) (snd x) fg = true ->
+    assert (is_negcl_dbfun fg (List.app cl bcl) /\ C.(db_check) (snd x) fg = true ->
       implies (C.(db_eval) (snd x)) (eval_clause (List.app cl bcl))) as Cvalid.
       intros. apply C.(db_check_valid) with (f := fg).
       tauto.
     destruct H1.
     unfold implies in Cvalid.
     assert (eval_clause (List.app cl bcl) theta).
-      apply Cvalid. tauto. assumption.
-    rewrite negclause_of_bounds_valid in H1.
-    rewrite <- Heqbcl in H1.
-    rewrite app_clause_or in H4.
-    tauto.
+      apply Cvalid. split. assumption. assumption. assumption.
+    unfold is_negcl_dbfun in H3.
+    rewrite app_clause_or in H5.
+    destruct H5; try assumption.
+    rewrite Heqbcl in H5.
+    now apply negclause_of_domset_valid in H5.
 Qed.
 
 Definition DomboundedCheck (D : DomCheck) : DomCheck :=
@@ -696,7 +839,7 @@ Definition DomboundedDBCheck (D : DomDBCheck) : DomDBCheck :=
   mkDomDBCheck
     (dombounded D.(Tb))
     (dombounded_eval D.(Tb) D.(db_eval))
-    (dombounded_check D.(Tb) D.(db_check))
+    (dombounded_db_check D.(Tb) D.(db_check))
     (dombounded_db_check_valid D).
 
 Definition check_from_dcheck (D : DomCheck) (x : D.(T)) (cl : clause) :=
@@ -712,13 +855,13 @@ Proof.
 Qed.
 
 Definition check_from_dbcheck (D : DomDBCheck) (x : D.(Tb)) (cl : clause) :=
-  D.(db_check) x (var_dom (negcl_domset cl)).
+  D.(db_check) x (var_db (negcl_domset cl)).
 Theorem check_from_dbcheck_valid : forall (D : DomDBCheck) (x : D.(Tb)) (cl : clause),
   check_from_dbcheck D x cl = true ->
     implies (D.(db_eval) x) (eval_clause cl).
 Proof.
   unfold check_from_dbcheck; intros.
-  remember (var_dom (negcl_domset cl)) as f.
+  remember (var_db (negcl_domset cl)) as f.
   apply D.(db_check_valid) with (f := f).
   split; [rewrite Heqf; apply negcl_domset_is_negcl_domfun_db | assumption].
 Qed.

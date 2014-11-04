@@ -397,7 +397,6 @@ Theorem sat_negclause_holes_iff : forall (x x' : ivar) (ks : ZSets.t) (k : Z),
 Proof.
   intros.
   unfold mem.
-  Check sat_negclause_holes'_iff.
   assert (sat_negclause (negclause_of_holes x (ZSets.elements ks)) x' k <-> (x <> x' \/ ~ List.In k (ZSets.elements ks))).
     apply sat_negclause_holes'_iff.
     rewrite H.
@@ -441,12 +440,45 @@ Proof.
     rewrite H; tauto.
     tauto.
 Qed.
+
 Theorem sat_dom_lit_iff : forall (l : lit) (x : ivar) (k : Z),
   sat_dom (dom_from_lit x l) k <-> sat_lit l x k.
 Proof.
   intros.
     unfold sat_dom.
     unfold dom_from_lit, sat_lit.
+    unfold dom_unconstrained, dom_le, dom_ge, dom_const, dom_neq, sat_dbound, sat_lb, sat_ub.
+    destruct l; destruct v; simpl;
+    try (remember (ivar_eqb x i) as exi; destruct exi); simpl;
+      try (symmetry in Heqexi; rewrite ivar_eqb_iff_eq in Heqexi; rewrite <- Heqexi); split; intros.
+    destruct H as [ [_ H] _]; now right.
+    destruct H; [tauto | split].
+    tauto. apply notmem_empty.
+    left; intro; apply ivar_eqb_iff_eq in H0; congruence.
+    split; [tauto | apply notmem_empty].
+    destruct H; right; omega.
+    split; [ destruct H ; [tauto | omega] | apply notmem_empty].
+    left; intro; apply ivar_eqb_iff_eq in H0; congruence.
+    split; [tauto | apply notmem_empty].
+    trivial.
+    split; [tauto | apply notmem_empty].
+    trivial.
+    split; [tauto | apply notmem_empty].
+    destruct H; right; omega.
+    split; [destruct H; [tauto | split ; [omega | tauto] ] | apply notmem_empty].
+    left; intro; apply ivar_eqb_iff_eq in H0; congruence.
+    split; [tauto | apply notmem_empty].
+    destruct H; apply notmem_add_if in H0; destruct H0; right; congruence.
+    split;
+      [ tauto | intro; apply mem_addk_if in H0] .
+    destruct H; [tauto | destruct H0 ; [ congruence | now apply notmem_empty in H0]].
+    left; intro; apply ivar_eqb_iff_eq in H0; congruence.
+    split ; [tauto | apply notmem_empty].
+    trivial.
+    split; [tauto | apply notmem_empty].
+    trivial.
+    split ; [tauto | apply notmem_empty].
+Qed.
     
 Definition negclause_of_dom (x : ivar) (d : dom) :=
   List.app (negclause_of_dbound x (fst d))
@@ -511,6 +543,16 @@ Proof.
   rewrite notapp_clause_iff.
   rewrite IHds; rewrite <- negclause_of_dom_valid; unfold eval_dom; simpl; tauto.
 Qed.
+  
+Fixpoint db_of_doms (x : ivar) (ds : list (ivar * dom)) :=
+  match ds with
+  | nil => (Unbounded, Unbounded)
+  | cons (y, d) ds' =>
+      if ivar_eqb x y then
+        db_meet (fst d) (db_of_doms x ds') 
+      else
+        db_of_doms x ds'
+  end.
 
 Theorem sat_dom_negclause_iff : forall (cl : clause) (x : ivar) (k : Z),
   sat_dom (dom_from_negclause x cl) k <-> sat_negclause cl x k.
@@ -524,12 +566,9 @@ Proof.
   rewrite dom_meet_iff.
   rewrite IHcl.
   apply and_iff_compat_r.
+  apply sat_dom_lit_iff.
+Qed.
 
-  unfold sat_dom, sat_lit, dom_from_lit, dom_unconstrained, dom_le, dom_ge, dom_const, dom_neq, sat_dbound, sat_lb, sat_ub.
-  destruct a; destruct v; simpl;
-    try (remember (ivar_eqb x i) as exi; destruct exi; symmetry in Heqexi); try (rewrite ivar_eqb_iff_eq in Heqexi; rewrite Heqexi); try congruence; simpl.
-
-  remember (ivar_eqb x i) as exi; destruct exi; apply ivar_eqb_true_iff in Heqexi.
 Theorem dom_from_negclause_valid : forall (x : ivar) (cl : clause) (theta : asg),
  ~eval_clause cl theta -> sat_dom (dom_from_negclause x cl) (eval_ivar x theta).
 Proof.
@@ -821,8 +860,12 @@ Definition check_tauto_bnd (bnd : list (ivar*Z*Z)) (cl : clause) :=
   (BoundedConstraint Tauto).(check) (bnd, tt) cl.
 
 Definition domfun := ivar -> dom.
+Definition dbfun := ivar -> dbound.
 Definition eval_domfun (f : domfun) (theta : asg) :=
   forall x : ivar, sat_dom (f x) (eval_ivar x theta).
+
+Definition eval_dbfun (f : dbfun) (theta : asg) :=
+  forall x : ivar, sat_dbound (f x) (eval_ivar x theta).
 
 Definition domfun_meet (f g : domfun) (x : ivar) :=
   dom_meet (f x) (g x).
@@ -835,6 +878,9 @@ Proof.
   intros; unfold domfun_meet.
   now rewrite dom_meet_iff.
 Qed.
+
+Definition dbfun_meet (f g : dbfun) (x : ivar) :=
+  db_meet (f x) (g x).
 
 Definition is_negcl_domfun (f : domfun) (cl : clause) :=
   forall (x : ivar) (k : Z),
@@ -851,6 +897,9 @@ Qed.
 Definition is_negcl_domfun_db (f : domfun) (cl : clause) :=
   forall (x : ivar),
     (fst (f x)) = db_from_negclause x cl.
+Definition is_negcl_dbfun (f : dbfun) (cl : clause) :=
+  forall (x : ivar),
+    f x = db_from_negclause x cl.
 
 (*
 Theorem bounded_negcl_domfun_valid : forall x f g cl theta,
@@ -924,6 +973,16 @@ Proof.
   tauto.
 Qed.
 
+Theorem app_negcl_dbfun_if : forall c d f g,
+  is_negcl_dbfun f c /\ is_negcl_dbfun g d -> is_negcl_dbfun (dbfun_meet f g) (List.app c d).
+Proof.
+  unfold is_negcl_dbfun; intros.
+  unfold dbfun_meet.
+  rewrite app_db_from_negclause_meet.
+  destruct H.
+  now rewrite H, H0.
+Qed.
+
 Record DomCheck : Type := mkDomCheck
   { T : Type ;
     dc_eval : T -> asg -> Prop ;
@@ -936,10 +995,10 @@ Record DomCheck : Type := mkDomCheck
 Record DomDBCheck : Type := mkDomDBCheck
   { Tb : Type ;
     db_eval : Tb -> asg -> Prop ;
-    db_check : Tb -> domfun -> bool ;
+    db_check : Tb -> dbfun -> bool ;
     db_check_valid : 
-      forall (x : Tb) (f : domfun) (cl : clause),
-      is_negcl_domfun_db f cl /\ db_check x f = true ->
+      forall (x : Tb) (f : dbfun) (cl : clause),
+      is_negcl_dbfun f cl /\ db_check x f = true ->
         implies (db_eval x) (eval_clause cl) }.
 
 (*
@@ -1010,4 +1069,190 @@ Proof.
   split; intros;
     [apply dom_meet_iff with (dy := g x) | apply dom_meet_iff with (dx := f x)]; apply H.
   destruct H as [Hf Hg]; rewrite dom_meet_iff; split; [apply Hf | apply Hg].
+Qed.
+
+Lemma zle_ind : forall (z z' : Z),
+  ((forall k, (True /\ k <= z <-> True /\ k <= z')) <-> z = z').
+Proof.
+  intros; split; intros.
+  assert (z = z' \/ z < z' \/ z > z').
+    omega.
+  destruct H0; try assumption.
+  assert (z <= z); assert (z' <= z'); try omega.
+  destruct H0; assert False.
+    assert (H' := H z'). assert (z' <= z). tauto.
+    omega. contradiction.
+    assert (H' := H z); assert (z <= z'). tauto. omega. contradiction.
+  now rewrite H.
+Qed.
+
+Theorem lb_equal_alt : forall (b b' : bound),
+  b = b' <-> forall k, sat_lb b k <-> sat_lb b' k.
+Proof.
+  split; unfold sat_lb; intros.
+    now rewrite H.
+    destruct b, b'; try congruence.
+    assert (z <= (z-1)). apply H; tauto.
+    assert False. omega. contradiction.
+
+    assert (z <= (z-1)). apply H; tauto.
+    assert False. omega. contradiction.
+    assert (z = z0 \/ z < z0 \/ z0 < z).
+      omega.
+    destruct H0; [now rewrite H0 | destruct H0].
+    assert (z0 <= z). apply H; omega. assert False. omega. contradiction.
+    assert (z <= z0). apply H; omega. assert False. omega. contradiction.
+Qed.
+
+Theorem ub_equal_alt : forall (b b' : bound),
+  b = b' <-> forall k, sat_ub b k <-> sat_ub b' k.
+Proof.
+  split; unfold sat_ub; intros.
+    now rewrite H.
+    destruct b, b'; try congruence.
+    assert ((z+1) <= z). apply H; tauto.
+    assert False. omega. contradiction.
+
+    assert ((z+1) <= z). apply H; tauto.
+    assert False. omega. contradiction.
+    assert (z = z0 \/ z < z0 \/ z0 < z).
+      omega.
+    destruct H0; [now rewrite H0 | destruct H0].
+    assert (z0 <= z). apply H; omega. assert False. omega. contradiction.
+    assert (z <= z0). apply H; omega. assert False. omega. contradiction.
+Qed.
+
+Theorem forall_split : forall (A : Type) P Q,
+  (forall x : A, P x <-> Q x) <-> (forall x : A, P x -> Q x) /\ (forall x : A, Q x -> P x).
+Proof.
+  intros; split; intros.
+  split ; [apply H | apply H].
+  destruct H. split; intros; [now apply H | now apply H0].
+Qed.
+
+Theorem forall_and : forall (A : Type) P Q,
+  (forall x : A, P x /\ Q x) <-> (forall x : A, P x) /\ (forall x : A, Q x).
+Proof.
+  intros; split; intros.
+  split; intros; assert (H' := H x); destruct H' as [Hp Hq]; assumption.
+  destruct H as [Hp Hq]. split; [now apply Hp | now apply Hq].
+Qed.
+
+Theorem negclause_of_holes_db_uncon : forall (x x' : ivar) (zs : list Z),
+  db_from_negclause x' (negclause_of_holes x zs) = (Unbounded, Unbounded).
+Proof.
+  intros.
+    induction zs.
+    now unfold negclause_of_holes, db_from_negclause.
+
+    unfold db_from_negclause, negclause_of_holes; simpl.
+    fold db_from_negclause; fold negclause_of_holes.
+    rewrite IHzs.
+    unfold db_meet; now simpl.
+Qed.
+
+Theorem app_db_from_negclause_iff : forall (cx cy : clause) (x : ivar),
+  db_from_negclause x (List.app cx cy) = db_meet (db_from_negclause x cx) (db_from_negclause x cy).
+Proof.
+  intros; induction cx; intros.
+  unfold db_from_negclause at 1 2; simpl; fold db_from_negclause.
+  unfold db_meet; simpl.
+  now rewrite <- surjective_pairing.
+
+  unfold db_from_negclause; simpl; fold db_from_negclause.
+  rewrite IHcx; now rewrite db_meet_assoc.
+Qed.
+
+Theorem negclause_of_lb_inv : forall (b : bound) (x : ivar),
+  db_from_negclause x (negclause_of_lb x b) = (b, Unbounded).
+Proof.
+  intros.
+    unfold db_from_negclause, negclause_of_lb; destruct b; simpl; try congruence.
+    assert (ivar_eqb x x = true). now apply ivar_eqb_iff_eq.
+    remember (ivar_eqb x x) as xx; destruct xx.
+    unfold db_meet; simpl.
+    apply injective_projections; simpl.
+    apply f_equal; omega. trivial. discriminate.
+Qed.
+
+Theorem negclause_of_ub_inv : forall (b : bound) (x : ivar),
+  db_from_negclause x (negclause_of_ub x b) = (Unbounded, b).
+Proof.
+  intros.
+    unfold db_from_negclause, negclause_of_ub; destruct b; simpl; try congruence.
+    assert (ivar_eqb x x = true). now apply ivar_eqb_iff_eq.
+    remember (ivar_eqb x x) as xx; destruct xx.
+    unfold db_meet; simpl.
+    apply injective_projections; simpl.
+    trivial. trivial. discriminate.
+Qed.
+
+Theorem negclause_of_db_inv : forall (db : dbound) (x : ivar),
+  db_from_negclause x (negclause_of_dbound x db) = db.
+Proof.
+  intros.
+    unfold db_from_negclause, negclause_of_dbound.
+    fold db_from_negclause.
+    rewrite app_db_from_negclause_iff.
+    rewrite negclause_of_lb_inv.
+    rewrite negclause_of_ub_inv.
+    unfold db_meet, bound_max; simpl.
+    destruct db; destruct b; simpl; trivial.
+Qed.
+
+Theorem negclause_of_dom_db_inv : forall (d : dom) (x x' : ivar),
+  x = x' -> db_from_negclause x' (negclause_of_dom x d) = fst d.
+Proof.
+  intros.
+  destruct d; simpl.
+  rewrite <- H.
+  rewrite <- dom_from_negclause_db; destruct d; simpl.
+  unfold negclause_of_dom, dom_from_negclause. simpl.
+  fold dom_from_negclause.
+  rewrite app_dom_from_negclause_db_eq.
+  remember (dom_from_negclause x (negclause_of_dbound x (b, b0))) as dcl.
+  remember (dom_from_negclause x (negclause_of_holes x (ZSets.elements z))).
+  rewrite dom_meet_db with (x := fst dcl) (y := fst d); try (split; trivial).
+  rewrite Heqdcl, Heqd.
+  repeat (rewrite dom_from_negclause_db).
+  rewrite negclause_of_db_inv.
+  rewrite negclause_of_holes_db_uncon.
+  unfold db_meet; simpl.
+  unfold bound_max, bound_min; destruct b, b0; simpl; try congruence.
+Qed.
+
+Theorem negclause_of_dom_db_inv2 : forall (x x' : ivar) (d : dom),
+  x <> x' -> db_from_negclause x' (negclause_of_dom x d) = (Unbounded, Unbounded).
+Proof.
+  intros.
+    unfold negclause_of_dom.
+    rewrite app_db_from_negclause_meet.
+    rewrite negclause_of_holes_db_uncon.
+    assert (ivar_eqb x' x = false).
+      apply not_true_is_false; intro; apply ivar_eqb_iff_eq in H0; congruence.
+    destruct d; destruct d;
+      unfold db_meet, db_from_negclause, negclause_of_dbound, negclause_of_lb, negclause_of_ub;
+      destruct b, b0; simpl; try destruct (ivar_eqb x' x);
+        unfold bound_min, bound_max; simpl; try congruence.
+Qed.
+  
+Theorem negclause_of_doms_db_eq : forall (x : ivar) (ds : list (ivar * dom)),
+  db_from_negclause x (negclause_of_doms ds) = db_of_doms x ds.
+Proof.
+  intros; induction ds; intros; simpl; try trivial.
+
+  destruct a; simpl.
+  remember (ivar_eqb x i) as xi; symmetry in Heqxi; destruct xi.
+  rewrite ivar_eqb_iff_eq in Heqxi; rewrite <- Heqxi.
+  rewrite app_db_from_negclause_meet.
+  rewrite IHds.
+  now rewrite negclause_of_dom_db_inv.
+
+  assert (x <> i). intro; apply ivar_eqb_iff_eq in H; congruence.
+  rewrite app_db_from_negclause_meet.
+  rewrite negclause_of_dom_db_inv2.
+  rewrite IHds.
+  unfold db_meet, bound_min, bound_max; simpl.
+  now rewrite <- surjective_pairing.
+  congruence.
 Qed.

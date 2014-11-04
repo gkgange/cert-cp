@@ -16,6 +16,7 @@ Extraction "checker_impl.ml"
   prim.check_inf prim.check_clause
   (* domain.check_tauto *)
   domain.check_tauto_bnd
+  domset.bounds_domset
   (*
   cumulative.check_cumul
   cumulative.check_cumul_tt

@@ -117,15 +117,14 @@ let check_cumul model =
       (string_of_ivars model xs) (string_of_ints durations)
       (string_of_ints resources) lim in
     let bnd = M.get_bounds model in
-    let check = C_impl.check_cumul_tt_dbnd cumul bnd in
+    let dset = C_impl.bounds_domset bnd in
     {
       C.repr = repr ;
       C.check = (fun _ cl ->
         let icl = impl_clause_of_clause cl in
         (* C_impl.check_cumul_bnd cumul bnd icl *)
-        C_impl.check_cumul_tt_bnd cumul bnd icl
-        (* C_impl.check_cumul_tt_dbnd cumul bnd icl *)
-        (* check icl *)
+        (* C_impl.check_cumul_tt_bnd cumul bnd icl *)
+        C_impl.check_cumul_tt_dbnd cumul dset icl
       )
     }
 let register () =

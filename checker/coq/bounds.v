@@ -733,6 +733,19 @@ Proof.
     (x := x); exact H.
 Qed.
 
+Theorem app_db_from_negclause_meet :
+  forall (x : ivar) (cx cy : clause),
+    db_from_negclause x (List.app cx cy) =
+      db_meet (db_from_negclause x cx) (db_from_negclause x cy).
+Proof.
+  induction cx; intros.
+  rewrite app_nil_l.
+  unfold db_from_negclause at 2, db_meet; simpl; fold db_from_negclause.
+  now rewrite <- surjective_pairing.
+  unfold db_from_negclause at 1 2; simpl; fold db_from_negclause.
+  rewrite IHcx.
+  now rewrite db_meet_assoc.
+Qed.
 (*
 Definition lb_from_negclause (x : ivar) (cl : clause) :=
   fst (db_from_negclause x cl).
@@ -905,6 +918,26 @@ Proof.
   rewrite app_sat_negclause_and.
   rewrite <- sat_negclause_lb_iff, <- sat_negclause_ub_iff.
   tauto.
+Qed.
+
+Definition negclause_of_dbound_inv : forall (x : ivar) (db : dbound),
+  (db_from_negclause x (negclause_of_dbound x db)) = db.
+Proof.
+  intros.
+    unfold negclause_of_dbound, db_from_negclause.
+    assert (ivar_eqb x x = true).
+      apply ivar_eqb_iff_eq; tauto.
+    destruct db; destruct b, b0; simpl; try congruence;
+      try (remember (ivar_eqb x x) as exx; destruct exx;
+        try (symmetry in Heqexx; rewrite ivar_eqb_iff_eq in Heqexx));
+      try (unfold db_meet, bound_max, bound_min; simpl); try congruence;
+      try apply injective_projections; simpl; try trivial.
+    assert (z = z - 1 + 1).
+      omega.
+    now rewrite <- H0.
+    assert (z = z - 1 + 1).
+      omega.
+    now rewrite <- H0.
 Qed.
 
 Definition negclause_of_bound (b : model_bound) :=
