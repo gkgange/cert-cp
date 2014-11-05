@@ -89,6 +89,7 @@ Definition var_dom (ds : domset) (x : ivar) :=
   end.
 
 Definition var_db (ds : domset) (x : ivar) := fst (var_dom ds x).
+
 Definition sat_domset (ds : domset) (x : ivar) (k : Z) :=
   sat_dom (var_dom ds x) k.
 
@@ -871,3 +872,56 @@ Definition CheckOfDomCheck (D : DomCheck) :=
 
 Definition CheckOfDomDBCheck (D : DomDBCheck) :=
   mkConstraint (D.(Tb)) (D.(db_eval)) (check_from_dbcheck D) (check_from_dbcheck_valid D).
+
+
+Definition check_tauto_var_dfun (f : domfun) (v : ivar) :=
+  dom_unsatb (f v).
+Theorem check_tauto_var_dfun_valid : forall (f : domfun) (cl : clause) (v : ivar) (theta : asg),
+  is_negcl_domfun f cl ->
+    check_tauto_var_dfun f v = true -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta). tauto.
+  destruct H1; try assumption.
+  apply negcl_domfun_valid with (x := v) (theta := theta) in H.
+  unfold check_tauto_var_dfun in H0.
+  rewrite dom_unsatb_unsat in H0. now apply H0 in H.
+  assumption.
+Qed.
+
+Fixpoint check_tauto_dfun (vs : list ivar) (f : domfun) :=
+  match vs with
+  | nil => false
+  | cons v vs' => (check_tauto_var_dfun f v) || (check_tauto_dfun vs' f )
+  end.
+
+Theorem check_tauto_dfun_valid' : forall (f : domfun) (cl : clause) (vs : list ivar) (theta : asg),
+  is_negcl_domfun f cl ->
+    check_tauto_dfun vs f = true -> eval_clause cl theta.
+Proof.
+  intros; induction vs; intros.
+  now unfold check_tauto_dfun.
+
+  unfold check_tauto_dfun in H0; fold check_tauto_dfun in H0.
+  rewrite orb_true_iff in H0.
+  destruct H0 ; [ apply check_tauto_var_dfun_valid with (f := f) (v := a); assumption | apply IHvs; assumption ].
+Qed.
+
+Definition eval_tauto_hint (vs : list ivar) (theta : asg) := True.
+
+Theorem check_tauto_dfun_valid : forall (vs : list ivar) (f : domfun) (cl : clause),
+  is_negcl_domfun f cl /\
+    check_tauto_dfun vs f = true -> implies (eval_tauto_hint vs) (eval_clause cl).
+Proof.
+  intros. unfold implies, eval_tauto_hint; intros.
+  now apply check_tauto_dfun_valid' with (f := f) (theta := theta) (vs := vs).
+Qed.
+
+Definition TautoDom : DomCheck :=
+  mkDomCheck (list ivar) (eval_tauto_hint) (check_tauto_dfun) (check_tauto_dfun_valid).
+
+Definition TautoDCheck : Constraint :=
+  (CheckOfDomCheck (DomboundedCheck TautoDom)). 
+
+Definition check_tauto_dbnd (ds : domset) (cl : clause) :=
+  (TautoDCheck).(check) (ds, ZSets.elements (clause_varset cl)) cl.

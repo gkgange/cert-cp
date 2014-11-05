@@ -17,6 +17,7 @@ Extraction "checker_impl.ml"
   (* domain.check_tauto *)
   domain.check_tauto_bnd
   domset.bounds_domset
+  domset.check_tauto_dbnd
   (*
   cumulative.check_cumul
   cumulative.check_cumul_tt

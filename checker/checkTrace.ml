@@ -118,7 +118,9 @@ let fallback model =
 (*
 let tauto_check model = fallback model
 *)
-let tauto_check model = Builtins.tauto (M.get_bounds model)
+(* let tauto_check model = Builtins.tauto (M.get_bounds model) *)
+let tauto_check model = Builtins.tauto_dbnd
+  (Checker_impl.bounds_domset (M.get_bounds model))
 
 let update_assumps clauses cl =
   if List.exists (fun cl_y -> Builtins.clause_subsumes cl_y cl) clauses then

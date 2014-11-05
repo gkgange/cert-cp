@@ -781,6 +781,7 @@ Definition check_tauto_vprop (cl : clause) (vp : vprop) :=
   | IEq x k => check_tauto_var cl x
   | _ => false
   end.
+
 Theorem check_tauto_vprop_valid : forall (cl : clause) (vp : vprop) (theta : asg),
   check_tauto_vprop cl vp = true -> eval_clause cl theta.
 Proof.
@@ -1255,4 +1256,6 @@ Proof.
   unfold db_meet, bound_min, bound_max; simpl.
   now rewrite <- surjective_pairing.
   congruence.
+
 Qed.
+
