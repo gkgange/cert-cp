@@ -110,7 +110,9 @@ VFILES:=bounds.v\
   cumulative.v\
 	cumul_dset.v\
   element.v\
+	element_dset.v\
   linear.v\
+	linear_dset.v\
   prim.v\
   reif.v\
   checker_impl.v

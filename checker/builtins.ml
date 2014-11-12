@@ -46,21 +46,50 @@ let clause_subsumes cl_x cl_y =
   C_impl.check_clause (impl_clause_of_clause cl_x) (impl_clause_of_clause cl_y)
 
 (* Build the linear checker. *)
+let linear_args model = S.cons int_list (S.cons (ivar_list model) S.intconst)
+
 let check_linear_le model =
  fun tokens ->
-   let (coeffs, (vars, k)) =
-     (S.cons int_list (S.cons (ivar_list model) S.intconst)) tokens in
+   let (coeffs, (vars, k)) = linear_args model tokens in
+(*     (S.cons int_list (S.cons (ivar_list model) S.intconst)) tokens in *)
    let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
    let repr = Format.sprintf "linear_le(%s, %s, %d)"
      (string_of_ints coeffs) (string_of_ivars model vars) k in
+   let bnd = M.get_bounds model in
+   let dset = C_impl.bounds_domset bnd in
 {
   C.repr = repr ;
   C.check =
-    (fun  bnd cl ->
+    (*
+    (fun bnd cl ->
       C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl)
       || C_impl.check_linear_bnd (linterms, k) bnd (impl_clause_of_clause cl)
     )
+*)
+    (fun _ cl ->
+      C_impl.check_linear_dbnd (linterms, k) dset (impl_clause_of_clause cl))
 }
+
+(* Build a _reified_ linear checker. *)
+let check_reif_linear_le model =
+  fun tokens ->
+    let (r, (coeffs, (vars, k))) =
+      (S.cons (P.parse_lit model) (linear_args model)) tokens in
+    let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
+    let repr = Format.sprintf "linear_le_reif(%s, %s, %s, %d)"
+      (M.string_of_lit model r)
+      (string_of_ints coeffs)
+      (string_of_ivars model vars) k in
+    let bnd = M.get_bounds model in
+    let dset = C_impl.bounds_domset bnd in
+    {
+      C.repr = repr ;
+      C.check = (fun _ cl ->
+        C_impl.check_reif_linear_dbnd
+          (impl_lit_of_lit r)
+          (linterms, k) dset
+          (impl_clause_of_clause cl))
+    }
 
 let check_clause model =
   fun tokens ->
@@ -131,6 +160,7 @@ let check_cumul model =
     }
 let register () =
   R.add "linear_le" check_linear_le ;
+  R.add "linear_le_reif" check_reif_linear_le ;
   R.add "element" check_element ;
   R.add "cumulative" check_cumul ;
   R.add "clause" check_clause

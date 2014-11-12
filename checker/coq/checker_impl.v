@@ -4,10 +4,12 @@ Require Import ExtrOcamlZInt.
 Require prim.
 Require bounds.
 Require linear.
+Require linear_dset.
 Require cumulative.
 Require cumul_dset.
 Require reif.
 Require element.
+Require element_dset.
 
 Extract Constant prim.Z_eqb => "(=)".
 
@@ -28,6 +30,10 @@ Extraction "checker_impl.ml"
   reif.check_reif
   (* linear.check_lincon *)
   linear.check_linear_bnd
+  linear_dset.check_linear_dbnd
+  linear_dset.check_reif_linear_dbnd
   (* element.check_element *)
   element.check_element_bnd
+  element_dset.check_elem_dbnd
+  element_dset.check_reif_elem_dbnd
   nat_of_int int_of_nat.
