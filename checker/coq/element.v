@@ -93,9 +93,12 @@ Proof.
 Qed.
 
 Definition ElemConstraint : Constraint :=
-  mkConstraint (element) (eval_element) (check_element) (check_element_valid).
+  mkConstraint (element) (eval_element).
+Definition ElemBnd := BoundedConstraint ElemConstraint.
+Definition ElemCheck := mkChecker ElemConstraint (check_element) (check_element_valid).
+Definition ElemBndCheck := BoundedChecker ElemConstraint ElemCheck.
 Definition check_element_bnd (x : element) (bs : list (ivar*Z*Z)) (cl : clause) := 
-  (BoundedConstraint ElemConstraint).(check) (bs, x) cl.
+  (check ElemBnd ElemBndCheck) (bs, x) cl.
 (*
 
 Theorem check_element_valid :

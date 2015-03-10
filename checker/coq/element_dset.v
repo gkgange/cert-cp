@@ -66,14 +66,16 @@ Proof.
   now rewrite <- check_element_dfun_eq with (f := f).
 Qed.
   
-Definition ElemDSet : DomCheck :=
-  mkDomCheck (element) (eval_element) (check_element_dfun) (check_element_dfun_valid).
+Definition ElemDSet :=
+  mkDomCheck ElemConstraint (check_element_dfun) (check_element_dfun_valid).
+Definition ElemDbnd := DomboundedConstraint ElemConstraint.
+Definition ElemDbndCheck := DomboundedCheck ElemConstraint ElemDSet.
 
-Definition ElemDomCheck : Constraint :=
-  (CheckOfDomCheck (DomboundedCheck ElemDSet)). 
+Definition ElemDomCheck :=
+  CheckOfDomCheck ElemDbnd (ElemDbndCheck).
 
 Definition check_elem_dbnd (e : element) (ds : domset) (cl : clause) :=
-  (ElemDomCheck).(check) (ds, e) cl.
+  (check ElemDbnd ElemDomCheck) (ds, e) cl.
 
 Definition check_reif_elem_dbnd (r : lit) (e : element) (ds : domset) (cl : clause) :=
-  (ReifiedConstraint (ElemDomCheck)).(check) (r, (ds, e)) cl.
+  (check (ReifiedConstraint ElemDbnd) (ReifiedCheck ElemDbnd ElemDomCheck)) (r, (ds, e)) cl.

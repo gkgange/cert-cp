@@ -772,8 +772,8 @@ Definition dombounded_check (T : Type) (check : T -> domfun -> bool) (x : dombou
   check (snd x) (domfun_meet f (var_dom (fst x))).
 Definition dombounded_db_check (T : Type) (check : T -> dbfun -> bool) (x : dombounded T) (f : dbfun) :=
   check (snd x) (dbfun_meet f (var_db (fst x))).
-Theorem dombounded_check_valid : forall (C : DomCheck) (x : dombounded C.(T)) (f : domfun) (cl : clause),
-  is_negcl_domfun f cl /\ dombounded_check C.(T) C.(dc_check) x f = true -> implies (dombounded_eval C.(T) C.(dc_eval) x) (eval_clause cl).
+Theorem dombounded_check_valid : forall (C : Constraint) (Ch : DomCheck C) (x : dombounded C.(T)) (f : domfun) (cl : clause),
+  is_negcl_domfun f cl /\ dombounded_check C.(T) (dc_check C Ch) x f = true -> implies (dombounded_eval C.(T) C.(eval) x) (eval_clause cl).
 Proof.
   intros.
     destruct H.
@@ -788,8 +788,8 @@ Proof.
       rewrite Heqfg, Heqbcl; apply app_negcl_domfun_if.
       split; try assumption.
     apply negcl_of_domset_equiv.
-    assert (implies (C.(dc_eval) t) (eval_clause (List.app cl bcl))).
-    apply C.(dc_check_valid) with (f := fg); split; assumption.
+    assert (implies (C.(eval) t) (eval_clause (List.app cl bcl))).
+    apply (dc_check_valid C Ch) with (f := fg); split; assumption.
      
     unfold implies in H4.
     assert (Happ := H4 theta).
@@ -798,8 +798,8 @@ Proof.
     destruct H2; [assumption | rewrite Heqbcl in H2; now apply negclause_of_domset_valid in H2].
 Qed.
 
-Theorem dombounded_db_check_valid : forall (C : DomDBCheck) (x : dombounded C.(Tb)) (f : dbfun) (cl : clause),
-  is_negcl_dbfun f cl /\ dombounded_db_check C.(Tb) C.(db_check) x f = true -> implies (dombounded_eval C.(Tb) C.(db_eval) x) (eval_clause cl).
+Theorem dombounded_db_check_valid : forall (C : Constraint) (Ch : DomDBCheck C) (x : dombounded C.(T)) (f : dbfun) (cl : clause),
+  is_negcl_dbfun f cl /\ dombounded_db_check C.(T) (db_check C Ch) x f = true -> implies (dombounded_eval C.(T) C.(eval) x) (eval_clause cl).
 Proof.
   intros.
     destruct H.
@@ -814,9 +814,9 @@ Proof.
     rewrite Heqfg, Heqbcl; apply app_negcl_dbfun_if.
     split. assumption. apply negcl_of_domset_db_equiv.
      
-    assert (is_negcl_dbfun fg (List.app cl bcl) /\ C.(db_check) (snd x) fg = true ->
-      implies (C.(db_eval) (snd x)) (eval_clause (List.app cl bcl))) as Cvalid.
-      intros. apply C.(db_check_valid) with (f := fg).
+    assert (is_negcl_dbfun fg (List.app cl bcl) /\ (db_check C Ch) (snd x) fg = true ->
+      implies (C.(eval) (snd x)) (eval_clause (List.app cl bcl))) as Cvalid.
+      intros. apply (db_check_valid C Ch) with (f := fg).
       tauto.
     destruct H1.
     unfold implies in Cvalid.
@@ -829,49 +829,47 @@ Proof.
     now apply negclause_of_domset_valid in H5.
 Qed.
 
-Definition DomboundedCheck (D : DomCheck) : DomCheck :=
-  mkDomCheck
-    (dombounded D.(T))
-    (dombounded_eval D.(T) D.(dc_eval))
-    (dombounded_check D.(T) D.(dc_check))
-    (dombounded_check_valid D).
+Definition DomboundedConstraint (C : Constraint) := mkConstraint
+  (dombounded C.(T)) (dombounded_eval C.(T) C.(eval)).
+Definition DomboundedCheck (C : Constraint) (D : DomCheck C) :=
+  mkDomCheck (DomboundedConstraint C)
+    (dombounded_check C.(T) (dc_check C D))
+    (dombounded_check_valid C D).
 
-Definition DomboundedDBCheck (D : DomDBCheck) : DomDBCheck :=
-  mkDomDBCheck
-    (dombounded D.(Tb))
-    (dombounded_eval D.(Tb) D.(db_eval))
-    (dombounded_db_check D.(Tb) D.(db_check))
-    (dombounded_db_check_valid D).
+Definition DomboundedDBCheck (C : Constraint) (D : DomDBCheck C) :=
+  mkDomDBCheck (DomboundedConstraint C)
+    (dombounded_db_check C.(T) (db_check C D))
+    (dombounded_db_check_valid C D).
 
-Definition check_from_dcheck (D : DomCheck) (x : D.(T)) (cl : clause) :=
-  D.(dc_check) x (var_dom (negcl_domset cl)).
-Theorem check_from_dcheck_valid : forall (D : DomCheck) (x : D.(T)) (cl : clause),
-  check_from_dcheck D x cl = true ->
-    implies (D.(dc_eval) x) (eval_clause cl).
+Definition check_from_dcheck (C : Constraint) (D : DomCheck C) (x : C.(T)) (cl : clause) :=
+  (dc_check C D) x (var_dom (negcl_domset cl)).
+Theorem check_from_dcheck_valid : forall (C : Constraint) (D : DomCheck C) (x : C.(T)) (cl : clause),
+  check_from_dcheck C D x cl = true ->
+    implies (C.(eval) x) (eval_clause cl).
 Proof.
   unfold check_from_dcheck; intros.
   remember (var_dom (negcl_domset cl)) as f.
-  apply D.(dc_check_valid) with (f := f).
+  apply (dc_check_valid C D) with (f := f).
   split; [rewrite Heqf; apply negcl_domset_is_negcl_domfun | assumption].
 Qed.
 
-Definition check_from_dbcheck (D : DomDBCheck) (x : D.(Tb)) (cl : clause) :=
-  D.(db_check) x (var_db (negcl_domset cl)).
-Theorem check_from_dbcheck_valid : forall (D : DomDBCheck) (x : D.(Tb)) (cl : clause),
-  check_from_dbcheck D x cl = true ->
-    implies (D.(db_eval) x) (eval_clause cl).
+Definition check_from_dbcheck (C: Constraint) (D : DomDBCheck C) (x : C.(T)) (cl : clause) :=
+  (db_check C D) x (var_db (negcl_domset cl)).
+Theorem check_from_dbcheck_valid : forall (C : Constraint) (D : DomDBCheck C) (x : C.(T)) (cl : clause),
+  check_from_dbcheck C D x cl = true ->
+    implies (C.(eval) x) (eval_clause cl).
 Proof.
   unfold check_from_dbcheck; intros.
   remember (var_db (negcl_domset cl)) as f.
-  apply D.(db_check_valid) with (f := f).
+  apply (db_check_valid C D) with (f := f).
   split; [rewrite Heqf; apply negcl_domset_is_negcl_domfun_db | assumption].
 Qed.
 
-Definition CheckOfDomCheck (D : DomCheck) :=
-  mkConstraint (D.(T)) (D.(dc_eval)) (check_from_dcheck D) (check_from_dcheck_valid D).
+Definition CheckOfDomCheck (C : Constraint) (D : DomCheck C) :=
+  mkChecker C (check_from_dcheck C D) (check_from_dcheck_valid C D).
 
-Definition CheckOfDomDBCheck (D : DomDBCheck) :=
-  mkConstraint (D.(Tb)) (D.(db_eval)) (check_from_dbcheck D) (check_from_dbcheck_valid D).
+Definition CheckOfDomDBCheck (C : Constraint) (D : DomDBCheck C) :=
+  mkChecker C (check_from_dbcheck C D) (check_from_dbcheck_valid C D).
 
 
 Definition check_tauto_var_dfun (f : domfun) (v : ivar) :=
@@ -917,11 +915,13 @@ Proof.
   now apply check_tauto_dfun_valid' with (f := f) (theta := theta) (vs := vs).
 Qed.
 
-Definition TautoDom : DomCheck :=
-  mkDomCheck (list ivar) (eval_tauto_hint) (check_tauto_dfun) (check_tauto_dfun_valid).
+Definition HintTauto := mkConstraint (list ivar) eval_tauto_hint.
 
-Definition TautoDCheck : Constraint :=
-  (CheckOfDomCheck (DomboundedCheck TautoDom)). 
+Definition HintTautoDom : DomCheck HintTauto :=
+  mkDomCheck HintTauto (check_tauto_dfun) (check_tauto_dfun_valid).
+
+Definition HintTautoDomCheck : Checker (DomboundedConstraint HintTauto) :=
+  CheckOfDomCheck (DomboundedConstraint HintTauto) (DomboundedCheck HintTauto HintTautoDom).
 
 Definition check_tauto_dbnd (ds : domset) (cl : clause) :=
-  (TautoDCheck).(check) (ds, ZSets.elements (clause_varset cl)) cl.
+  (check (DomboundedConstraint HintTauto) HintTautoDomCheck) (ds, ZSets.elements (clause_varset cl)) cl.

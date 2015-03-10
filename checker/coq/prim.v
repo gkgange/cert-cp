@@ -258,13 +258,16 @@ Definition lit_leq (x : lit) (y : lit) : Prop :=
 
 Record Constraint : Type := mkConstraint
   { T : Type ;
-    eval : T -> asg -> Prop ;
-    check : T -> clause -> bool ;
-    check_valid : 
-      forall (x : T) (cl : clause),
-      check x cl = true -> implies (eval x) (eval_clause cl) }.
+    eval : T -> asg -> Prop }.
 
-Definition check_inf (C : Constraint) (x : C.(T)) (cl : clause) := C.(check) x cl.
+Record Checker (C: Constraint) := mkChecker
+  {
+    check : C.(T) -> clause -> bool ;
+    check_valid : 
+      forall (x : C.(T)) (cl : clause),
+      check x cl = true -> implies (C.(eval) x) (eval_clause cl) }.
+
+Definition check_inf (C : Constraint) (Ch : Checker C) (x : C.(T)) (cl : clause) : bool := check C Ch x cl.
 
 Definition vprop_leqb (u : vprop) (v : vprop) :=
   match u with
@@ -402,7 +405,8 @@ Proof.
   apply H4; exact H0.
 Qed.
 
-Definition CheckClause := mkConstraint clause eval_clause check_clause.
+Definition ClauseCon := mkConstraint clause eval_clause.
+Definition CheckClause := mkChecker ClauseCon check_clause.
 
 (* Var reasoning. *)
 Definition vprop_ivar (vp : vprop) :=

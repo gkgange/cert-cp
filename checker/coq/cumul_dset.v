@@ -135,11 +135,12 @@ Proof.
   assumption. assumption.
 Qed.
 
-Definition CumulTTDSet : DomDBCheck :=
-  mkDomDBCheck (cumul) (eval_cumul) (dset_check_cumul_tt) (dset_check_cumul_tt_valid).
+Definition CumulTTDSet : DomDBCheck CumulConstraint :=
+  mkDomDBCheck CumulConstraint (dset_check_cumul_tt) (dset_check_cumul_tt_valid).
 
-Definition CumulTTDCheck : Constraint :=
-  (CheckOfDomDBCheck (DomboundedDBCheck CumulTTDSet)). 
+Definition CumulDomBnd := DomboundedConstraint CumulConstraint.
+Definition CumulTTDCheck :=
+  (CheckOfDomDBCheck CumulDomBnd (DomboundedDBCheck CumulConstraint CumulTTDSet)). 
 
 Definition check_cumul_tt_dbnd (c : cumul) (ds : domset) (cl : clause) :=
-  (CumulTTDCheck).(check) (ds, c) cl.
+  (check CumulDomBnd CumulTTDCheck) (ds, c) cl.

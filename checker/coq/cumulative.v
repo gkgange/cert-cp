@@ -692,12 +692,21 @@ Definition CumulConstraint (C : Constraint) : Constraint :=
   mkConstraint (cumul) (eval_cumul) (check_cumul) (check_cumul_valid).
   *)
 Definition CumulConstraint : Constraint :=
-  mkConstraint (cumul) (eval_cumul) (check_cumul_tt) (check_cumul_tt_valid).
-
+  mkConstraint (cumul) (eval_cumul).
+Definition CumulBnd := BoundedConstraint CumulConstraint.
+  
+Definition CumulCheck := mkChecker
+  CumulConstraint (check_cumul_tt) (check_cumul_tt_valid).
+Definition CumulBndCheck := BoundedChecker CumulConstraint CumulCheck.
 Definition check_cumul_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
-  (BoundedConstraint CumulConstraint).(check) (bs, c) cl.
+  (check CumulBnd CumulBndCheck) (bs, c) cl.
 
-Definition CumulTTConstraint : Constraint :=
-  mkConstraint (cumul) (eval_cumul) (check_cumul_ttonly) (check_cumul_ttonly_valid).
+Definition CumulTTCheck := mkChecker
+  CumulConstraint (check_cumul_ttonly) (check_cumul_ttonly_valid).
+Definition CumulBndTTCheck := BoundedChecker CumulConstraint CumulTTCheck.
+
 Definition check_cumul_tt_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
-  (BoundedConstraint CumulTTConstraint).(check) (bs, c) cl.
+  (check CumulBnd CumulBndTTCheck) (bs, c) cl.
+
+Definition check_cumul_zsol (c : cumul) (zs : zsol) :=
+  false.

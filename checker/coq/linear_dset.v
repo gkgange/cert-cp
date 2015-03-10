@@ -62,14 +62,17 @@ Proof.
   now rewrite <- check_lincon_dbfun_eq with (f := f).
 Qed.
   
-Definition LinearDSet : DomDBCheck :=
-  mkDomDBCheck (lin_leq) (eval_lincon) (check_lincon_dbfun) (check_lincon_dbfun_valid).
+Definition LinearDSet := DomboundedConstraint LinearCon.
+Definition LinearDSCheck := 
+  mkDomDBCheck LinearCon (check_lincon_dbfun) (check_lincon_dbfun_valid).
+Definition LinearDbndCheck := DomboundedDBCheck LinearCon LinearDSCheck.
 
-Definition LinearDBCheck : Constraint :=
-  (CheckOfDomDBCheck (DomboundedDBCheck LinearDSet)). 
+Definition LinearDBCheck :=
+  (CheckOfDomDBCheck LinearDSet LinearDbndCheck). 
 
 Definition check_linear_dbnd (l : lin_leq) (ds : domset) (cl : clause) :=
-  (LinearDBCheck).(check) (ds, l) cl.
+  (check LinearDSet LinearDBCheck) (ds, l) cl.
 
+Definition ReifiedLinearDSet := ReifiedConstraint LinearDSet.
 Definition check_reif_linear_dbnd (r : lit) (l : lin_leq) (ds : domset) (cl : clause) :=
-  (ReifiedConstraint (LinearDBCheck)).(check) (r, (ds, l)) cl.
+  (check ReifiedLinearDSet (ReifiedCheck LinearDSet (LinearDBCheck))) (r, (ds, l)) cl.

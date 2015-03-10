@@ -987,14 +987,14 @@ Definition bounded (C : Constraint) : Type :=
   ((list (ivar*Z*Z)) * C.(T))%type.
 Definition bounded_eval (C : Constraint) (x : bounded C) (theta : asg) :=
   eval_bounds (fst x) theta /\ C.(eval) (snd x) theta.
-Definition bounded_check (C : Constraint) (x : bounded C) (cl : clause) :=
-  C.(check) (snd x) (negclause_of_bounds (fst x) ++ cl).
-Theorem bounded_check_valid : forall (C : Constraint) (x : bounded C) (cl : clause),
-  bounded_check C x cl = true -> implies (bounded_eval C x) (eval_clause cl).
+Definition bounded_check (C : Constraint) (Ch : Checker C) (x : bounded C) (cl : clause) :=
+  check C Ch (snd x) (negclause_of_bounds (fst x) ++ cl).
+Theorem bounded_check_valid : forall (C : Constraint) (Ch : Checker C) (x : bounded C) (cl : clause),
+  bounded_check C Ch x cl = true -> implies (bounded_eval C x) (eval_clause cl).
 Proof.
   unfold implies, bounded_eval; intros.
     destruct H0.
-    apply C.(check_valid) in H.
+    apply (check_valid C Ch) in H.
     unfold implies in H.
     assert (eval_clause (negclause_of_bounds (fst x) ++ cl) theta).
       apply H. exact H1.
@@ -1006,5 +1006,7 @@ Proof.
 Qed.
 
 Definition BoundedConstraint (C : Constraint) : Constraint :=
-  mkConstraint (bounded C) (bounded_eval C) (bounded_check C) (bounded_check_valid C).
+  mkConstraint (bounded C) (bounded_eval C).
+Definition BoundedChecker (C : Constraint) (Ch : Checker C)  : Checker (BoundedConstraint C) :=
+  mkChecker (BoundedConstraint C) (bounded_check C Ch) (bounded_check_valid C Ch).
 

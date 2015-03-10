@@ -855,10 +855,13 @@ Proof.
 Qed.
 
 Definition Tauto : Constraint :=
-  mkConstraint (unit) (eval_tauto) (check_tauto) (check_tauto_valid). 
+  mkConstraint (unit) (eval_tauto).
+Definition CheckTauto := mkChecker Tauto (check_tauto) (check_tauto_valid).
 
+Definition BoundedTauto := BoundedConstraint Tauto.
+Definition BoundedTautoChk := BoundedChecker Tauto CheckTauto.
 Definition check_tauto_bnd (bnd : list (ivar*Z*Z)) (cl : clause) :=
-  (BoundedConstraint Tauto).(check) (bnd, tt) cl.
+  check BoundedTauto BoundedTautoChk (bnd, tt) cl.
 
 Definition domfun := ivar -> dom.
 Definition dbfun := ivar -> dbound.
@@ -984,23 +987,20 @@ Proof.
   now rewrite H, H0.
 Qed.
 
-Record DomCheck : Type := mkDomCheck
-  { T : Type ;
-    dc_eval : T -> asg -> Prop ;
-    dc_check : T -> domfun -> bool ;
+Record DomCheck (C : Constraint) : Type := mkDomCheck
+  {
+    dc_check : C.(T) -> domfun -> bool ;
     dc_check_valid : 
-      forall (x : T) (f : domfun) (cl : clause),
+      forall (x : C.(T)) (f : domfun) (cl : clause),
       is_negcl_domfun f cl /\ dc_check x f = true ->
-        implies (dc_eval x) (eval_clause cl) }.
+        implies (C.(eval) x) (eval_clause cl) }.
 
-Record DomDBCheck : Type := mkDomDBCheck
-  { Tb : Type ;
-    db_eval : Tb -> asg -> Prop ;
-    db_check : Tb -> dbfun -> bool ;
+Record DomDBCheck (C : Constraint) : Type := mkDomDBCheck
+  { db_check : C.(T) -> dbfun -> bool ;
     db_check_valid : 
-      forall (x : Tb) (f : dbfun) (cl : clause),
+      forall (x : C.(T)) (f : dbfun) (cl : clause),
       is_negcl_dbfun f cl /\ db_check x f = true ->
-        implies (db_eval x) (eval_clause cl) }.
+        implies (C.(eval) x) (eval_clause cl) }.
 
 (*
 Theorem dombounded_negcl_iff :
