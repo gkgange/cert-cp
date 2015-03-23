@@ -708,5 +708,5 @@ Definition CumulBndTTCheck := BoundedChecker CumulConstraint CumulTTCheck.
 Definition check_cumul_tt_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
   (check CumulBnd CumulBndTTCheck) (bs, c) cl.
 
-Definition check_cumul_zsol (c : cumul) (zs : zsol) :=
+Definition check_cumul_sol (c : cumul) (theta : asg) :=
   false.

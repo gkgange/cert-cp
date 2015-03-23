@@ -122,7 +122,6 @@ BASE_MLFILES:=\
   registry.ml\
   parse.ml\
   builtins.ml\
-  corresp.ml\
 	checkTrace.ml
 
 AUTO_MLFILES:=checker_impl.ml

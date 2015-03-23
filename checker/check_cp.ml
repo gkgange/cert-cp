@@ -172,6 +172,7 @@ let rec parse_and_check_inferences model bounds tokens =
      else
        false
 
+(*
 let check_corresp model clauses =
   match !COption.tracefile with
   | None -> true
@@ -187,6 +188,7 @@ let get_assumptions model clauses =
       let tchannel = open_in tfile in
       let ttoks = Spec.lexer (Stream.of_channel tchannel) in
       Some (Corresp.assumptions model clauses ttoks)
+      *)
 
 let trace_assumptions model lmap =
   match !COption.tracefile with

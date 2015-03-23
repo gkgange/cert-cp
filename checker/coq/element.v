@@ -2,6 +2,7 @@ Require Import ZArith.
 Require Import Bool.
 Require Import List.
 Require Import prim.
+Require Import sol.
 Require Import bounds.
 Require Import domain.
 
@@ -99,6 +100,8 @@ Definition ElemCheck := mkChecker ElemConstraint (check_element) (check_element_
 Definition ElemBndCheck := BoundedChecker ElemConstraint ElemCheck.
 Definition check_element_bnd (x : element) (bs : list (ivar*Z*Z)) (cl : clause) := 
   (check ElemBnd ElemBndCheck) (bs, x) cl.
+
+
 (*
 
 Theorem check_element_valid :
@@ -122,4 +125,39 @@ Proof.
 Qed.
    
 *)
+Fixpoint eval_element_sol_rec x i ys theta :=
+  match ys with
+  | nil => false
+  | cons (k, y) ys' =>
+    (Z_eqb (eval_ivar i theta)  k) && (Z_eqb (eval_ivar x theta) y)
+      || eval_element_sol_rec x i ys' theta
+  end.
 
+Definition eval_element_sol (con : element) (theta : asg) :=
+  match con with
+  | Elem x i ys => eval_element_sol_rec x i (augment Z ys) theta
+  end.
+
+Theorem eval_element_sol_rec_iff :
+  forall x i ys theta,
+    eval_element_sol_rec x i ys theta = true <-> eval_element_rec x i ys theta.
+Proof.
+  intros; induction ys; unfold eval_element_sol_rec, eval_element_rec;
+    fold eval_element_sol_rec; fold eval_element_rec; simpl in *.
+
+  split; intros; try congruence; try contradiction.
+
+  destruct a; simpl in *.
+  rewrite <- IHys.
+  rewrite orb_true_iff; rewrite andb_true_iff.
+  now  repeat (rewrite Z_eqb_iff_eq).
+Qed.
+Theorem eval_element_sol_valid :
+    forall elt theta,
+      (eval_element_sol elt theta = true) -> eval_element elt theta.
+Proof.
+  intros elt theta; unfold eval_element_sol, eval_element; destruct elt.
+  now rewrite eval_element_sol_rec_iff.
+Qed.
+
+Definition ElementSolCheck := mkSolCheck ElemConstraint eval_element_sol eval_element_sol_valid.

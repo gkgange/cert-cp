@@ -10,6 +10,23 @@ Require Import bounds.
 Require Import domain.
 
 (* Partial solution - mapping of variables to integers. *)
+Definition partial_zsol : Type := zmap Z.
+Definition partial_bsol : Type := zmap bool.
+
+Definition eval_partial_zsol zs x :=
+  match ZMaps.find zs x with
+  | Some k => k
+  | None => 0%Z
+  end.
+Definition eval_partial_bsol bs x :=
+  match ZMaps.find bs x with
+  | Some b => b
+  | None => false
+  end.
+
+Definition asg_of_partial_sol zs bs :=
+  ((eval_partial_zsol zs), (eval_partial_bsol bs)).
+(*
 Definition zsol : Type := zmap Z.
 
 Definition eval_zsol zs theta :=
@@ -27,11 +44,11 @@ Proof.
   unfold eval_zsol in H0.
   now apply ZMaps.find_2, H0 in H.
 Qed.
+*)
 
 Record SolCheck (C : Constraint) := mkSolCheck
   {
-    sol_check : C.(T) -> zsol -> bool ;
-    sol_check_valid : forall (x : C.(T) ) (zs : zsol),
-      (sol_check x zs = true) ->
-        implies (eval_zsol zs) (C.(eval) x)
+    sol_check : C.(T) -> asg -> bool ;
+    sol_check_valid : forall (x : C.(T) ) (sol : asg),
+      (sol_check x sol = true) -> C.(eval) x sol
   }.
