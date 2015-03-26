@@ -5,6 +5,7 @@ module H = Hashtbl
 module GL = Genlex
 module MT = MTypes
 module C = Checker
+module Sol = SolCheck
 module M = Model
 module S = Spec
 module P = Parse
@@ -198,6 +199,14 @@ let trace_assumptions model lmap =
       let ttoks = Spec.lexer (Stream.of_channel tchannel) in
       Some (CheckTrace.assumptions model lmap ttoks)
 
+let trace_assumptions_sdrup model lmap =
+  match !COption.tracefile with
+  | None -> None
+  | Some tfile ->
+      let tchannel = open_in tfile in
+      let stream = Stream.of_channel tchannel in
+      Some (CheckTrace.assumptions_sdrup model lmap stream)
+
 let get_litsem model = parser
   | [< 'GL.Int v ; 'GL.Kwd "[" ; l = Parse.parse_vprop model ; 'GL.Kwd "]" >]
     -> (v, l)
@@ -211,12 +220,31 @@ let parse_lmap model tokens =
   done ;
   lmap
 
+let parse_var_asg model = parser
+  | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] ->
+      (M.get_ivar model v, k)
+
+let parse_asg model tokens =
+  chomp tokens (GL.Kwd "[") ;
+  let asg = ref [] in
+  while Stream.peek tokens <> Some (GL.Kwd "]")
+  do
+    asg := (parse_var_asg model tokens) :: !asg ;
+    (if Stream.peek tokens = Some (GL.Kwd ",") then
+      Stream.junk tokens)
+  done ;
+  List.rev !asg
+
+let check_solution model sol =
+  let sol_checks = M.get_sol_checkers model in
+  List.for_all (fun c -> c.Sol.check sol) sol_checks
+
 let main () =
   (* Parse the command-line arguments *)
   Arg.parse
     COption.speclist
       (begin fun infile -> COption.infile := Some infile end)
-      "cp-certify <options> <inputfile>"
+      "check_cp <options> <model_file>"
   ;
   (* Parse the program *)
   let input = match !COption.infile with
@@ -228,42 +256,25 @@ let main () =
   List.iter (fun m -> DL.loadfile_private m) !COption.modules ;
   let tokens = Spec.lexer (Stream.of_channel input) in 
   let model = parse_model tokens in
-  (*
-  let okay =
-    if !COption.stream then
-      parse_and_check_inferences model (M.get_bounds model) tokens
-    else
-      let infs = parse_inferences model tokens in
-      check_inferences model (M.get_bounds model) infs
-        && check_corresp model (L.map (fun (i, cl) -> cl) infs)
-    in
-  if okay then
-    Format.fprintf fmt "OKAY@."
-  else
-    Format.fprintf fmt "FAILURE: invalid inference found.@." 
-    *)
-  (*
-  let infs = parse_inferences model tokens in
-  if check_inferences model (M.get_bounds model) infs
-  then
-    let assumps =
-      get_assumptions model (L.map (fun (i, cl) -> cl) infs) in
-    match assumps with
-    | None -> Format.fprintf fmt "OKAY (no trace)@."
-    | Some [] -> Format.fprintf fmt "OKAY@."
-    | Some xs ->
-        Format.fprintf fmt "ASSUMPTIONS %s@."
-          (string_of_assumptions model xs)
-  else
-    Format.fprintf fmt "FAILURE: invalid clause logged.@."
-    *)
+  begin
+    match !COption.solfile with
+    | None -> ()
+    | Some sf ->
+        begin
+          let asg_toks = Spec.lexer (Stream.of_channel (open_in sf)) in
+          match check_solution model (parse_asg model asg_toks) with
+          | true -> Format.fprintf fmt "Solution valid.@."
+          | false -> Format.fprintf fmt "Solution failed.@."
+        end
+  end ;
   let lit_tokens = match !COption.litfile with
     | None -> tokens
     | Some lfile -> Spec.lexer (Stream.of_channel (open_in lfile))
   in
   let lmap = parse_lmap model lit_tokens in
   let assumps =
-    trace_assumptions model lmap in
+    (* trace_assumptions model lmap in *)
+    trace_assumptions_sdrup model lmap in
   match assumps with
   | None -> Format.fprintf fmt "ERROR: No trace specified@."
   | Some [] -> Format.fprintf fmt "OKAY@."

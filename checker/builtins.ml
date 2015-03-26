@@ -3,6 +3,7 @@
  * at runtime. *)
 module R = Registry
 module C = Checker
+module Sol = SolCheck
 module MT = MTypes
 module P = Parse
 module S = Spec
@@ -48,13 +49,22 @@ let clause_subsumes cl_x cl_y =
 (* Build the linear checker. *)
 let linear_args model = S.cons int_list (S.cons (ivar_list model) S.intconst)
 
-let check_linear_le model =
- fun tokens ->
+let parse_linear_le model tokens =
    let (coeffs, (vars, k)) = linear_args model tokens in
-(*     (S.cons int_list (S.cons (ivar_list model) S.intconst)) tokens in *)
    let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
    let repr = Format.sprintf "linear_le(%s, %s, %d)"
      (string_of_ints coeffs) (string_of_ivars model vars) k in
+   ((linterms, k), repr)
+
+let check_linear_le model =
+ fun tokens ->
+   (*
+   let (coeffs, (vars, k)) = linear_args model tokens in
+   let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
+   let repr = Format.sprintf "linear_le(%s, %s, %d)"
+     (string_of_ints coeffs) (string_of_ivars model vars) k in
+   *)
+   let ((linterms, k), repr) = parse_linear_le model tokens in
    let bnd = M.get_bounds model in
    let dset = C_impl.bounds_domset bnd in
 {

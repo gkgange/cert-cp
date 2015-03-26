@@ -17,6 +17,8 @@ type lit =
 type bound = (ivar * int) * int
 type bounds = bound list
 
+type assignment = (ivar * int) list
+
 val negate : lit -> lit
 
 type clause = lit list

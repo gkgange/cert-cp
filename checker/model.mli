@@ -21,6 +21,8 @@ val get_lit : t -> MTypes.ident -> MTypes.lit
 val get_checker : t -> MTypes.ident -> Checker.t
 val get_all_checkers : t -> Checker.t list
 
+val get_sol_checkers : t -> SolCheck.t list
+
 val string_of_vprop : t -> MTypes.vprop -> string
 val string_of_lit : t -> MTypes.lit -> string
 val string_of_clause : t -> MTypes.clause -> string

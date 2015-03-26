@@ -117,7 +117,9 @@ BASE_MLFILES:=\
   cOption.ml\
   mTypes.ml\
   spec.ml\
+	sdrup.ml\
   checker.ml\
+	solCheck.ml\
   model.ml\
   registry.ml\
   parse.ml\

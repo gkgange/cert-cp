@@ -2,6 +2,7 @@ Require Import ZArith.
 Require Import Bool.
 Require Import bounds.
 Require Import prim.
+Require Import sol.
 Require Import domset.
 
 Local Open Scope nat_scope.
@@ -708,5 +709,136 @@ Definition CumulBndTTCheck := BoundedChecker CumulConstraint CumulTTCheck.
 Definition check_cumul_tt_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
   (check CumulBnd CumulBndTTCheck) (bs, c) cl.
 
+Fixpoint min_start (ts : list task) (theta : asg) :=
+  match ts with
+  | nil => 0%Z
+  | cons t ts' => Z.min (eval_start t theta) (min_start ts' theta)
+  end.
+
+Theorem min_start_empty : forall (ts : list task) (theta : asg) (time : Z),
+  Zlt time (min_start ts theta) -> eval_usage ts time theta = 0.
+Proof.
+  intros ts theta time; induction ts; unfold min_start, eval_usage; fold min_start; fold eval_usage; intros; try trivial.
+  assert (Zlt time (eval_start a theta)).
+  assert (Zle (Z.min (eval_start a theta) (min_start ts theta)) (eval_start a theta)).
+  apply Z.min_le_iff; left; apply Zle_refl.
+  omega.
+  rewrite IHts.
+  unfold task_at_time.
+  remember (Z_leb (eval_start a theta) time) as ple.
+  destruct ple.
+  apply eq_sym in Heqple; rewrite Z_leb_iff_le in Heqple.
+  clear IHts; omega.
+  rewrite andb_false_l; omega.
+  assert (Zle (Z.min (eval_start a theta) (min_start ts theta)) (min_start ts theta)).
+  apply Z.min_le_iff; right; apply Zle_refl.
+  omega.
+Qed.
+
+Fixpoint max_end (ts : list task) (theta : asg) :=
+  match ts with
+  | nil => 0%Z
+  | cons t ts' => Z.max (eval_end t theta) (max_end ts' theta)
+  end.
+ Theorem max_end_empty : forall (ts : list task) (theta : asg) (time : Z),
+  Zlt (max_end ts theta) time -> eval_usage ts time theta = 0.
+Proof.
+  intros ts theta time; induction ts; unfold max_end, eval_usage; fold max_end; fold eval_usage; intros; try trivial.
+  assert (Zlt (eval_end a theta) time).
+  assert (Zle (eval_end a theta) (Z.max (eval_end a theta) (max_end ts theta))).
+  apply Z.max_le_iff; left; apply Zle_refl.
+  omega.
+  rewrite IHts.
+  unfold task_at_time.
+  remember (Z_ltb time (eval_end a theta)) as ple.
+  destruct ple.
+  apply eq_sym in Heqple; rewrite Z_ltb_iff_lt in Heqple.
+  clear IHts; omega.
+  rewrite andb_false_r; omega.
+  assert (Zle (max_end ts theta) (Z.max (eval_end a theta) (max_end ts theta))).
+  apply Z.max_le_iff; right; apply Zle_refl.
+  omega.
+Qed.
+
+Fixpoint span_max (ts : list task) (start : Z) (sz : nat) (theta : asg) :=
+  match sz with
+  | O => 0%nat
+  | S sz' =>
+     max (eval_usage ts (start+(Zpred (Z_of_nat sz))) theta) (span_max ts start sz' theta)
+  end.
+
+Theorem span_max_ub_nat : forall (ts : list task) (start : Z) (sz : nat) (k : nat) (theta : asg),
+  lt k sz ->
+    (eval_usage ts (Zplus start (Z_of_nat k)) theta) <= span_max ts start sz theta.
+Proof.
+  intros.
+  induction sz.
+  now apply lt_n_0 in H.
+  remember (Zplus start (Z_of_nat k)) as tk.
+  unfold span_max, eval_usage; fold span_max; fold eval_usage.
+  rewrite Nat2Z.inj_succ.
+  rewrite <- Zpred_succ.
+  assert (lt k sz \/ k = sz). omega.
+  destruct H0; fold span_max.
+
+    
+    apply IHsz in H0.
+    assert (le (span_max ts start sz theta) (max (eval_usage ts (Zplus start (Z_of_nat sz)) theta) (span_max ts start sz theta))).
+    apply Max.le_max_r.
+    omega.
+
+    rewrite Heqtk; rewrite H0.
+    apply Max.le_max_l.
+Qed.
+
+Theorem span_max_ub_range : forall (ts : list task) (lb ub k : Z) (theta : asg),
+  Zle lb k /\ Zle k ub ->
+    le (eval_usage ts k theta) (span_max ts lb (S (Zabs_nat (Zminus ub lb))) theta).
+Proof.
+  intros.
+  remember (S (Z.abs_nat (Zminus ub lb))) as sz.
+  remember (Z.abs_nat (Zminus k lb)) as kshift.
+  assert (k = Zplus lb (Z_of_nat kshift)).
+  rewrite Heqkshift.
+  rewrite Zabs2Nat.id_abs.
+  rewrite Z.abs_eq; omega.
+  rewrite H0; apply span_max_ub_nat.
+  rewrite Heqkshift.
+  rewrite Heqsz.
+  rewrite <- Zabs2Nat.inj_succ.
+  apply Zabs_nat_lt.
+  omega.
+  omega.
+Qed.
+  
 Definition check_cumul_sol (c : cumul) (theta : asg) :=
-  false.
+  let start := min_start (tasks c) theta in
+  let last := max_end (tasks c) theta in
+  Compare_dec.leb (span_max (tasks c) start (S (Zabs_nat (Zminus last start))) theta) (limit c).
+Theorem check_cumul_sol_valid : forall (c : cumul) (theta : asg),
+  check_cumul_sol c theta = true -> eval_cumul c theta.
+Proof.
+  intros c theta; destruct c;
+    unfold eval_cumul; simpl; intros.
+  unfold check_cumul_sol in H; simpl tasks in *; simpl limit in *.
+  assert (Hlow := min_start_empty tasks0 theta time).
+  assert (Hhigh := max_end_empty tasks0 theta time).
+  remember (min_start tasks0 theta) as lb.
+  remember (max_end tasks0 theta) as ub.
+  assert (Hrange := span_max_ub_range tasks0 lb ub time theta).
+  assert (Zlt time lb \/ Zle lb time).
+    omega.
+  destruct H0.
+    omega.
+
+    assert (Zlt ub time \/ Zle time ub).
+      omega.
+    destruct H1; try omega.
+    assert (Zle lb time /\ Zle time ub) as Hr.
+      omega.
+    apply Hrange in Hr.
+    rewrite leb_iff in H.
+    omega.
+Qed.    
+
+Definition CumulSolCheck := mkSolCheck CumulConstraint check_cumul_sol check_cumul_sol_valid.

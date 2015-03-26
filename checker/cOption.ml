@@ -3,6 +3,7 @@ let infile = ref None
 let modules = ref []
 let tracefile = ref None
 let litfile = ref None
+let solfile = ref None
 
 let verbosity = ref 0
 
@@ -35,4 +36,8 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
       Arg.String(fun f -> litfile := Some f),
       " mapping of trace literals to model semantics."
      );
+     ("-solution",
+      Arg.String(fun f -> solfile := Some f),
+      " claimed solution to check."
+     )
     ]

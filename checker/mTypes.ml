@@ -17,6 +17,8 @@ type lit =
 type bound = (ivar * int) * int
 type bounds = bound list
 
+type assignment = (ivar * int) list
+
 let negate = function
   | Pos vp -> Neg vp
   | Neg vp -> Pos vp

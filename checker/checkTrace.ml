@@ -6,6 +6,7 @@ module M = Model
 module H = Hashtbl
 module A = DynArray
 module C = Checker
+module SD = Sdrup
 
 (* Look up a literal in the mapping. *)
 let get_lit lmap k =
@@ -25,6 +26,15 @@ let tlit lmap = parser
         MT.negate (get_lit lmap (-k))
       else
         get_lit lmap k
+
+let lit_of_int lmap k =
+  if k < 0 then
+    MT.negate (get_lit lmap (-k))
+  else
+    get_lit lmap k
+
+let clause_of_ints lmap ks =
+  List.map (lit_of_int lmap) ks
 
 (* Parse a checker hint from the trace. *)
 let parse_hint =
@@ -150,3 +160,22 @@ let rec assumptions' model hint tcheck lmap tokens assumps =
     
 let assumptions model lmap tokens =
   assumptions' model None (tauto_check model) lmap tokens []
+
+let rec assumptions_sdrup' model hint tcheck lmap stream assumps =
+  match SD.next stream with
+    None -> assumps
+  | Some (SD.Hint hint) ->
+      assumptions_sdrup' model (resolve_hint model hint)
+        tcheck lmap stream assumps
+  | Some (SD.Intro ls) ->
+      let cl = clause_of_ints lmap ls in
+      if check_clause model hint tcheck cl then
+        assumptions_sdrup' model hint tcheck lmap stream assumps
+      else
+        assumptions_sdrup' model hint tcheck lmap stream
+          (update_assumps assumps cl) 
+  | Some (SD.Delete _ | SD.Infer _ | SD.Comment _) ->
+      assumptions_sdrup' model hint tcheck lmap stream assumps
+
+let assumptions_sdrup model lmap stream =
+  assumptions_sdrup' model None (tauto_check model) lmap stream []

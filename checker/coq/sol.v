@@ -26,6 +26,17 @@ Definition eval_partial_bsol bs x :=
 
 Definition asg_of_partial_sol zs bs :=
   ((eval_partial_zsol zs), (eval_partial_bsol bs)).
+
+(*
+Fixpoint zasg_of_list zl :=
+  match zl with
+  | [] => ZMaps.empty
+  | cons (x, k) :: zl' =>
+      match ZMaps.find zl x with
+      | Some b => 
+          *)
+
+(* Definition asg_of_list (zl, bl) := (zasg_of_list zl, basg_of_list bl) *)
 (*
 Definition zsol : Type := zmap Z.
 
