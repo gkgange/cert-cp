@@ -113,6 +113,7 @@ VFILES:=bounds.v\
 	element_dset.v\
   linear.v\
 	linear_dset.v\
+	sol.v\
   prim.v\
   reif.v\
   checker_impl.v

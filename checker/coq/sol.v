@@ -27,6 +27,19 @@ Definition eval_partial_bsol bs x :=
 Definition asg_of_partial_sol zs bs :=
   ((eval_partial_zsol zs), (eval_partial_bsol bs)).
 
+Fixpoint eval_alist_zsol zs x :=
+  match zs with
+  | nil => 0%Z
+  | cons (x', k) zs' =>
+      if Z_eqb x x' then
+        k
+      else
+        eval_alist_zsol zs' x
+  end.
+
+Definition asg_of_alist zs :=
+  ((eval_alist_zsol zs), (fun (bv : bvar) => false)).
+
 (*
 Fixpoint zasg_of_list zl :=
   match zl with

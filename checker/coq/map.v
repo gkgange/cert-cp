@@ -170,3 +170,11 @@ Theorem find_add_none : forall (A : Type) (xs : ZMaps.t A) (x a : ZMaps.key) (e 
           now apply Hnf in H0.
         discriminate.
 Qed.
+
+Definition asg_map := ZMaps.t Z.
+
+Fixpoint asg_map_of_alist (ls : list (Z * Z)) :=
+  match ls with
+  | nil => ZMaps.empty Z
+  | cons (x, k) ls' => ZMaps.add x k (asg_map_of_alist ls')
+  end.

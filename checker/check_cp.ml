@@ -86,11 +86,15 @@ let term_defn model id =
       end
   | _ ->
     let pcon = (Registry.find key) model in
+    let psol = (Registry.find_sol key) model in
     fun tokens ->
       (* Indirection is to support (eventually) providing
        * multiple checkers for a constraint. *)
       let args = P.grab_args tokens in
-      M.add_checker model id (pcon (Stream.of_list args))
+      begin
+        M.add_checker model id (pcon (Stream.of_list args)) ;
+        M.add_sol_check model id (psol (Stream.of_list args))
+      end
     in
   parser
     | [< 'GL.Ident key ; v = aux key >] -> v
@@ -237,7 +241,14 @@ let parse_asg model tokens =
 
 let check_solution model sol =
   let sol_checks = M.get_sol_checkers model in
-  List.for_all (fun c -> c.Sol.check sol) sol_checks
+  List.for_all (fun c ->
+    let okay = c.Sol.check sol in
+    begin
+      if not okay then
+        Format.fprintf fmt "FAILED: %s" c.Sol.repr 
+    end ;
+    c.Sol.check sol
+    ) sol_checks
 
 let main () =
   (* Parse the command-line arguments *)

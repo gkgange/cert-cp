@@ -80,6 +80,25 @@ let check_linear_le model =
       C_impl.check_linear_dbnd (linterms, k) dset (impl_clause_of_clause cl))
 }
 
+let check_linear_le_sol model =
+ fun tokens ->
+   let ((linterms, k), repr) = parse_linear_le model tokens in
+   let bnd = M.get_bounds model in
+   let dset = C_impl.bounds_domset bnd in
+{
+  Sol.repr = repr ;
+  Sol.check =
+    (*
+    (fun bnd cl ->
+      C_impl.check_lincon (linterms, k) (impl_clause_of_clause cl)
+      || C_impl.check_linear_bnd (linterms, k) bnd (impl_clause_of_clause cl)
+    )
+*)
+    (fun asg ->
+      let asg_map = C_impl.asg_of_alist asg in
+      C_impl.check_lincon_sol (linterms, k) asg_map)
+}
+
 (* Build a _reified_ linear checker. *)
 let check_reif_linear_le model =
   fun tokens ->
@@ -168,12 +187,32 @@ let check_cumul model =
         C_impl.check_cumul_tt_dbnd cumul dset icl
       )
     }
+
+let check_cumul_sol model =
+  fun tokens ->
+    let (xs, durations, resources, lim) = parse_cumul_args model tokens in
+    let cumul = make_cumul xs durations resources lim in
+    let repr = Format.sprintf "cumulative(%s, %s, %s, %d)"
+      (string_of_ivars model xs) (string_of_ints durations)
+      (string_of_ints resources) lim in
+    {
+      Sol.repr = repr ;
+      Sol.check = (fun asg ->
+        let asg_map = C_impl.asg_of_alist asg in
+        C_impl.check_cumul_sol cumul asg_map
+      )
+    }
+
 let register () =
   R.add "linear_le" check_linear_le ;
   R.add "linear_le_reif" check_reif_linear_le ;
   R.add "element" check_element ;
   R.add "cumulative" check_cumul ;
-  R.add "clause" check_clause
+  R.add "clause" check_clause ;
+
+  R.add_sol "linear_le" check_linear_le_sol ;
+  R.add_sol "cumulative" check_cumul_sol
+
 (*
   R.add "clause" R.null_checker ;
   R.add "linear_le" R.null_checker

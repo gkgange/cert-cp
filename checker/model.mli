@@ -9,6 +9,7 @@ val add_ivar : t -> MTypes.ident -> (int*int) option -> unit
 val add_bvar : t -> MTypes.ident -> unit
 val add_lit : t -> MTypes.ident -> MTypes.lit -> unit
 val add_checker : t -> MTypes.ident -> Checker.t -> unit
+val add_sol_check : t -> MTypes.ident -> SolCheck.t -> unit
 
 val get_ivar : t -> MTypes.ident -> MTypes.ivar
 val get_bvar : t -> MTypes.ident -> MTypes.bvar

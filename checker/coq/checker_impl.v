@@ -15,6 +15,7 @@ Extract Constant prim.Z_eqb => "(=)".
 
 Set Extraction Optimize.
 Extraction "checker_impl.ml"
+  sol.asg_of_alist
   prim.check_inf prim.check_clause
   (* domain.check_tauto *)
   domain.check_tauto_bnd
@@ -24,11 +25,13 @@ Extraction "checker_impl.ml"
   cumulative.check_cumul
   cumulative.check_cumul_tt
   *)
+  cumulative.check_cumul_sol
   cumulative.check_cumul_bnd
   cumulative.check_cumul_tt_bnd
   cumul_dset.check_cumul_tt_dbnd
   reif.check_reif
   (* linear.check_lincon *)
+  linear.check_lincon_sol
   linear.check_linear_bnd
   linear_dset.check_linear_dbnd
   linear_dset.check_reif_linear_dbnd
