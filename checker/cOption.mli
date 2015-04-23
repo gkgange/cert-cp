@@ -7,6 +7,12 @@ val modules : string list ref
 val verbosity : int ref
 val stream : bool ref
 
+type trace_kind =
+  | IDrup (* DRUP with axiom introduction. *)
+  | Dres (* Resolution proof with deletion *)
+
+val tracemode : trace_kind ref
+
 (* --------------------------------------------- *)
 (*       Specification list for options          *)
 (* --------------------------------------------- *)

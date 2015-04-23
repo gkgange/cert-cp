@@ -9,6 +9,11 @@ let verbosity = ref 0
 
 let stream = ref false
 
+type trace_kind =
+  | IDrup (* DRUP with axiom introduction. *)
+  | Dres (* Resolution proof with deletion *)
+
+let tracemode = ref IDrup
 (* --------------------------------------------- *)
 (*       Specification list for options          *)
 (* --------------------------------------------- *)
@@ -31,6 +36,13 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
      ("-trace",
       Arg.String(fun f -> tracefile := Some f),
       " resolution proof trace to attempt to justify."
+     );
+     ("-format",
+       Arg.Symbol([ "idrup" ; "dres" ], fun m ->
+         match m with
+         | "idrup" -> tracemode := IDrup
+         | "dres" -> tracemode := Dres),
+       " format of resolution trace."
      );
      ("-lits",
       Arg.String(fun f -> litfile := Some f),

@@ -83,8 +83,8 @@ let check_linear_le model =
 let check_linear_le_sol model =
  fun tokens ->
    let ((linterms, k), repr) = parse_linear_le model tokens in
-   let bnd = M.get_bounds model in
-   let dset = C_impl.bounds_domset bnd in
+   (* let bnd = M.get_bounds model in
+   let dset = C_impl.bounds_domset bnd in *)
 {
   Sol.repr = repr ;
   Sol.check =

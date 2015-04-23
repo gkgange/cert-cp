@@ -200,16 +200,19 @@ let trace_assumptions model lmap =
   | None -> None
   | Some tfile ->
       let tchannel = open_in tfile in
-      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
+      (* let ttoks = Spec.lexer (Stream.of_channel tchannel) in *)
+      let ttoks = Stream.of_channel tchannel in
       Some (CheckTrace.assumptions model lmap ttoks)
 
-let trace_assumptions_sdrup model lmap =
+(*
+let trace_assumptions_idrup model lmap =
   match !COption.tracefile with
   | None -> None
   | Some tfile ->
       let tchannel = open_in tfile in
       let stream = Stream.of_channel tchannel in
-      Some (CheckTrace.assumptions_sdrup model lmap stream)
+      Some (CheckTrace.assumptions_idrup model lmap stream)
+*)
 
 let get_litsem model = parser
   | [< 'GL.Int v ; 'GL.Kwd "[" ; l = Parse.parse_vprop model ; 'GL.Kwd "]" >]
@@ -284,8 +287,7 @@ let main () =
   in
   let lmap = parse_lmap model lit_tokens in
   let assumps =
-    (* trace_assumptions model lmap in *)
-    trace_assumptions_sdrup model lmap in
+    trace_assumptions model lmap in
   match assumps with
   | None -> Format.fprintf fmt "ERROR: No trace specified@."
   | Some [] -> Format.fprintf fmt "OKAY@."

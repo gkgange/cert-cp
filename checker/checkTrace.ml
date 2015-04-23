@@ -6,7 +6,7 @@ module M = Model
 module H = Hashtbl
 module A = DynArray
 module C = Checker
-module SD = Sdrup
+module ID = Idrup
 
 (* Look up a literal in the mapping. *)
 let get_lit lmap k =
@@ -158,24 +158,45 @@ let rec assumptions' model hint tcheck lmap tokens assumps =
       assumptions' model hint tcheck lmap tokens
         (update_assumps assumps cl)
     
-let assumptions model lmap tokens =
-  assumptions' model None (tauto_check model) lmap tokens []
-
-let rec assumptions_sdrup' model hint tcheck lmap stream assumps =
-  match SD.next stream with
+let rec assumptions_idrup model hint tcheck lmap stream assumps =
+  match ID.next stream with
     None -> assumps
-  | Some (SD.Hint hint) ->
-      assumptions_sdrup' model (resolve_hint model hint)
+  | Some (ID.Hint hint) ->
+      assumptions_idrup model (resolve_hint model hint)
         tcheck lmap stream assumps
-  | Some (SD.Intro ls) ->
+  | Some (ID.Intro ls) ->
       let cl = clause_of_ints lmap ls in
       if check_clause model hint tcheck cl then
-        assumptions_sdrup' model hint tcheck lmap stream assumps
+        assumptions_idrup model hint tcheck lmap stream assumps
       else
-        assumptions_sdrup' model hint tcheck lmap stream
+        assumptions_idrup model hint tcheck lmap stream
           (update_assumps assumps cl) 
-  | Some (SD.Delete _ | SD.Infer _ | SD.Comment _) ->
-      assumptions_sdrup' model hint tcheck lmap stream assumps
+  | Some (ID.Delete _ | ID.Infer _ | ID.Comment _) ->
+      assumptions_idrup model hint tcheck lmap stream assumps
 
+let rec assumptions_dres model hint tcheck lmap stream assumps =
+  match Dres.next stream with
+    None -> assumps
+  | Some (Dres.Hint hint) ->
+      assumptions_dres model (resolve_hint model hint)
+        tcheck lmap stream assumps
+  | Some (Dres.Intro (_, ls)) ->
+      let cl = clause_of_ints lmap ls in
+      if check_clause model hint tcheck cl then
+        assumptions_dres model hint tcheck lmap stream assumps
+      else
+        assumptions_dres model hint tcheck lmap stream
+          (update_assumps assumps cl) 
+  | Some (Dres.Delete _ | Dres.Infer _ | Dres.Comment _) ->
+      assumptions_dres model hint tcheck lmap stream assumps
+
+let assumptions model lmap tokens =
+  match !COption.tracemode with
+  | COption.IDrup -> assumptions_idrup model None (tauto_check model) lmap tokens []
+  | COption.Dres -> assumptions_dres model None (tauto_check model) lmap tokens []
+
+
+(*
 let assumptions_sdrup model lmap stream =
   assumptions_sdrup' model None (tauto_check model) lmap stream []
+*)

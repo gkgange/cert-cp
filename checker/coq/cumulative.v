@@ -5,6 +5,9 @@ Require Import prim.
 Require Import sol.
 Require Import domset.
 
+Require Import Psatz.
+
+
 Local Open Scope nat_scope.
 
 (* Really should add some stuff regarding
@@ -68,11 +71,7 @@ Proof.
     unfold span_usage; fold span_usage.
     assert (le (eval_usage (tasks c) (start + (Z_of_nat (S sz)) - 1) theta) c.(limit)).
     apply H.
-    rewrite <- mult_n_Sm.
-    rewrite plus_comm.
-    apply plus_le_compat.
-    apply IHsz.
-    exact H0.
+    lia.
 Qed.
 
 Definition span_usageZ (ts : list task) (lb ub : Z) (theta : asg) :=
@@ -102,11 +101,8 @@ Proof.
     unfold span_usage; omega.
 
     unfold span_usage ; fold span_usage.
-    assert (forall (i j k l : nat), plus (plus (plus i k)  j) l = (plus (plus i j)  (plus k l))).
-      intros. omega.
-    rewrite <- H.
-    unfold eval_usage at 1; fold eval_usage. unfold eval_usage at 2.
-    rewrite IHsz. omega.
+    unfold eval_usage.
+    lia.
 Qed.
  
 Fixpoint task_usage (t : task) (start : Z) (sz : nat) (theta : asg) :=
@@ -151,9 +147,7 @@ Proof.
     unfold task_usage; fold task_usage.
     assert (in_span t (Zminus (Zplus (eval_start t theta) (Z_of_nat (S sz))) 1) theta).
       unfold in_span, eval_start, eval_end.
-      assert (Zlt (Z_of_nat sz) (Z_of_nat t.(duration))).
-        omega.
-      rewrite inj_S;  omega.
+      lia.
     rewrite task_in_span.
     rewrite IHsz.
     rewrite mult_succ_r; rewrite plus_comm; trivial.
@@ -204,13 +198,9 @@ Theorem task_usageZ_split :
       = task_usageZ t lb ub theta.
 Proof.
   intros.
-    assert (mid = (Zplus lb (Z_of_nat (Zabs_nat (Zminus mid lb))))).
-    rewrite inj_Zabs_nat;
-    rewrite Zabs_eq. omega. omega.
-    assert (ub = (Zplus mid (Z_of_nat (Zabs_nat (Zminus ub mid))))).
-    rewrite inj_Zabs_nat; rewrite Zabs_eq. omega. omega.
-    assert (ub = (Zplus lb (Z_of_nat (Zabs_nat (Zminus ub lb))))).
-    rewrite inj_Zabs_nat; rewrite Zabs_eq. omega. omega.
+    assert (mid = (Zplus lb (Z_of_nat (Zabs_nat (Zminus mid lb))))). lia.
+    assert (ub = (Zplus mid (Z_of_nat (Zabs_nat (Zminus ub mid))))). lia.
+    assert (ub = (Zplus lb (Z_of_nat (Zabs_nat (Zminus ub lb))))). lia.
   rewrite H2 at 2; rewrite H1, H0.
   repeat (rewrite <- task_usageZ_eq).
   repeat (rewrite inj_Zabs_nat).
