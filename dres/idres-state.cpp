@@ -27,7 +27,15 @@ void IDres::add_clause(int cl_id, vec<lit>& ps)
 {
   grow_to(ps);
 
-  Clause* cl = Clause_new(ps);
+//  Clause* cl = Clause_new(ps);
+  Clause* cl = NULL;
+  if(ps.size() == 1)
+  {
+    cl = (Clause*) (ps[0]<<1|1);
+  } else {
+    cl = Clause_new(ps);
+  }
+
   table.insert(std::make_pair(cl_id, cl));
 }
 
@@ -39,15 +47,18 @@ bool IDres::check_clause(vec<lit>& cl, vec<int>& ant_ids)
     Clause* cl = find_clause(cl_id);
     ants.push(cl);
     
-    assert(cl->size() > 0);
-    if(cl->size() == 1)
+//    if(cl->size() == 1)
+    if(((uintptr_t) cl)&1)
     {
-      if(!enqueue((*cl)[0]))
+//      lit l = (*cl)[0];
+      lit l = ((uintptr_t) cl)>>1;
+      if(!enqueue(l))
       {
         clear_state();
         return true;
       }
     } else {
+      assert(cl->size() > 1);
       cl->count = cl->size();
       for(lit l : (*cl))
       {
@@ -141,7 +152,8 @@ void IDres::remove_clause(int cl_id)
 {
   Clause* cl = pop_clause(cl_id);
   assert(cl);
-  free(cl); 
+  if(!(((uintptr_t) cl)&1))
+    free(cl); 
 }
 
 Clause* IDres::pop_clause(int cl_id)
