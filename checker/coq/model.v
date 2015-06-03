@@ -1,0 +1,55 @@
+Require Import ZArith.
+Require Import prim.
+Require Import linear.
+Require Import element.
+Require Import cumulative.
+Require Import domset.
+Require Import bounds.
+Require Import sol.
+
+(* Closed set of constraints. *)
+Inductive cst :=
+  | Lin : LinearCon.(T) -> cst
+  | Elem : ElemConstraint.(T) -> cst  
+  | Cumul : CumulConstraint.(T) -> cst  
+  | Clause : ClauseCon.(T) -> cst.
+
+Definition cst_id := Z.
+Definition csts := list (cst_id * cst).
+
+Definition eval_cst c theta := match c with
+  | Lin x => LinearCon.(eval) x theta
+  | Elem x => ElemConstraint.(eval) x theta
+  | Cumul x => CumulConstraint.(eval) x theta
+  | Clause x => ClauseCon.(eval) x theta
+  end.
+
+Fixpoint eval_csts (cs : csts) theta := 
+  match cs with
+  | nil => True
+  | cons c cs' => (eval_cst (snd c) theta) /\ (eval_csts cs' theta)
+  end.
+
+Definition model := ((list model_bound) * csts)%type.
+
+Definition eval_model model theta :=
+  (eval_bounds (fst model) theta) /\ (eval_csts (snd model) theta).
+
+Definition ModelConstraint : Constraint := 
+  mkConstraint model eval_model.
+
+Definition check_cst_sol (c : cst) (s : asg) :=
+  match c with
+  | Lin x => sol_check LinearCon LinearSolCheck x s
+  | Elem x => sol_check ElemConstraint ElementSolCheck x s
+  | Cumul x => sol_check CumulConstraint CumulSolCheck x s
+  | Clause x => sol_check ClauseCon CheckClauseSol x s
+  end.
+
+Definition check_cst (c : cst) (cl : clause) :=
+  match c with
+  | Lin x => check LinearCon CheckLinear x cl
+  | Elem x => check ElemConstraint ElemCheck x cl
+  | Cumul x => check CumulConstraint CumulCheck x cl
+  | Clause x => check ClauseCon CheckClause x cl
+  end.

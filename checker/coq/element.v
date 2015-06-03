@@ -101,30 +101,6 @@ Definition ElemBndCheck := BoundedChecker ElemConstraint ElemCheck.
 Definition check_element_bnd (x : element) (bs : list (ivar*Z*Z)) (cl : clause) := 
   (check ElemBnd ElemBndCheck) (bs, x) cl.
 
-
-(*
-
-Theorem check_element_valid :
-  forall (elt : element) (cl : clause),
-  check_element elt cl = true ->
-    implies (eval_element elt) (eval_clause cl).
-Proof.
-  unfold implies, check_element, eval_element.
-  intros elt cl; destruct elt.
-  intros; induction l.
-    unfold eval_element_rec in H0.
-    tauto.
-
-    unfold check_element_rec in H; fold check_element_rec in H.
-    unfold eval_element_rec in H0; fold eval_element_rec in H0.
-    apply andb_true_iff in H; destruct H as [Ha Hr].
-    rewrite negb_true_iff in Ha.
-    rewrite andb_false_iff in Ha.
-    destruct H as apply andb_true_iff in H.
-
-Qed.
-   
-*)
 Fixpoint eval_element_sol_rec x i ys theta :=
   match ys with
   | nil => false

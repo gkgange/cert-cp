@@ -4,6 +4,8 @@ Require ZArith.ZArith_dec.
 Require Import OrderedType.
 Require FSets.
 Require FSets.FMapAVL.
+Require FMaps.
+
 
 Module Z_as_Int.
   Open Scope Z_scope.
@@ -78,6 +80,7 @@ Module Z_as_map_OT.
 End Z_as_map_OT.
 
 Module ZMaps := FSets.FMapAVL.IntMake(Z_as_Int)(Z_as_map_OT).
+Module ZMapProperties := FMapFacts.WProperties(ZMaps).
 
 Definition zmap (T : Type) : Type := ZMaps.t T.
 

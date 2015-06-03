@@ -76,3 +76,9 @@ Record SolCheck (C : Constraint) := mkSolCheck
     sol_check_valid : forall (x : C.(T) ) (sol : asg),
       (sol_check x sol = true) -> C.(eval) x sol
   }.
+
+Theorem evalb_clause_valid : forall (cl : clause) (sol : asg), evalb_clause cl sol = true -> eval ClauseCon cl sol.
+Proof.
+  intros; now rewrite <- evalb_clause_iff.
+Qed.
+Definition CheckClauseSol := mkSolCheck ClauseCon evalb_clause evalb_clause_valid.

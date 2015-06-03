@@ -842,12 +842,33 @@ Definition eval_bound (b : model_bound) (theta : asg) :=
   match b with
   | (x, lb, ub) => Zle lb (eval_ivar x theta) /\ Zle (eval_ivar x theta) ub
   end.
+Definition evalb_bound (b : model_bound) (theta : asg) :=
+  match b with
+  | (x, lb, ub) => Z_leb lb (eval_ivar x theta) && Z_leb (eval_ivar x theta) ub
+  end.
+Lemma evalb_bound_iff : forall b theta, evalb_bound b theta = true <-> eval_bound b theta.
+Proof.
+  intros; destruct b; destruct p; simpl; rewrite andb_true_iff; now repeat rewrite <- Zle_is_le_bool.
+Qed.
+        
 Fixpoint eval_bounds (bs : list model_bound) (theta : asg) :=
   match bs with
   | nil => True
   | cons b bs' => (eval_bound b theta) /\ (eval_bounds bs' theta)
   end.
-
+Fixpoint evalb_bounds bs theta :=
+  match bs with
+  | nil => true
+  | cons b bs' => (evalb_bound b theta) && evalb_bounds bs' theta
+  end.
+Theorem evalb_bounds_iff : forall bs theta, evalb_bounds bs theta = true <-> eval_bounds bs theta.
+Proof.
+  intros; induction bs; simpl;
+  [tauto |
+   unfold evalb_bounds, eval_bounds ; fold evalb_bounds; fold eval_bounds ;
+   now rewrite andb_true_iff, evalb_bound_iff, IHbs].
+Qed.
+  
 Definition negclause_of_lb (x : ivar) (b : bound) :=
   match b with
   | Unbounded => nil

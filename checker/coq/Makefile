@@ -116,6 +116,9 @@ VFILES:=bounds.v\
 	sol.v\
   prim.v\
   reif.v\
+	model.v\
+	resolution.v\
+	log.v\
   checker_impl.v
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))

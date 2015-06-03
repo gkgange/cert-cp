@@ -82,7 +82,7 @@ Inductive vprop : Type :=
   | IEq : ivar -> Z -> vprop
   | BTrue : bvar -> vprop
   | CTrue : vprop.
-
+     
 (* A literal is either a positive
  * or negative proposition. *)
 Inductive lit : Type :=
@@ -98,6 +98,60 @@ Definition eval_vprop
   | BTrue bv => (eval_bvar bv theta) = true
   | CTrue => True
   end.
+
+(* Evaluate a proposition under an assignment. *)
+Definition evalb_vprop
+  (p : vprop) (theta : asg) : bool :=
+  match p with
+  | ILeq iv k => Z_leb (eval_ivar iv theta) k
+  | IEq iv k => Z_eqb (eval_ivar iv theta) k
+  | BTrue bv => (eval_bvar bv theta)
+  | CTrue => true
+  end.
+
+Definition vprop_eqb x y :=
+  match x with
+  | ILeq vx kx =>
+    match y with
+    | ILeq vy ky => ivar_eqb vx vy && Z_eqb kx ky
+    | _ => false
+    end
+  | IEq vx kx =>
+    match y with
+    | IEq vy ky => ivar_eqb vx vy && Z_eqb kx ky
+    | _ => false
+    end
+  | BTrue bx =>
+    match y with
+    | BTrue byy => Z_eqb bx byy
+    | _ => false
+    end
+  | CTrue =>
+    match y with
+    | CTrue => true
+    | _ => false
+    end
+  end.
+ 
+Definition lit_eqb x y :=
+  match x with
+  | Pos vx =>
+    match y with
+    | Pos vy => vprop_eqb vx vy
+    | _ => false
+    end
+  | Neg vx =>
+    match y with
+    | Neg vy => vprop_eqb vx vy
+    | _ => false
+    end
+  end.
+      
+Theorem evalb_vprop_iff : forall p theta, evalb_vprop p theta = true <-> eval_vprop p theta.
+Proof.
+  unfold evalb_vprop, eval_vprop; intros; destruct p; simpl;
+    try rewrite Zle_is_le_bool; try rewrite Zeq_is_eq_bool; tauto.
+Qed.
 
 Definition sat_lit
   (l : lit) (x : ivar) (k : Z) :=
@@ -116,6 +170,27 @@ Definition eval_lit
   | Pos vp => eval_vprop vp theta
   | Neg vp => ~(eval_vprop vp theta)
   end.
+Definition evalb_lit (l : lit) (theta : asg) : bool :=
+  match l with
+  | Pos vp => evalb_vprop vp theta
+  | Neg vp => negb (evalb_vprop vp theta)
+  end.
+Theorem evalb_lit_iff : forall l theta, evalb_lit l theta = true <-> eval_lit l theta.
+Proof.
+  unfold evalb_lit, eval_lit; intros; destruct l; simpl; rewrite <- evalb_vprop_iff;
+  [tauto | now rewrite negb_true_iff, not_true_iff_false].
+Qed.
+
+Theorem lit_eqb_eval : forall (l l' : lit) (theta : asg),
+  lit_eqb l l' = true -> (eval_lit l theta <-> eval_lit l' theta).
+Proof.
+  unfold eval_lit, eval_vprop, lit_eqb, vprop_eqb; intros; destruct l, l'; destruct v, v0; simpl;
+    try (rewrite andb_true_iff in H; destruct H as [Hl Hr];
+        apply Zeq_is_eq_bool in Hl; apply Zeq_is_eq_bool in Hr; now rewrite Hl, Hr);
+    try (apply Zeq_is_eq_bool in H; now rewrite H);
+    try discriminate;
+    try tauto.
+Qed.
 
 Theorem dec_evallit : forall (l : lit) (theta : asg),
   decidable (eval_lit l theta).
@@ -157,6 +232,22 @@ Fixpoint eval_clause
   | nil => False
   | cons l ls' => (eval_lit l theta) \/ (eval_clause ls' theta)
   end.
+
+Definition eval_clauses cs theta := List.fold_left (fun p cl => p /\ eval_clause cl theta) cs True.
+
+Fixpoint evalb_clause
+ (ls : clause) (theta : asg) : bool :=
+  match ls with
+  | nil => false
+  | cons l ls' => (evalb_lit l theta) || (evalb_clause ls' theta)
+  end.
+Theorem evalb_clause_iff : forall ls theta, evalb_clause ls theta = true <-> eval_clause ls theta.
+Proof.
+  intros; induction ls; unfold evalb_clause, eval_clause; simpl.
+  split; intros; [discriminate| tauto].
+  fold evalb_clause; fold eval_clause; simpl.
+  now rewrite <- IHls, <- evalb_lit_iff, orb_true_iff.
+Qed.
 
 Theorem dec_evalclause : forall (ls : clause) (theta : asg),
   decidable (eval_clause ls theta).
@@ -406,7 +497,7 @@ Proof.
 Qed.
 
 Definition ClauseCon := mkConstraint clause eval_clause.
-Definition CheckClause := mkChecker ClauseCon check_clause.
+Definition CheckClause := mkChecker ClauseCon check_clause check_clause_valid.
 
 (* Var reasoning. *)
 Definition vprop_ivar (vp : vprop) :=
