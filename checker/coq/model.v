@@ -53,3 +53,14 @@ Definition check_cst (c : cst) (cl : clause) :=
   | Cumul x => check CumulConstraint CumulCheck x cl
   | Clause x => check ClauseCon CheckClause x cl
   end.
+
+Theorem check_cst_valid : forall (c : cst) (cl : clause),
+  check_cst c cl = true ->
+    forall theta, eval_cst c theta -> eval_clause cl theta.
+Proof.
+  unfold eval_cst, check_cst; destruct c; simpl; intros.
+  apply (check_valid LinearCon CheckLinear t cl) in H; unfold implies in H; now apply H.
+  apply (check_valid ElemConstraint ElemCheck t cl) in H; unfold implies in H; now apply H.
+  apply (check_valid CumulConstraint CumulCheck t cl) in H; unfold implies in H; now apply H.
+  apply (check_valid ClauseCon CheckClause t cl) in H; unfold implies in H; now apply H.
+Qed.

@@ -1,6 +1,7 @@
 (* Resolution of clauses. *)
 Require Import prim.
 Require Lists.List.
+Require Import domset.
 
 (* Actually, we can get away with doing deduplication in a preprocess;
  * soundness doesn't rely on preserving the proof semantics, just the
@@ -15,6 +16,7 @@ Fixpoint dedup (cl : clause) :=
       else
         cons l (dedup cl')
   end.
+
 
 (* FIXME: Implement resolvable. *)
 Definition resolvable (cl : clause) (ants : list clause) :=
