@@ -260,6 +260,14 @@ Proof.
   tauto.
 Qed.
 
+Theorem evalclause_contra : forall cl theta, (~ eval_clause cl theta -> False) -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta) as Hd.
+    apply dec_evalclause.
+  destruct Hd as [Hd | Hd] ; [ assumption | now apply H in Hd ].
+Qed.
+
 Theorem app_clause_or : forall (cx cy : clause) (theta : asg),
   eval_clause (cx ++ cy) theta <-> eval_clause cx theta \/ eval_clause cy theta.
 Proof.

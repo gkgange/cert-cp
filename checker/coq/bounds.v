@@ -6,6 +6,7 @@ Require Import Compare_dec.
 Require Import Omega.
 Require Import Decidable.
 Require Import List.
+Require Psatz.
 (*
 Require Import Logic.
 Require Import Classical_Prop.
@@ -381,6 +382,16 @@ Definition bound_add (u v : bound) :=
     end
   end.
 
+Definition bound_mul (u v : bound) :=
+  match u with
+  | Unbounded => Unbounded
+  | Bounded x =>
+    match v with
+    | Unbounded => Unbounded
+    | Bounded y => Bounded (x * y)
+    end
+  end.
+
 Theorem lb_impl_addlb : forall (k k' : Z) (bk bk' : bound),
   sat_lb bk k /\ sat_lb bk' k' -> sat_lb (bound_add bk bk') (k + k').
 Proof.
@@ -443,6 +454,68 @@ Proof.
   tauto.
 Qed.
 
+Ltac unfold_satdb := unfold sat_dbound, sat_lb, sat_ub in *; simpl in *.
+
+Definition db_join x y :=
+  if unsatb_db x then
+    y
+  else if unsatb_db y then
+    x
+  else
+    (match (fst x, fst y) with
+       | (Bounded k, Bounded k') => Bounded (Z.min k k')
+       | _ => Unbounded
+     end,
+     match (snd x, snd y) with
+       | (Bounded k, Bounded k') => Bounded (Z.max k k')
+       | _ => Unbounded
+     end).
+Lemma db_join_l : forall x y k, sat_dbound x k -> sat_dbound (db_join x y) k.
+Proof.
+  intros.
+  assert (unsatb_db x <> true).
+    intro. rewrite unsatb_db_true_iff in H0.
+    unfold unsat_db in *; now apply H0 in H.
+  apply not_true_is_false in H0.
+  unfold db_join; destruct (unsatb_db x); try assumption; try congruence.
+
+  destruct (unsatb_db y); try assumption; try congruence.
+  destruct x, y; destruct b, b0, b1, b2; simpl; unfold_satdb; try Psatz.lia.
+Qed.
+ 
+Lemma db_join_r : forall y x k, sat_dbound x k -> sat_dbound (db_join y x) k.
+Proof.
+  intros.
+   assert (unsatb_db x <> true).
+    intro. rewrite unsatb_db_true_iff in H0.
+    unfold unsat_db in *; now apply H0 in H.
+  apply not_true_is_false in H0.
+  unfold db_join; destruct (unsatb_db x); try assumption; try congruence.
+
+  destruct (unsatb_db y); try assumption; try congruence.
+  destruct x, y; destruct b, b0, b1, b2; simpl; unfold_satdb; try Psatz.lia.
+Qed.
+
+Lemma db_join_comm : forall x y k, sat_dbound (db_join x y) k <-> sat_dbound (db_join y x) k.
+Proof.
+  intros x y k.
+  unfold db_join.
+
+  remember (unsatb_db x) as ux; remember (unsatb_db y) as uy.
+  destruct ux, uy; try tauto; try congruence.
+  symmetry in Hequx, Hequy; apply unsatb_db_true_iff in Hequx;
+    apply unsatb_db_true_iff in Hequy; unfold unsat_db in *.
+  split; intros; try apply Hequx in H; try apply Hequy in H; try contradiction.
+
+  destruct x, y; destruct b, b0, b1, b2; simpl in *;
+  try rewrite Z.max_comm; try rewrite Z.min_comm; split; try congruence.
+Qed.
+  
+Lemma db_join_if : forall x y k, sat_dbound x k \/ sat_dbound y k -> sat_dbound (db_join x y) k.
+Proof.
+  intros; destruct H; [now apply db_join_l | now apply db_join_r].
+Qed.
+  
 Theorem bound_max_assoc : forall (x y z : bound),
   bound_max (bound_max x y) z = bound_max x (bound_max y z).
 Proof.

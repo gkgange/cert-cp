@@ -103,6 +103,7 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 ###################################
 
 VFILES:=bounds.v\
+	arith_ops.v\
   domain.v\
   zset.v\
 	map.v\
@@ -116,6 +117,7 @@ VFILES:=bounds.v\
 	sol.v\
   prim.v\
   reif.v\
+	arith.v\
 	model.v\
 	resolution.v\
 	log.v\

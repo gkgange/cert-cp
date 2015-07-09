@@ -6,13 +6,15 @@ Require Import cumulative.
 Require Import domset.
 Require Import bounds.
 Require Import sol.
+Require Import arith.
 
 (* Closed set of constraints. *)
 Inductive cst :=
   | Lin : LinearCon.(T) -> cst
   | Elem : ElemConstraint.(T) -> cst  
   | Cumul : CumulConstraint.(T) -> cst  
-  | Clause : ClauseCon.(T) -> cst.
+  | Clause : ClauseCon.(T) -> cst
+  | Arith : ArithConstraint.(T) -> cst.
 
 Definition cst_id := Z.
 Definition csts := list (cst_id * cst).
@@ -22,6 +24,7 @@ Definition eval_cst c theta := match c with
   | Elem x => ElemConstraint.(eval) x theta
   | Cumul x => CumulConstraint.(eval) x theta
   | Clause x => ClauseCon.(eval) x theta
+  | Arith x => ArithConstraint.(eval) x theta
   end.
 
 Fixpoint eval_csts (cs : csts) theta := 
@@ -44,6 +47,7 @@ Definition check_cst_sol (c : cst) (s : asg) :=
   | Elem x => sol_check ElemConstraint ElementSolCheck x s
   | Cumul x => sol_check CumulConstraint CumulSolCheck x s
   | Clause x => sol_check ClauseCon CheckClauseSol x s
+  | Arith x => sol_check ArithConstraint ArithSolCheck x s
   end.
 
 Definition check_cst (c : cst) (cl : clause) :=
@@ -52,15 +56,18 @@ Definition check_cst (c : cst) (cl : clause) :=
   | Elem x => check ElemConstraint ElemCheck x cl
   | Cumul x => check CumulConstraint CumulCheck x cl
   | Clause x => check ClauseCon CheckClause x cl
+  | Arith x => check ArithConstraint ArithCheck x cl
   end.
 
 Theorem check_cst_valid : forall (c : cst) (cl : clause),
   check_cst c cl = true ->
     forall theta, eval_cst c theta -> eval_clause cl theta.
 Proof.
-  unfold eval_cst, check_cst; destruct c; simpl; intros.
-  apply (check_valid LinearCon CheckLinear t cl) in H; unfold implies in H; now apply H.
-  apply (check_valid ElemConstraint ElemCheck t cl) in H; unfold implies in H; now apply H.
-  apply (check_valid CumulConstraint CumulCheck t cl) in H; unfold implies in H; now apply H.
-  apply (check_valid ClauseCon CheckClause t cl) in H; unfold implies in H; now apply H.
+  unfold eval_cst, check_cst; destruct c; simpl; intros;
+    [apply (check_valid LinearCon CheckLinear t cl) |
+     apply (check_valid ElemConstraint ElemCheck t cl) in H |
+     apply (check_valid CumulConstraint CumulCheck t cl) in H |
+     apply (check_valid ClauseCon CheckClause t cl) in H |
+     apply (check_valid ArithConstraint ArithCheck t cl) in H ];
+  unfold implies in H; try apply H; try apply H0.
 Qed.

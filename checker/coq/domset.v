@@ -126,6 +126,15 @@ Qed.
 Definition eval_domset (ds : domset) (theta : asg) := forall x : ivar,
   sat_domset ds x (eval_ivar x theta).
 
+Definition domset_unsat (ds : domset) := forall theta, ~ eval_domset ds theta.
+
+Fixpoint doms_unsatb (elts : list (ivar * dom)) :=
+  match elts with
+  | nil => false
+  | cons (x, dom) elts' => (dom_unsatb dom) || (doms_unsatb elts')
+  end.
+
+
 Theorem eval_domset_alt : forall (ds : domset) (theta : asg),
   eval_domset ds theta <->
     (forall (x : ivar) (d : dom), ZMaps.MapsTo x d ds -> eval_dom (x, d) theta).
@@ -143,6 +152,16 @@ Proof.
     symmetry in Heqfx; apply ZMaps.find_2 in Heqfx; now apply H in Heqfx.
     apply dom_unconstrained_is_uncon.
 Qed.
+  
+(*
+Definition domset_unsatb (ds : domset) := doms_unsatb (ZMaps.elements ds).
+Lemma domset_unsatb_iff : forall (ds : domset), domset_unsatb ds = true <-> domset_unsat ds.
+Proof.
+  intros; remember (ZMaps.elements ds) as elts; induction elts.
+  unfold domset_unsatb, doms_unsatb; rewrite <- Heqelts.
+  unfold domset_unsat; split; intros; try discriminate.
+  unfold eval_domset in H.
+*)
   
 Theorem not_invars_uncon : forall (cl : clause) (x : ivar),
   ~ mem (clause_varset cl) x <-> dom_is_unconstrained (dom_from_negclause x cl).
@@ -732,37 +751,6 @@ Proof.
   rewrite negclause_of_doms_db_eq.
   apply db_of_doms_domset_eq.
 Qed.
-
-(*
-Record DomCheck : Type := mkDomCheck
-  { T : Type ;
-    eval : T -> asg -> Prop ;
-    check : T -> domfun -> bool ;
-    check_valid : 
-      forall (x : T) (f : domfun) (cl : clause),
-      is_negcl_domfun f cl /\ check x f = true ->
-        implies (eval x) (eval_clause cl) }.
-
-Theorem negcl_domfun_meet_iff : forall (f g : domfun) (c d : clause),
-  is_negcl_domfun f c /\ is_negcl_domfun g d ->
-    is_negcl_domfun (domfun_meet f g) (c ++ d).
-Proof.
-  unfold is_negcl_domfun; intros.
-  rewrite domfun_meet_iff.
-  SearchAbout app_or.
-  
-Theorem dombounded_negcl_iff :
-  forall (f g : domfun) (cl : clause) (theta : asg),
-  eval_domfun f theta ->
-    (eval_domfun g theta -> eval_clause cl theta) ->
-    (eval_domfun (domfun_meet dx dy) theta -> eval_clause cl theta).
-Proof.
-  intros.
-  unfold eval_domfun in H1.
-  apply H0; unfold eval_domfun; intros.
-  now apply domfun_meet_iff with (f := f).
-Qed.
-*)
      
 Definition dombounded T : Type :=
   (domset * T)%type.

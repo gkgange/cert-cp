@@ -17,6 +17,43 @@ Fixpoint dedup (cl : clause) :=
         cons l (dedup cl')
   end.
 
+(* FIXME: Implement prop_clause. *)
+Definition prop_clause (ds : domset) (cl : clause) := ds.
+(*
+  match cl with
+  | nil => ds (* FIXME - should be empty domain. *)
+  | cons l cl' =>
+    if lit_unsat ds l then
+      prop_clause ds cl'
+    else
+      if clause_unsat ds cl' then
+        
+      else
+        ds
+  end.
+*)
+
+Lemma prop_clause_valid : forall (ds : domset) (cl : clause) (theta : asg),
+    eval_domset ds theta -> eval_domset (prop_clause ds cl) theta.
+Proof.
+  intros; unfold prop_clause; assumption.
+Qed.
+
+Fixpoint unit_prop (ds : domset) (cs : list clause) :=
+  match cs with
+  | nil => ds
+  | cons cl cs' =>
+      prop_clause (unit_prop (prop_clause ds cl) cs') cl
+  end.
+Lemma unit_prop_valid : forall (ds : domset) (cs : list clause) (theta : asg),
+  eval_domset ds theta -> eval_domset (unit_prop ds cs) theta.
+Proof.
+  unfold unit_prop; intros; induction cs.
+    assumption.
+    fold unit_prop in *.
+    apply prop_clause_valid; apply IHcs; now apply prop_clause_valid.
+Qed.
+  
 
 (* FIXME: Implement resolvable. *)
 Definition resolvable (cl : clause) (ants : list clause) :=
