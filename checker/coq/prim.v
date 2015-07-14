@@ -233,7 +233,12 @@ Fixpoint eval_clause
   | cons l ls' => (eval_lit l theta) \/ (eval_clause ls' theta)
   end.
 
-Definition eval_clauses cs theta := List.fold_left (fun p cl => p /\ eval_clause cl theta) cs True.
+(* Definition eval_clauses cs theta := List.fold_left (fun p cl => p /\ eval_clause cl theta) cs True. *)
+Fixpoint eval_clauses cs theta :=
+  match cs with
+  | nil => True
+  | cons c cs' => (eval_clause c theta) /\ (eval_clauses cs' theta)
+  end.
 
 Fixpoint evalb_clause
  (ls : clause) (theta : asg) : bool :=

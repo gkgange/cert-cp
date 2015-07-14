@@ -60,7 +60,7 @@ Proof.
   rewrite IHds; intros.
   apply H; tauto.
 Qed.
-
+ 
 Fixpoint eval_doms (ds : list (ivar * dom)) (theta : asg) :=
   match ds with
   | nil => True
@@ -227,6 +227,13 @@ Proof.
       apply H. apply H0.
 Qed.
   
+Theorem eval_dom_meet : forall x d d' theta,
+  eval_dom (x, dom_meet d d') theta <-> eval_dom (x, d) theta /\ eval_dom (x, d') theta.
+Proof.
+  unfold eval_dom; simpl; intros.
+  apply dom_meet_iff; split; assumption.
+Qed.
+
 Definition dom_from_lit (x : ivar) (l : lit) :=
   match l with
   | Pos (IEq x' k) =>

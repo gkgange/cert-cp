@@ -509,6 +509,19 @@ Proof.
   apply ZSets.elements_spec1 in H. tauto.
 Qed.
 
+Theorem dom_from_domset_valid :
+  forall (ds : domset) (x : ivar) (theta : asg),
+    eval_domset ds theta -> eval_dom (x, (dom_from_domset ds x)) theta.
+Proof.
+  intros; rewrite eval_domset_alt in H.
+  unfold dom_from_domset; remember (ZMaps.find x ds) as f; symmetry in Heqf.
+  destruct f; try congruence.
+    apply H; now apply ZMaps.find_2.
+
+    unfold eval_dom; simpl.
+    apply dom_unconstrained_is_uncon.
+Qed.
+
 Definition bounds_domset (bs : list model_bound) :=
   negcl_domset (negclause_of_bounds bs).
  
@@ -586,6 +599,20 @@ Proof.
   intros; rewrite H; now unfold dom_from_domset, var_dom.
 Qed.
 
+Theorem eval_negcl_domset : forall (cl : clause) (theta : asg),
+  ~ eval_clause cl theta -> eval_domset (negcl_domset cl) theta.
+Proof.
+  intros.
+  assert (Hd := dom_from_negclause_valid).
+  assert (forall x, sat_dom (dom_from_negclause x cl) (eval_ivar x theta)).
+    intros; now apply Hd.
+  unfold eval_domset; intros.
+  apply dom_from_negclause_valid with (x := x) in H.
+  unfold sat_domset.
+  assert (Hcl := negcl_domset_is_negcl_domfun); unfold is_negcl_domfun in Hcl.
+  now rewrite Hcl.
+Qed.
+  
 Theorem sat_dom_negclause_iff : forall (ds : list (ivar * dom)) (x : ivar) (k : Z),
   sat_dom (dom_from_negclause x (negclause_of_doms ds)) k
     <-> sat_doms ds x k.
