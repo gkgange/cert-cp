@@ -10,6 +10,7 @@ Require cumul_dset.
 Require reif.
 Require element.
 Require element_dset.
+Require log.
 
 Extract Constant prim.Z_eqb => "(=)".
 
@@ -39,4 +40,6 @@ Extraction "checker_impl.ml"
   element.check_element_bnd
   element_dset.check_elem_dbnd
   element_dset.check_reif_elem_dbnd
+  log.certify_unsat
   nat_of_int int_of_nat.
+
