@@ -71,6 +71,32 @@ Proof.
     now apply IHcl in H.
 Qed.
 
+Fixpoint simplify_clause ds cl :=
+  match cl with
+  | nil => nil
+  | cons l cl' =>
+    let tl := simplify_clause ds cl' in
+    if lit_unsatb ds l then
+      tl
+    else
+      cons l tl
+  end.
+
+Lemma simplify_clause_valid : forall ds cl theta,
+  eval_domset ds theta -> eval_clause cl theta -> eval_clause (simplify_clause ds cl) theta.
+Proof.
+  induction cl; unfold eval_clause; intros; [contradiction | fold eval_clause in *].
+  unfold simplify_clause; fold simplify_clause.
+  remember (lit_unsatb ds a) as ul; symmetry in Hequl; destruct ul.  
+  apply lit_unsatb_valid with (theta := theta) in Hequl; try assumption.
+  destruct H0 as [Ha | Hcl]; [contradiction | ].
+  apply IHcl; assumption.
+
+  unfold eval_clause; fold eval_clause.
+  destruct H0 as [Ha | Hcl]; [left ; assumption | right].
+  apply  IHcl; try assumption.
+Qed.
+
 Definition dom_tighten ds l :=
   match lit_ivar l with
   | None => Some ds

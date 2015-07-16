@@ -38,6 +38,8 @@ Definition model := ((list model_bound) * csts)%type.
 Definition eval_model model theta :=
   (eval_bounds (fst model) theta) /\ (eval_csts (snd model) theta).
 
+Definition model_unsat model := forall theta, ~ eval_model model theta.
+
 Definition ModelConstraint : Constraint := 
   mkConstraint model eval_model.
 
