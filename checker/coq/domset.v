@@ -846,6 +846,15 @@ Qed.
 
 Definition DomboundedConstraint (C : Constraint) := mkConstraint
   (dombounded C.(T)) (dombounded_eval C.(T) C.(eval)).
+
+Theorem eval_dombounded_if : forall (C : Constraint) (b : domset) (x : C.(T)) (theta : asg),
+  eval_domset b theta -> C.(eval) x theta -> eval (DomboundedConstraint C) (b, x) theta.
+Proof.
+  intros.
+  unfold DomboundedConstraint, dombounded, dombounded_eval; simpl.
+  split; assumption.
+Qed.
+
 Definition DomboundedCheck (C : Constraint) (D : DomCheck C) :=
   mkDomCheck (DomboundedConstraint C)
     (dombounded_check C.(T) (dc_check C D))

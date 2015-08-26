@@ -1,4 +1,5 @@
 Require Import prim.
+Require Import ZArith.
 Require Lists.List.
 Require Import domain.
 Require Import domset.
@@ -50,11 +51,18 @@ Proof.
   congruence.
 Qed.
 
+Fixpoint clauses_size (cs : list clause) :=
+  match cs with
+  | nil => O
+  | cons cl cs' => (List.length cl) + (clauses_size cs')
+  end.
+    
 Fixpoint clause_unsatb ds cl :=
   match cl with
   | nil => true
   | cons l cl' => andb (lit_unsatb ds l) (clause_unsatb ds cl')
   end.
+
 Theorem clause_unsatb_valid : forall ds cl theta,
   clause_unsatb ds cl = true -> eval_domset ds theta -> ~ eval_clause cl theta.
 Proof.
@@ -97,6 +105,20 @@ Proof.
   apply  IHcl; try assumption.
 Qed.
 
+Lemma simplify_clause_mono : forall ds cl,
+  (List.length (simplify_clause ds cl)) <= (List.length cl).
+Proof.
+  intros.
+  assert (forall (a : lit) x, length (a :: x) = S (length x)).
+    intros; unfold length; omega.
+  induction cl; unfold simplify_clause; fold simplify_clause.
+
+    unfold length; omega.
+    destruct (lit_unsatb ds a).
+    rewrite H; omega.
+    repeat (rewrite H); omega.
+Qed.
+                                    
 Definition dom_tighten ds l :=
   match lit_ivar l with
   | None => Some ds
