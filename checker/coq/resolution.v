@@ -18,7 +18,6 @@ Fixpoint dedup (cl : clause) :=
         cons l (dedup cl')
   end.
 
-(* FIXME: Implement prop_clause. *)
 Definition lit_unsatb (ds : domset) (l : lit) :=
   match lit_ivar l with
   | None => false
