@@ -102,6 +102,8 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 #                                 #
 ###################################
 
+MODEL_FILES:=$(wildcard models/*.v)
+
 VFILES:=bounds.v\
 	arith_ops.v\
   domain.v\
@@ -121,7 +123,7 @@ VFILES:=bounds.v\
 	model.v\
 	resolution.v\
 	log.v\
-  checker_impl.v
+  checker_impl.v $(MODEL_FILES)
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))
 GLOBFILES:=$(VFILES:.v=.glob)

@@ -6,73 +6,10 @@ Require Import prim.
 
 Require Import Orders.
 Require Import Relations.
+Require OrdersEx.
 
-Module Z_as_Int.
-  Open Scope Z_scope.
-  Definition t := Z.
-  Definition int := t.
-  Definition _0 := 0.
-  Definition _1 := 1.
-  Definition _2 := 2.
-  Definition _3 := 3.
-  Definition plus := Zplus.
-  Definition opp := Zopp.
-  Definition minus := Zminus.
-  Definition mult := Zmult.
-  Definition max := Zmax.
-  Definition gt_le_dec := Z_gt_le_dec.
-  Definition ge_lt_dec := Z_ge_lt_dec.
-  Definition eq_dec := Z_eq_dec.
-  Definition i2z : int -> Z := fun n => n.
-  Lemma i2z_eq : forall n p, i2z n=i2z p -> n = p.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_0 : i2z _0 = 0.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_1 : i2z _1 = 1.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_2 : i2z _2 = 2.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_3 : i2z _3 = 3.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_plus : forall n p, i2z (n + p) = i2z n + i2z p.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_opp : forall n, i2z (- n) = - i2z n.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_minus : forall n p, i2z (n - p) = i2z n - i2z p.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_mult : forall n p, i2z (n * p) = i2z n * i2z p.
-  Proof. intros; tauto. Qed.
-  Lemma i2z_max : forall n p, i2z (max n p) = Zmax (i2z n) (i2z p).
-  Proof. intros; tauto. Qed.
-End Z_as_Int.
-
-Module Z_as_OT <: OrderedType.
-  Definition t := Z.
-  Definition eq := @eq Z.
-  Definition eq_refl := @refl_equal t.
-  Definition eq_sym := @sym_eq t.
-  Definition eq_trans := @trans_eq t.
-
-  Program Instance eq_equiv : Equivalence eq.
-
-  Definition lt (x y:Z) := (x<y).
-
-  Lemma lt_trans : forall x y z, x<y -> y<z -> x<z.
-  Proof. intros; omega. Qed.
-
-  Lemma lt_not_eq : forall x y, x<y -> ~ x=y.
-  Proof. intros; omega. Qed.
-
-  Definition compare := Zcompare.
-
-  Definition eq_dec := Z_eq_dec.
-
-  Program Instance lt_strorder : StrictOrder lt.
-  Program Definition lt_compat : Proper (eq ==> eq ==> iff) lt := _.
-  Lemma compare_spec : forall n m : Z, CompSpec eq lt n m (n ?= m).
-  Proof. apply Zcompare_spec. Qed.
-End Z_as_OT.
-
+Module Z_as_Int := Int.Z_as_Int.
+Module Z_as_OT := OrdersEx.Z_as_OT.
 Module ZSets := MSetAVL.IntMake(Z_as_Int)(Z_as_OT).
 
 Definition zset : Type := ZSets.t.
@@ -145,54 +82,6 @@ Proof.
   now apply mem_mem_add with (k' := k) in H0.
 Qed.
   
-(*
-Fixpoint rem (s : zset) (k : Z) := ZSets.remove k s.
-Theorem notmem_k_remk : forall (s : zset) (k : Z),
-  ~ mem (rem s k) k.
-Proof.
-  unfold mem, rem; intros.
-  apply ZSets.remove_spec.
-
-  unfold mem, rem. tauto.
-
-  unfold rem; fold rem.
-  assert (Z_eqb a k = true <-> a = k). apply Z_eqb_iff_eq.
-  destruct (Z_eqb a k).
-
-  exact IHs.
-  unfold mem; fold mem.
-  rewrite <- memb_true_iff_mem in IHs.
-  rewrite <- memb_true_iff_mem.
-  rewrite <- H.
-  destruct (memb (rem s k) k).
-  tauto.
-  tauto.
-Qed.
-Theorem notmem_notmem_remk : forall (s : zset) (k k' : Z),
-  ~ mem s k' -> ~ mem (rem s k) k'.
-Proof.
-  intros s k k'; induction s.
-
-  unfold mem, rem; tauto.
-
-  unfold rem; fold rem. unfold mem; fold mem.
-  assert (Z_eqb a k = true <-> a = k). apply Z_eqb_iff_eq.
-  destruct (Z_eqb a k).
-  intros. apply IHs.
-  rewrite <- memb_true_iff_mem.
-  rewrite <- memb_true_iff_mem in H0.
-  destruct (memb s k').
-  tauto. tauto.
-
-  unfold mem; fold mem.
-  rewrite <- memb_true_iff_mem in IHs.
-  rewrite <- memb_true_iff_mem in IHs.
-  rewrite <- memb_true_iff_mem.
-  rewrite <- memb_true_iff_mem.
-  tauto.
-Qed.
-*)
-
 Definition union (xs ys : zset) := ZSets.union xs ys.
 Theorem mem_union_iff : forall (xs ys : zset) (k : Z),
   mem (union xs ys) k <-> mem xs k \/ mem ys k.
