@@ -36,13 +36,19 @@ Inductive int_arith :=
 Definition eval_int_arith arith theta :=
   match arith with
   | Mul x y z => (eval_ivar x theta) = (eval_ivar y theta)*(eval_ivar z theta)
-  | Div x y z => (eval_ivar x theta) = (eval_ivar y theta)/(eval_ivar z theta)
+  | Div x y z =>
+    (eval_ivar z theta) <> 0 /\ (eval_ivar x theta) = Z.quot (eval_ivar y theta) (eval_ivar z theta)
   end.
 
+(* What are the semantics of Div?
+   - Round towards zero/round towards -infty?
+   - x/0 fails? or x/0 = 0?
+   Most sense to have round-towards-zero, x/0 fails. *)
 Definition check_int_arith_sol arith theta :=
   match arith with
   | Mul x y z => Z_eqb (eval_ivar x theta) ((eval_ivar y theta)*(eval_ivar z theta))
-  | Div x y z => Z_eqb (eval_ivar x theta) ((eval_ivar y theta)/(eval_ivar z theta))
+  | Div x y z =>
+    andb (negb (Z_eqb (eval_ivar z theta) 0)) (Z_eqb (eval_ivar x theta) (Z.quot (eval_ivar y theta) (eval_ivar z theta)))
   end.
 
 Definition check_int_arith arith (cl : clause) :=
@@ -52,7 +58,7 @@ Definition check_int_arith arith (cl : clause) :=
       (db_meet
          (db_from_negclause x cl)
          (arith_ops.db_mul (db_from_negclause y cl) (db_from_negclause z cl)))
-  | Div x y z => false
+  | Div x y z => negb (arith_ops.db_div_check (db_from_negclause x cl) (db_from_negclause y cl) (db_from_negclause z cl))
   end.
 
 Theorem check_int_arith_valid :
@@ -78,6 +84,20 @@ Proof.
   apply Hmeet; split; try assumption.
     rewrite H0. apply arith_ops.db_mul_sound; try assumption.
   unfold unsat_db in H. now apply H in H2.
+
+  remember (eval_ivar i0 theta) as k; remember (eval_ivar i1 theta) as k'.
+  apply evalclause_contra; intro Hcl.
+  assert (Hsk := Hcl); apply (db_from_negclause_valid i cl theta) in Hsk.
+  assert (Hsk' := Hcl); apply (db_from_negclause_valid i0 cl theta) in Hsk'.
+  assert (Hskk' := Hcl); apply (db_from_negclause_valid i1 cl theta) in Hskk'.
+  remember (db_from_negclause i cl) as x; remember (db_from_negclause i0 cl) as y;
+    remember (db_from_negclause i1 cl) as z.
+  destruct H0 as [Hz Hq].
+  assert (Hf := arith_ops.db_div_check_sound x y z k k').
+  apply negb_true_iff in H.
+  assert (arith_ops.db_div_check x y z = true).
+  apply Hf; [assumption | rewrite Heqk | rewrite Heqk' | rewrite <- Hq]; assumption.
+  congruence.
 Qed.
 
 Definition ArithConstraint : Constraint :=
@@ -94,7 +114,7 @@ Definition check_int_arith_dbfun arith (f : dbfun) :=
     unsatb_db
       (db_meet (f x)
          (arith_ops.db_mul (f y) (f z)))
-  | Div x y z => false
+  | Div x y z => negb (arith_ops.db_div_check (f x) (f y) (f z))
   end.
 
 Theorem check_int_arith_dbfun_valid : forall (c : int_arith) (f : dbfun) (cl : clause),
@@ -104,9 +124,10 @@ Proof.
   unfold check_int_arith; unfold is_negcl_dbfun in *.
   intros; apply check_int_arith_valid; destruct H.
   unfold check_int_arith_dbfun in H0; unfold check_int_arith.
-  destruct c; try tauto.
+  destruct c; try tauto; try contradiction.
 
-  now rewrite <- (H i), <- (H i0), <- (H i1).
+  now rewrite <- (H i), <- (H i0), <- (H i1); congruence. 
+  now rewrite <- (H i), <- (H i0), <- (H i1); congruence. 
 Qed.
  
 Definition ArithDSet :=
@@ -128,7 +149,10 @@ Theorem eval_int_arith_sol_valid :
       (check_int_arith_sol arith theta = true) -> eval_int_arith arith theta.
 Proof.
   intros arith theta; unfold check_int_arith_sol, eval_int_arith; destruct arith;
-    now rewrite Z_eqb_iff_eq.
+    [now rewrite Z_eqb_iff_eq |
+     rewrite andb_true_iff; rewrite negb_true_iff; rewrite Z_eqb_iff_eq].
+  intro H; destruct H as [H0 Hquot].
+  split; [intro Heq ; rewrite <- Z_eqb_iff_eq in Heq; now rewrite Heq in H0 | assumption].
 Qed.
 
 Definition ArithSolCheck := mkSolCheck ArithConstraint check_int_arith_sol eval_int_arith_sol_valid.

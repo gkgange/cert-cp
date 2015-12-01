@@ -74,7 +74,7 @@ PROF:=
 
 OCAMLFIND = ocamlfind
 
-ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB) -I coq # -w A
+ZFLAGS=$(OCAMLLIBS) $(COQSRCLIBS) -I $(CAMLP4LIB) -I coq -annot # -w A
 OPT:=
 COQFLAGS:=-q $(OPT) $(COQLIBS) $(OTHERFLAGS) $(COQ_XML)
 ifdef CAMLBIN
@@ -140,7 +140,7 @@ CMXSFILES:=$(MLFILES:.ml=.cmxs)
 CMXSFILES0:=$(filter-out ,$(CMXSFILES))
 OFILES:=$(MLFILES:.ml=.o)
 
-TARGETS:=check_cp
+TARGETS:=check_cp coqify_cp
 BYTE_TARGETS:=$(addsuffix .byte,$(TARGETS))
 # all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 all: $(TARGETS)

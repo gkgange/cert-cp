@@ -177,24 +177,6 @@ let rec parse_and_check_inferences model bounds tokens =
      else
        false
 
-(*
-let check_corresp model clauses =
-  match !COption.tracefile with
-  | None -> true
-  | Some tfile ->
-      let tchannel = open_in tfile in
-      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
-      Corresp.check model clauses ttoks
-
-let get_assumptions model clauses =
-  match !COption.tracefile with
-  | None -> None
-  | Some tfile ->
-      let tchannel = open_in tfile in
-      let ttoks = Spec.lexer (Stream.of_channel tchannel) in
-      Some (Corresp.assumptions model clauses ttoks)
-      *)
-
 let trace_assumptions model lmap =
   match !COption.tracefile with
   | None -> None
@@ -203,16 +185,6 @@ let trace_assumptions model lmap =
       (* let ttoks = Spec.lexer (Stream.of_channel tchannel) in *)
       let ttoks = Stream.of_channel tchannel in
       Some (CheckTrace.assumptions model lmap ttoks)
-
-(*
-let trace_assumptions_idrup model lmap =
-  match !COption.tracefile with
-  | None -> None
-  | Some tfile ->
-      let tchannel = open_in tfile in
-      let stream = Stream.of_channel tchannel in
-      Some (CheckTrace.assumptions_idrup model lmap stream)
-*)
 
 let get_litsem model = parser
   | [< 'GL.Int v ; 'GL.Kwd "[" ; l = Parse.parse_vprop model ; 'GL.Kwd "]" >]

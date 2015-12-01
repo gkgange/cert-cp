@@ -924,6 +924,14 @@ Proof.
   intros; destruct b; destruct p; simpl; rewrite andb_true_iff; now repeat rewrite <- Zle_is_le_bool.
 Qed.
         
+Fixpoint tighten_model_ub (bs : list model_bound) (x : ivar) (k : Z) :=
+  match bs with
+  | nil => nil
+  | cons (y, l, u) bs' =>
+    let tl := tighten_model_ub bs' x k in
+    if ivar_eqb x y then cons (y, l, Z.min k u) tl else cons (y, l, u) tl
+  end.
+
 Fixpoint eval_bounds (bs : list model_bound) (theta : asg) :=
   match bs with
   | nil => True
@@ -942,6 +950,24 @@ Proof.
    now rewrite andb_true_iff, evalb_bound_iff, IHbs].
 Qed.
   
+Lemma tighten_model_ub_correct : forall (bs : list model_bound) (x : ivar) (k : Z) (theta : asg),
+  eval_bounds bs theta -> (eval_ivar x theta <= k) -> eval_bounds (tighten_model_ub bs x k) theta.
+Proof.
+  intros.
+  induction bs; unfold eval_bounds, tighten_model_ub; fold eval_bounds; fold tighten_model_ub;
+    try trivial.
+  destruct a; destruct p; simpl in *; destruct H as [Hl Hr].
+  remember (ivar_eqb x i) as exi; destruct exi; symmetry in Heqexi.
+  apply ivar_eqb_iff_eq in Heqexi.
+  unfold eval_bounds; fold eval_bounds.
+
+  split; [unfold eval_bound | now apply IHbs].
+  rewrite Heqexi in H0; Psatz.lia.
+
+  unfold eval_bounds; fold eval_bounds.
+  split; [now unfold eval_bound | now apply IHbs].
+Qed.
+
 Definition negclause_of_lb (x : ivar) (b : bound) :=
   match b with
   | Unbounded => nil

@@ -115,3 +115,9 @@ Proof.
    apply (check_valid ArithDbnd ArithDomCheck (b, t) cl) ];
   try assumption; try (apply eval_dombounded_if; assumption).
 Qed.
+
+Definition is_model_ub (m : model) (o : ivar) (theta : asg) :=
+  forall theta', eval_model m theta' -> (eval_ivar o theta) <= (eval_ivar o theta').
+
+Definition is_model_minimum (m : model) (o : ivar) (theta : asg) :=
+  eval_model m theta /\ is_model_ub m o theta.

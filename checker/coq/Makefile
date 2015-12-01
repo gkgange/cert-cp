@@ -123,7 +123,7 @@ VFILES:=bounds.v\
 	model.v\
 	resolution.v\
 	log.v\
-  checker_impl.v $(MODEL_FILES)
+  checker_impl.v
 VOFILES:=$(VFILES:.v=.vo)
 VOFILES0:=$(filter-out ,$(VOFILES))
 GLOBFILES:=$(VFILES:.v=.glob)
@@ -133,6 +133,8 @@ HTMLFILES:=$(VFILES:.v=.html)
 GHTMLFILES:=$(VFILES:.v=.g.html)
 AUTO_MLFILES:=checker_impl.ml
 MLFILES:=#$(AUTO_MLFILES)
+
+MODEL_VOFILES=$(MODEL_FILES:.v=.vo)
 
 CMOFILES:=$(MLFILES:.ml=.cmo)
 CMOFILES0:=$(filter-out ,$(CMOFILES))
@@ -146,6 +148,7 @@ OFILES:=$(MLFILES:.ml=.o)
 TARGETS:=
 all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 spec: $(VIFILES)
+models: $(MODEL_VOFILES)
 
 gallina: $(GFILES)
 
