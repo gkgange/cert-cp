@@ -67,4 +67,3 @@ let find_impl tbl default warn ident =
 
 let find = find_impl registry null_checker "Warning: Checker not found for '%s'. Using null checker.@."
 let find_sol = find_impl sol_registry null_sol_checker "Warning: Solution checker not found for '%s'.@."
-

@@ -20,6 +20,10 @@ Inductive cst :=
   | Clause : ClauseCon.(T) -> cst
   | Arith : ArithConstraint.(T) -> cst.
 
+Definition make_linear xs k := Lin (xs, k).
+Definition make_element x y ks := Elem (element.Element x y ks).
+Definition make_cumul (c : cumul) := Cumul c.                                  
+
 Definition cst_id := Z.
 Definition csts := list (cst_id * cst).
 

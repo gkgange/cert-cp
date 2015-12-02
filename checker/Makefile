@@ -124,6 +124,7 @@ BASE_MLFILES:=\
   model.ml\
   registry.ml\
   parse.ml\
+  proofState.ml\
   builtins.ml\
 	checkTrace.ml
 

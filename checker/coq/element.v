@@ -11,7 +11,7 @@ Require Import domain.
  * 
  * We're assuming the elements are *)
 Inductive element : Type :=
-  | Elem : ivar -> ivar -> list Z -> element.
+  | Element : ivar -> ivar -> list Z -> element.
 
 (* This is kind of an awkward definition. *)
 Fixpoint eval_element_rec x i ys theta :=
@@ -32,7 +32,7 @@ Definition augment (A : Type) (xs : list A) :=
 
 Definition eval_element (con : element) (theta : asg) :=
   match con with
-  | Elem x i ys => eval_element_rec x i (augment Z ys) theta
+  | Element x i ys => eval_element_rec x i (augment Z ys) theta
   end.
 
 Fixpoint check_element_rec x i ys cl :=
@@ -50,7 +50,7 @@ Fixpoint check_element_rec x i ys cl :=
   end.
 Definition check_element elem cl :=
   match elem with
-  | Elem x i ys => check_element_rec x i (augment Z ys) cl
+  | Element x i ys => check_element_rec x i (augment Z ys) cl
   end.
 
 Theorem check_element_valid :
@@ -111,7 +111,7 @@ Fixpoint eval_element_sol_rec x i ys theta :=
 
 Definition eval_element_sol (con : element) (theta : asg) :=
   match con with
-  | Elem x i ys => eval_element_sol_rec x i (augment Z ys) theta
+  | Element x i ys => eval_element_sol_rec x i (augment Z ys) theta
   end.
 
 Theorem eval_element_sol_rec_iff :

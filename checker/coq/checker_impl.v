@@ -40,6 +40,10 @@ Extraction "checker_impl.ml"
   element.check_element_bnd
   element_dset.check_elem_dbnd
   element_dset.check_reif_elem_dbnd
+  model.cst
+  model.make_linear
+  model.make_cumul
+  model.make_element
   log.certify_unsat
   nat_of_int int_of_nat.
 

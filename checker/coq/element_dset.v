@@ -19,7 +19,7 @@ Fixpoint check_element_dfun_rec (x i : ivar) ys f :=
   end.
 Definition check_element_dfun elem f :=
   match elem with
-  | Elem x i ys => check_element_dfun_rec x i (augment Z ys) f
+  | Element x i ys => check_element_dfun_rec x i (augment Z ys) f
   end.
 
 Theorem check_element_dfun_rec_eq : forall (x i : ivar) ys cl f,
