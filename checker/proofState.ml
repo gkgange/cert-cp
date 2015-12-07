@@ -204,12 +204,14 @@ let coq_lit_of_lit = function
   | MT.Neg v -> C_impl.neglit (coq_lit_of_vprop v)
  *)
 
+let parse_int = parser
+  | [< 'GL.Kwd "-" ; 'GL.Int k >] -> (-k)
+  | [< 'GL.Int k >] -> k
 
 let parse_ilist =
   let rec aux ls = parser
     | [< 'GL.Int 0 >] -> List.rev ls
-    | [< 'GL.Kwd "-" ; 'GL.Int k ; ret = aux ((-k) :: ls) >] -> ret
-    | [< 'GL.Int k ; ret = aux (k :: ls) >] -> ret in
+    | [< k = parse_int ; ret = aux (k :: ls) >] -> ret in
  fun toks -> aux [] toks
 
 let parse_hint model = parser
@@ -265,3 +267,40 @@ let parse_proof minfo lmap toks =
       aux ((parse_inf minfo lmap toks) :: ss)
   in
   aux []
+
+let parse_solution minfo toks =
+  let rec aux = parser
+    | [< 'GL.Ident id ; 'GL.Kwd "="; k = parse_int >] -> (get_ivar minfo id, k)
+  in
+  let alist = S.listof aux toks in
+  C_impl.asg_of_alist alist
+
+let print_list ?sep:(sep=";") f fmt xs =
+  Format.fprintf fmt "[@[" ;
+  begin
+    match xs with
+    | [] -> ()
+    | (h :: tl) ->
+      begin
+        f fmt h ;
+        List.iter (fun x ->
+          Format.fprintf fmt "%s@ " sep ;
+          f fmt x
+        ) tl
+      end
+  end ;
+  Format.fprintf fmt "]@]"
+
+let print_vprop fmt v =
+  match v with
+  | C_impl.ILeq (x, k) -> Format.fprintf fmt "ILeq %d (%d)" x k
+  | C_impl.IEq (x, k) -> Format.fprintf fmt "IEq %d (%d)" x k
+  | C_impl.CTrue -> Format.fprintf fmt "CTrue"
+  | _ -> ()
+
+let print_lit fmt l =
+  match l with
+  | C_impl.Pos v -> (Format.fprintf fmt "Pos (" ; print_vprop fmt v; Format.fprintf fmt ")")
+  | C_impl.Neg v -> (Format.fprintf fmt "Neg (" ; print_vprop fmt v; Format.fprintf fmt ")")
+ 
+let print_clause fmt cl = print_list print_lit fmt cl

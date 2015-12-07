@@ -10,6 +10,8 @@ module M = Model
 module S = Spec
 module P = Parse
 
+module Pr = ProofState
+
 module DL = Dynlink
 
 (* constraint(id) |- clause *)
@@ -52,7 +54,7 @@ let check_inference model bounds ident clause =
       log "Error: constraint not found: %s" ident ;
       false
     end
-
+  
 (* Check a set of inferences; terminates after the
  * first failure. *)
 (*

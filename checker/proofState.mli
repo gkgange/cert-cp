@@ -27,3 +27,8 @@ val next : proof_state -> (Checker_impl.step * proof_state) option
 
 val parse_step : model_info -> literal_map -> Genlex.token Stream.t -> Checker_impl.step
 val parse_proof : model_info -> literal_map -> Genlex.token Stream.t -> Checker_impl.step list
+
+val print_lit : Format.formatter -> Checker_impl.lit -> unit
+val print_clause : Format.formatter -> Checker_impl.clause -> unit
+
+val parse_solution : model_info -> Genlex.token Stream.t -> Checker_impl.asg

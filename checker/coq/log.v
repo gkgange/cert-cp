@@ -153,7 +153,8 @@ Definition check_inference (bs : domset) (s : state) (cl : clause) :=
   match s with
   | (csts, clauses, hint) =>
     match ZMaps.find hint csts with
-    | None => false
+    (* | None => false *)
+    | None => check_tauto_dbnd bs cl
     | Some cst => check_cst_bnd bs cst cl
     end
   end.
@@ -165,7 +166,7 @@ Proof.
   remember (ZMaps.find h cs) as fh; destruct fh; simpl in *.
     symmetry in Heqfh; apply find_mapsto_iff in Heqfh.
     apply check_cst_bnd_valid with (b := bs) (c := c). assumption. assumption. now apply H1 with (id := h).
-    discriminate.
+    now apply check_tauto_dbnd_valid with (ds := bs).
 Qed.
 
 Lemma check_inference_valid : forall (bs : domset) (s : state) (cl : clause),
@@ -262,6 +263,7 @@ Definition get_clauses (s : state) (ids : list Z) :=
 
 Definition apply_resolution (s : state) (id : Z) (cl : clause) (ants : list Z) :=
   if resolvable cl (get_clauses s ants) then
+    (* add_clause s id (simplify_clause cl) *)
     add_clause s id cl
   else
     s.
@@ -449,12 +451,13 @@ Proof.
   destruct d; simpl; try congruence.
   destruct (ZMaps.find (elt := cst) z z0); simpl; try congruence.
   destruct (check_cst_bnd bs c0 c); try congruence.
+  destruct (check_tauto_dbnd bs c); try congruence.
   unfold apply_resolution.
     destruct (resolvable c (get_clauses (z0, z1, z) l));
       unfold add_clause; try congruence.
 Qed.
 
- Lemma state_csts_const_gen : forall bs s lim T x next, state_csts s = state_csts (apply_steps_gen bs s lim T x next).
+Lemma state_csts_const_gen : forall bs s lim T x next, state_csts s = state_csts (apply_steps_gen bs s lim T x next).
 Proof.
   intros bs s lim T x next.
   apply (apply_steps_gen_ind bs); intros; try assumption; try congruence.
@@ -465,6 +468,7 @@ Proof.
   destruct d; simpl; try congruence.
   destruct (ZMaps.find (elt := cst) z z0); simpl; try congruence.
   destruct (check_cst_bnd bs c0 c); try congruence.
+  destruct (check_tauto_dbnd bs c); try congruence.
   unfold apply_resolution;
     destruct (resolvable c (get_clauses (z0, z1, z) l));
       unfold add_clause; try congruence.
@@ -535,4 +539,103 @@ Corollary certify_unsat_list_valid : forall m ss,
   certify_unsat_list m ss = true -> model_unsat m.
 Proof.
   intros m ss; unfold certify_unsat_list; apply certify_unsat_valid.
+Qed.
+
+Lemma eval_domset_if_bounds : forall bs theta,
+  eval_bounds bs theta -> eval_domset (bounds_domset bs) theta.
+Proof.
+  intros.
+  unfold bounds_domset.
+  rewrite negclause_of_bounds_valid in H.
+  now apply eval_negcl_domset in H.
+Qed.
+
+(*
+Lemma eval_bounds_if_domset : forall bs theta,
+  eval_domset (bounds_domset bs) theta -> eval_bounds bs theta.
+Proof.
+  intros.
+  unfold bounds_domset in H.
+  rewrite negclause_of_bounds_valid.
+*)
+
+(* Check a single inference for a model. *)
+Definition check_inference_model m hint cl :=
+  let s0 := empty_state m in
+  let sH := set_hint s0 hint in
+  check_inference (bounds_domset (fst m)) sH cl.
+Lemma check_inference_model_valid : forall m hint cl,
+  check_inference_model m hint cl = true -> forall theta, eval_model m theta -> eval_clause cl theta.
+Proof.
+  intros m hint cl.
+  unfold check_inference_model.
+  intro.
+  apply (check_inference_valid (bounds_domset (fst m)) (set_hint (empty_state m) hint) cl) in H.
+  assert (Hv := empty_state_valid_bnd m (bounds_domset (fst m))).
+  intros.
+  unfold eval_model in H0; destruct H0 as [Hb Hc].
+  unfold empty_state, set_hint in *; destruct m; simpl in *.
+  apply H; try assumption.
+  apply eval_domset_if_bounds; assumption.
+  now apply cst_map_if_csts.
+Qed.
+
+(* FIXME: Placeholder *)
+Definition certify_solution (m : model) (sol : asg) :=
+  match m with
+  | (bs, cs) => andb (evalb_bounds bs sol) (check_csts_sol cs sol)
+  end.
+
+Theorem certify_solution_valid : forall m sol, certify_solution m sol = true -> eval_model m sol.
+Proof.
+  intros m sol; unfold certify_solution, eval_model; destruct m; simpl in *; intros.
+  rewrite Bool.andb_true_iff in H.
+  destruct H as [Hb Hcs].
+  apply evalb_bounds_iff in Hb; apply check_csts_sol_sound in Hcs.
+  split; assumption.
+Qed.
+
+Definition certify_optimal (m : model) (obj : ivar) (sol : asg) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
+  let b0 := bounds_domset (fst m) in
+  let bs := domset_apply_lt b0 obj (eval_ivar obj sol) in
+  andb (certify_solution m sol) (state_unsat (apply_steps_gen bs (empty_state m) lim T x next)).
+
+Theorem certify_optimal_valid : forall m obj sol lim T x next,
+  certify_optimal m obj sol lim T x next = true ->
+    eval_model m sol /\ forall sol', eval_model m sol' -> (eval_ivar obj sol) <= (eval_ivar obj sol').
+Proof.
+  unfold certify_optimal; intros.
+  rewrite Bool.andb_true_iff in H.
+  destruct H as [Hs Hp].
+  split; [now apply certify_solution_valid | trivial].
+
+  intros.
+  remember (bounds_domset (fst m)) as b0.
+  remember (domset_apply_lt b0 obj (eval_ivar obj sol)) as bs.
+  assert (Hs0 := empty_state_valid_bnd m bs).
+  remember (empty_state m) as s0.
+  apply apply_steps_gen_valid with (lim := lim) (x := x) (next := next) in Hs0.
+  assert (Hsc := state_csts_const_gen bs s0 lim T x next).
+  remember (apply_steps_gen bs s0 lim T x next) as sF.
+  assert (eval_domset bs sol' -> ~ eval_cstmap (state_csts sF) sol').
+    intros.
+    apply state_unsat_valid with (bs := bs); try assumption.
+
+  unfold eval_model in H; destruct H as [Hb Hcs].
+  assert (eval_ivar obj sol <= eval_ivar obj sol' \/ eval_ivar obj sol' < eval_ivar obj sol).
+    omega.
+  destruct H ; [assumption | trivial].
+  assert (eval_domset bs sol').
+    rewrite Heqbs.
+    apply domset_apply_lt_1.
+    apply eval_domset_if_bounds in Hb.
+    now rewrite Heqb0.
+
+    assumption.
+  apply H0 in H1.  
+  apply cst_map_if_csts in Hcs.
+  rewrite <- Hsc in H1.
+  rewrite Heqs0 in H1.
+  unfold empty_state, state_csts in H1; destruct m; simpl in *.
+  contradiction.
 Qed.

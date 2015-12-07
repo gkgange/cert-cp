@@ -141,7 +141,7 @@ CMXSFILES:=$(MLFILES:.ml=.cmxs)
 CMXSFILES0:=$(filter-out ,$(CMXSFILES))
 OFILES:=$(MLFILES:.ml=.o)
 
-TARGETS:=check_cp coqify_cp
+TARGETS:=check_cp coqify_cp certcp_stream
 BYTE_TARGETS:=$(addsuffix .byte,$(TARGETS))
 # all: $(VOFILES) $(CMOFILES) $(CMXSFILES) $(TARGETS)
 all: $(TARGETS)

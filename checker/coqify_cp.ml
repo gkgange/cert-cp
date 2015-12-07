@@ -16,21 +16,6 @@ module C_impl = Checker_impl
 type ident = Pr.ident
 type ivar = int
 
-(*
-type linterm = (int * ivar)
-
-type task = {
-  duration : int ;
-  resource : int ;
-  svar : ivar 
-}
-
-type cumul = {
-  tasks : task list ;
-  limit : int
-}
-*)
-
 let ident_list = S.listof S.ident
 let int_list = S.listof S.intconst
 
@@ -92,6 +77,7 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
+ (*
 let write_coq_vprop fmt v =
   match v with
   | C_impl.ILeq (x, k) -> Format.fprintf fmt "ILeq %d (%d)" x k
@@ -103,6 +89,7 @@ let write_coq_lit fmt l =
   match l with
   | C_impl.Pos v -> (Format.fprintf fmt "Pos (" ; write_coq_vprop fmt v; Format.fprintf fmt ")")
   | C_impl.Neg v -> (Format.fprintf fmt "Neg (" ; write_coq_vprop fmt v; Format.fprintf fmt ")")
+*)
   
 let parse_ilist =
   let rec aux ls = parser
@@ -119,12 +106,14 @@ let emit_step fmt step =
     | C_impl.Intro (id, cl) -> 
       begin
         Format.fprintf fmt "log.Intro %d@ " id ;
-        print_list write_coq_lit fmt cl
+        Pr.print_clause fmt cl
+        (* print_list write_coq_lit fmt cl *)
       end
     | C_impl.Resolve (id, cl, ants) ->
       begin
         Format.fprintf fmt "log.Resolve %d@ " id ;
-        print_list write_coq_lit fmt cl ;
+        Pr.print_clause fmt cl ;
+        (* print_list write_coq_lit fmt cl ; *)
         Format.fprintf fmt "@ " ;
         print_list Format.pp_print_int fmt ants
       end
@@ -150,17 +139,6 @@ let parse_asg model tokens =
   done ;
   List.rev !asg
 
-let check_solution model sol =
-  let sol_checks = M.get_sol_checkers model in
-  List.for_all (fun c ->
-    let okay = c.Sol.check sol in
-    begin
-      if not okay then
-        Format.fprintf fmt "FAILED: %s" c.Sol.repr 
-    end ;
-    c.Sol.check sol
-    ) sol_checks
-
 let write_coq_tuple f fmt xs = print_list ~sep:"," f fmt xs
 
 let write_lin fmt ks c =
@@ -183,7 +161,8 @@ let write_cumul fmt c =
 
 let write_clause fmt cl = 
   Format.fprintf fmt "model.Clause " ;
-  print_list write_coq_lit fmt cl
+  (* print_list write_coq_lit fmt cl *)
+  Pr.print_clause fmt cl
 let write_arith fmt arith =
   Format.fprintf fmt "model.Arith <fix>"
 

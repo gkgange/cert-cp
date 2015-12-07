@@ -2,6 +2,7 @@
 val infile : string option ref
 val tracefile : string option ref
 val solfile : string option ref
+val objective : string option ref
 val litfile : string option ref
 val modules : string list ref
 val verbosity : int ref

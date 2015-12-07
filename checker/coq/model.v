@@ -75,6 +75,38 @@ Definition check_cst_sol (c : cst) (s : asg) :=
   | Arith x => sol_check ArithConstraint ArithSolCheck x s
   end.
 
+Lemma check_cst_sol_sound : forall (c : cst) (s : asg),
+  check_cst_sol c s = true -> eval_cst c s.                              
+Proof.
+  unfold check_cst_sol, eval_cst; intros.
+  destruct c;
+    [apply (sol_check_valid LinearCon LinearSolCheck t s) |
+     apply (sol_check_valid ElemConstraint ElementSolCheck t s) in H |
+     apply (sol_check_valid CumulConstraint CumulSolCheck t s) in H |
+     apply (sol_check_valid ClauseCon CheckClauseSol t s) in H |
+     apply (sol_check_valid ArithConstraint ArithSolCheck t s) in H ]; assumption.
+Qed.
+
+Fixpoint check_csts_sol (cs : csts) (s : asg) :=
+  match cs with
+  | nil => true
+  | cons (_, c) cs' => andb (check_cst_sol c s) (check_csts_sol cs' s)
+  end.
+
+Theorem check_csts_sol_sound : forall (cs : csts) (s : asg),
+  check_csts_sol cs s = true -> eval_csts cs s.                                 
+Proof.
+  intros cs s; induction cs; unfold check_csts_sol, eval_csts; fold check_csts_sol; fold eval_csts; intros.
+    trivial.
+
+    destruct a; simpl in *.
+    rewrite Bool.andb_true_iff in H.
+    destruct H as [Hs Hcs].
+    apply check_cst_sol_sound in Hs.
+    apply IHcs in Hcs.
+    split; assumption.
+Qed.
+
 Definition check_cst (c : cst) (cl : clause) :=
   match c with
   | Lin x => check LinearCon CheckLinear x cl

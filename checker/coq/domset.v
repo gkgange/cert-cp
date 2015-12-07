@@ -525,6 +525,68 @@ Qed.
 Definition bounds_domset (bs : list model_bound) :=
   negcl_domset (negclause_of_bounds bs).
  
+Definition domset_apply_lt (ds : domset) (x : ivar) (k : Z) :=
+  ZMaps.add x (dom_meet (dom_from_domset ds x) (dom_le (k-1))) ds.
+
+Lemma domset_apply_lt_1 : forall ds x k theta,
+  eval_domset ds theta -> eval_ivar x theta < k -> eval_domset (domset_apply_lt ds x k) theta.
+Proof.
+  intros ds x k theta; unfold domset_apply_lt.
+  intros.
+  assert (Hd := H); apply dom_from_domset_valid with (x := x) in Hd.
+  apply eval_domset_alt; intros.
+  apply ZMapProperties.F.add_mapsto_iff in H1.
+  destruct H1 as [He | He]; destruct He as [Hx Hm].
+  rewrite <- Hm; rewrite <- Hx; apply eval_dom_meet.
+  split ; try assumption.
+    unfold eval_dom, dom_le, sat_dom, sat_dbound, sat_lb, sat_ub; simpl.
+      split; [split; [trivial | omega] | apply notmem_empty].
+
+  rewrite eval_domset_alt in H.
+  now apply H.
+Qed.
+
+Lemma domset_apply_lt_2 : forall ds x k theta,
+  eval_domset (domset_apply_lt ds x k) theta -> eval_domset ds theta.
+Proof.
+  unfold domset_apply_lt; intros.
+  rewrite eval_domset_alt; intros.
+  rewrite eval_domset_alt in H.
+  remember (dom_meet (dom_from_domset ds x) (dom_le (k-1))) as d'.
+
+  assert (x = x0 \/ x <> x0) as Hx. tauto.  
+  destruct Hx as [Hx | Hx].
+
+  assert (eval_dom (x0, d') theta).
+  rewrite <- Hx; apply H; now apply ZMaps.add_1.
+  rewrite Heqd' in H1; apply eval_dom_meet in H1; destruct H1 as [Hex Hek].
+  unfold dom_from_domset in Hex.
+  rewrite find_mapsto_iff in H0.
+  remember (ZMaps.find x ds) as f; symmetry in Heqf; destruct f; try congruence.
+
+  assert (ZMaps.MapsTo x0 d (ZMaps.add x d' ds)).
+    apply ZMaps.add_2; assumption.
+  now apply H.
+Qed.
+
+Lemma domset_apply_lt_3 : forall ds x k theta,
+  eval_domset (domset_apply_lt ds x k) theta -> eval_ivar x theta < k.
+Proof.
+  intros.
+  rewrite eval_domset_alt in H.
+  unfold domset_apply_lt in H.
+  remember (dom_meet (dom_from_domset ds x) (dom_le (k-1))) as d'.
+  assert (eval_dom (x, d') theta).
+    apply H; now apply ZMaps.add_1.
+ 
+  rewrite Heqd' in H0.
+  rewrite eval_dom_meet in H0.
+  destruct H0 as [Hex Hel].
+  unfold eval_dom, dom_le, sat_dom, sat_dbound, sat_lb, sat_ub in Hel; simpl in *.
+  destruct Hel as [[Ht Hek] Hm].
+  omega.
+Qed.
+
 Theorem InA_eq_key_elt_iff_In : forall (B : Type) (xs : list (Z * B)) (y : (Z * B)),
   InA (ZMaps.eq_key_elt (elt := B)) y xs <-> In y xs.
 Proof.
@@ -949,3 +1011,13 @@ Definition HintTautoDomCheck : Checker (DomboundedConstraint HintTauto) :=
 
 Definition check_tauto_dbnd (ds : domset) (cl : clause) :=
   (check (DomboundedConstraint HintTauto) HintTautoDomCheck) (ds, ZSets.elements (clause_varset cl)) cl.
+
+Lemma check_tauto_dbnd_valid : forall (ds : domset) (cl : clause),
+  check_tauto_dbnd ds cl = true -> forall theta, eval_domset ds theta -> eval_clause cl theta.
+Proof.
+  unfold check_tauto_dbnd; intros.
+  apply (check_valid (DomboundedConstraint HintTauto) HintTautoDomCheck) in H; unfold implies in H.
+  apply H.
+  unfold eval; simpl in *; unfold dombounded_eval; simpl.
+  unfold eval_tauto_hint; split ; [assumption | trivial].
+Qed.
