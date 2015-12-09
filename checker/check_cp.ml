@@ -1,3 +1,4 @@
+(*
 (* Top-level checker code. *)
 module List = ExtLib.List
 module L = List
@@ -270,3 +271,4 @@ let main () =
         (string_of_assumptions model xs)
       
 let _ = main () 
+*)
