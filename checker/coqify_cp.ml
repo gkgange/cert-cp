@@ -5,9 +5,6 @@ module L = List
 module H = Hashtbl
 module GL = Genlex
 module MT = MTypes
-module C = Checker
-module Sol = SolCheck
-module M = Model
 module S = Spec
 module P = Parse
 module Pr = ProofState
@@ -124,6 +121,7 @@ let emit_step fmt step =
 let parse_and_emit_steps fmt model lmap tokens =
   emit_stream fmt (fun fmt toks -> emit_step fmt (Pr.parse_step model lmap toks)) tokens
 
+(*
 let parse_var_asg model = parser
   | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] ->
       (M.get_ivar model v, k)
@@ -138,6 +136,7 @@ let parse_asg model tokens =
       Stream.junk tokens)
   done ;
   List.rev !asg
+  *)
 
 let write_coq_tuple f fmt xs = print_list ~sep:"," f fmt xs
 
@@ -265,7 +264,7 @@ let main () =
   (*
   init_parsers () ;
   *)
-  Builtins.register () ;
+  (* Builtins.register () ; *)
   let model_channel = match !COption.infile with
       | None -> stdin
       | Some file -> open_in file

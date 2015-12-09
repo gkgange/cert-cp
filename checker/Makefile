@@ -117,16 +117,8 @@ BASE_MLFILES:=\
   cOption.ml\
   mTypes.ml\
   spec.ml\
-	idrup.ml\
-	dres.ml\
-  checker.ml\
-	solCheck.ml\
-  model.ml\
-  registry.ml\
   parse.ml\
-  proofState.ml\
-  builtins.ml\
-	checkTrace.ml
+  proofState.ml
 
 AUTO_MLFILES:=checker_impl.ml
 
@@ -274,7 +266,7 @@ clean:
 	rm -f all.ps all-gal.ps all.pdf all-gal.pdf all.glob $(VFILES:.v=.glob) $(HTMLFILES) $(GHTMLFILES) $(VFILES:.v=.tex) $(VFILES:.v=.g.tex) $(VFILES:.v=.v.d)
 	rm -f $(CMOFILES) $(MLFILES:.ml=.cmi) $(MLFILES:.ml=.ml.d) $(MLFILES:.ml=.cmx) $(MLFILES:.ml=.o)
 	rm -f $(TARGETS:%=%.cmo) $(TARGETS:%=%.cmi) $(TARGETS:%=%.cmx) $(TARGETS:%=%.o)
-	rm -f $(AUTO_MLFILES) $(AUTO_MLFILES:%=%.mli)
+	rm -f $(AUTO_MLFILES) $(AUTO_MLFILES:.ml=.mli)
 	- rm -rf html
 
 archclean:

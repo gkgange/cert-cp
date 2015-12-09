@@ -6,24 +6,8 @@ type 'a spec = (token S.t -> 'a)
 
 let keywords = ["(";")";";";",";":=";"|-";">=";"<=";"<";"=";"-";"~";"[";"]"]
 
-(* )
-let lexer stream = 
-  let rec aux = parser
-    | [< 'h; t=aux >] -> [< 'h; t >]
-    | [< >] -> [< >] in
-    (* drop_comments (aux (make_lexer keywords stream)) *)
-    aux (make_lexer keywords stream)
-( *)
 let lexer stream =
-  (*
-  let rec aux t = parser
-    | [< 'h; tl = aux (h :: t) >] -> tl
-    | [< >] -> List.rev t
-  in
-  Stream.of_list (aux [] (make_lexer keywords stream))
-  *)
   make_lexer keywords stream
-(*  *)
 
 let ident = parser
   | [< 'Ident s >] -> s

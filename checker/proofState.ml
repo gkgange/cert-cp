@@ -4,7 +4,6 @@ module H = Hashtbl
 module A = DynArray
 module GL = Genlex
 module S = Spec
-module R = Registry
 
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
@@ -191,19 +190,6 @@ type _proof_state =
 type proof_state = _proof_state ref
 type t = proof_state
   
- (*
-let coq_lit_of_vprop v =
-  match v with
-  | MT.ILe (x, k) -> C_impl.Pos (C_impl.ILeq (x, k))
-  | MT.IEq (x, k) -> C_impl.Pos (C_impl.IEq (x, k))
-  | MT.BTrue x -> C_impl.Neg (C_impl.ILe (x, 0))
-  | MT.CTrue -> C_impl.Pos C_impl.CTrue
-
-let coq_lit_of_lit = function
-  | MT.Pos v -> coq_lit_of_vprop v
-  | MT.Neg v -> C_impl.neglit (coq_lit_of_vprop v)
- *)
-
 let parse_int = parser
   | [< 'GL.Kwd "-" ; 'GL.Int k >] -> (-k)
   | [< 'GL.Int k >] -> k

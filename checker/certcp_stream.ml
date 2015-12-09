@@ -5,9 +5,6 @@ module L = List
 module H = Hashtbl
 module GL = Genlex
 module MT = MTypes
-module C = Checker
-module Sol = SolCheck
-module M = Model
 module S = Spec
 module P = Parse
 module Pr = ProofState
@@ -18,12 +15,6 @@ type ivar = int
 
 let ident_list = S.listof S.ident
 let int_list = S.listof S.intconst
-
-(*
-type arith =
-  | Mul of (ivar * (ivar * ivar))
-  | Div of (ivar * (ivar * ivar))
-*)
 
 (* Boolean variables are just integers with range [0, 1]. *)
 let print_list ?sep:(sep=";") f fmt xs =
@@ -68,6 +59,7 @@ let parse_ilist =
     | [< 'GL.Int k ; ret = aux (k :: ls) >] -> ret in
  fun toks -> aux [] toks
 
+(*
 let parse_var_asg model = parser
   | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] ->
       (M.get_ivar model v, k)
@@ -82,6 +74,7 @@ let parse_asg model tokens =
       Stream.junk tokens)
   done ;
   List.rev !asg
+  *)
 
 let check_inferences model_info lmap toks =
   let model = Pr.model_of_model_info model_info in
@@ -134,7 +127,7 @@ let main () =
       "check_cp <options> <model_file>"
   ;
   (* Parse the model specification *)
-  Builtins.register () ;
+  (* Builtins.register () ; *)
   let model_channel = match !COption.infile with
       | None -> stdin
       | Some file -> open_in file
