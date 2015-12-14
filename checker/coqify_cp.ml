@@ -10,6 +10,8 @@ module P = Parse
 module Pr = ProofState
 module C_impl = Checker_impl
 
+open Utils
+
 type ident = Pr.ident
 type ivar = int
 
@@ -19,23 +21,6 @@ let int_list = S.listof S.intconst
 type arith =
   | Mul of (ivar * (ivar * ivar))
   | Div of (ivar * (ivar * ivar))
-
-(* Boolean variables are just integers with range [0, 1]. *)
-let print_list ?sep:(sep=";") f fmt xs =
-  Format.fprintf fmt "[@[" ;
-  begin
-    match xs with
-    | [] -> ()
-    | (h :: tl) ->
-      begin
-        f fmt h ;
-        List.iter (fun x ->
-          Format.fprintf fmt "%s@ " sep ;
-          f fmt x
-        ) tl
-      end
-  end ;
-  Format.fprintf fmt "]@]"
 
 let emit_stream fmt f toks =
   Format.fprintf fmt "[@[" ;
@@ -74,27 +59,6 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
- (*
-let write_coq_vprop fmt v =
-  match v with
-  | C_impl.ILeq (x, k) -> Format.fprintf fmt "ILeq %d (%d)" x k
-  | C_impl.IEq (x, k) -> Format.fprintf fmt "IEq %d (%d)" x k
-  | C_impl.CTrue -> Format.fprintf fmt "CTrue"
-  | _ -> ()
-
-let write_coq_lit fmt l =
-  match l with
-  | C_impl.Pos v -> (Format.fprintf fmt "Pos (" ; write_coq_vprop fmt v; Format.fprintf fmt ")")
-  | C_impl.Neg v -> (Format.fprintf fmt "Neg (" ; write_coq_vprop fmt v; Format.fprintf fmt ")")
-*)
-  
-let parse_ilist =
-  let rec aux ls = parser
-    | [< 'GL.Int 0 >] -> List.rev ls
-    | [< 'GL.Kwd "-" ; 'GL.Int k ; ret = aux ((-k) :: ls) >] -> ret
-    | [< 'GL.Int k ; ret = aux (k :: ls) >] -> ret in
- fun toks -> aux [] toks
-
 let emit_step fmt step =
   Format.pp_open_box fmt 2 ;
   begin
@@ -104,13 +68,11 @@ let emit_step fmt step =
       begin
         Format.fprintf fmt "log.Intro %d@ " id ;
         Pr.print_clause fmt cl
-        (* print_list write_coq_lit fmt cl *)
       end
     | C_impl.Resolve (id, cl, ants) ->
       begin
         Format.fprintf fmt "log.Resolve %d@ " id ;
         Pr.print_clause fmt cl ;
-        (* print_list write_coq_lit fmt cl ; *)
         Format.fprintf fmt "@ " ;
         print_list Format.pp_print_int fmt ants
       end
@@ -121,22 +83,12 @@ let emit_step fmt step =
 let parse_and_emit_steps fmt model lmap tokens =
   emit_stream fmt (fun fmt toks -> emit_step fmt (Pr.parse_step model lmap toks)) tokens
 
-(*
-let parse_var_asg model = parser
-  | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] ->
-      (M.get_ivar model v, k)
+let parse_var_asg minfo = parser
+  | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] -> (Pr.get_ivar minfo v, k)
 
-let parse_asg model tokens =
-  chomp tokens (GL.Kwd "[") ;
-  let asg = ref [] in
-  while Stream.peek tokens <> Some (GL.Kwd "]")
-  do
-    asg := (parse_var_asg model tokens) :: !asg ;
-    (if Stream.peek tokens = Some (GL.Kwd ",") then
-      Stream.junk tokens)
-  done ;
-  List.rev !asg
-  *)
+let parse_sol minfo tokens =
+  let asg = S.listof (parse_var_asg minfo) tokens in
+  asg
 
 let write_coq_tuple f fmt xs = print_list ~sep:"," f fmt xs
 
@@ -174,49 +126,23 @@ let write_coq_cst fmt id cst =
     | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
     | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
     | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
-    (*
-    | C_impl.Lin (ts, k) -> write_lin fmt ts k 
-    | C_impl.Elem (x, y, ks) -> write_elem fmt x y ks
-    | C_impl.Cumul c -> write_cumul fmt c
-    | C_impl.Clause cs -> write_clause fmt cs
-    | C_impl.Arith arith -> write_arith fmt arith
-    *)
   end ;
   Format.fprintf fmt ")@]"
     
+(* Bundle each cst with its index, then print *)
 let write_coq_csts fmt csts =
-  Format.fprintf fmt "[@[" ;
-  begin
-    if A.length csts > 0 then
-      begin
-        write_coq_cst fmt 0 (A.get csts 0) ;
-        for i = 1 to (A.length csts)-1 do
-          Format.fprintf fmt ";@ " ;
-          write_coq_cst fmt i (A.get csts i)
-        done
-      end
-  end ;
-  Format.fprintf fmt "]@]"
+  Utils.print_enum (fun fmt (i, c) -> write_coq_cst fmt i c) fmt
+    @@ Enum.mapi (fun i b -> (i, b)) @@ A.enum csts
       
+(* Bundle bounds with the corresponding index, remove missing bounds, then print. *)
 let write_bounds fmt bs =
-  Format.fprintf fmt "@[[" ;
-  let first = ref true in
-  let aux i l u =
-    begin
-        if !first then
-          first := false
-        else
-          Format.fprintf fmt ";@ "
-    end ;
-    Format.fprintf fmt "(%d, %d, %d)" i l u
+  let print_tuple = (fun fmt (i, l, u) -> Format.fprintf fmt "(%d, %d, %d)" i l u) in
+  let flatten (i, b) = match b with
+    | None -> None
+    | Some (l, u) -> Some (i, l, u)
   in
-  for i = 0 to (A.length bs) - 1
-  do
-    match A.get bs i with
-    | Some (l, u) -> aux i l u
-    | None -> ()
-  done ;
-  Format.fprintf fmt "]@]"
+  (* Utils.print_enum print_tuple fmt @@ Enum.filter_map flatten @@ Enum.mapi (fun i b -> (i, b)) @@ A.enum bs *)
+  A.enum bs |> Enum.mapi (fun i b -> (i, b)) |> Enum.filter_map flatten |> Utils.print_enum print_tuple fmt
   
 let write_coq_model fmt ident model =
   Format.fprintf fmt "@[Definition %s_bounds@ :=@ @[" ident ;
@@ -236,6 +162,7 @@ let write_prelude fmt =
   Format.fprintf fmt "Require Import prim.@." ;
   Format.fprintf fmt "Require bounds.@." ;
   Format.fprintf fmt "Require model.@." ;
+  Format.fprintf fmt "Require sol.@." ;
   Format.fprintf fmt "Require log.@." ;
   Format.fprintf fmt "Require map.@." ;
   Format.fprintf fmt "Require Import List.@." ;
@@ -243,16 +170,63 @@ let write_prelude fmt =
   Format.fprintf fmt "Import List.ListNotations.@." ;
   Format.fprintf fmt "Open Scope Z_scope.@."
 
+let write_unsat_theorem fmt model_id proof_id =
+  Format.fprintf fmt "Theorem model_unsat : model.model_unsat %s.@." model_id;
+  Format.fprintf fmt "Proof.@." ;
+  Format.fprintf fmt "  apply log.certify_unsat_list_valid with (ss := %s)." proof_id ;
+  Format.fprintf fmt "  now vm_compute.@." ;
+  Format.fprintf fmt "Qed.@."
+
+let write_sol_theorem fmt model_id sol_id =
+  Format.fprintf fmt "Theorem model_solution : model.eval_model %s %s.@." model_id sol_id;
+  Format.fprintf fmt "Proof.@." ;
+  Format.fprintf fmt "  apply log.certify_solution_valid.@." ;
+  Format.fprintf fmt "  now vm_compute.@." ;
+  Format.fprintf fmt "Qed.@."
+
+let write_opt_theorem fmt model_id obj sol_id proof_id =
+  Format.fprintf fmt "Theorem model_opt : model.is_model_minimum %s %d %s.@." model_id obj sol_id;
+  Format.fprintf fmt "Proof.@." ;
+  Format.fprintf fmt "  apply log.certify_optimal_list_valid with (ss := %s)." proof_id ;
+  Format.fprintf fmt "  now vm_compute.@." ;
+  Format.fprintf fmt "Qed.@."
+
+let write_coq_sol fmt sol_id sol =
+  Format.fprintf fmt "Definition %s := sol.asg_of_alist " sol_id ;
+  print_list (fun fmt (x, k) -> Format.fprintf fmt "(%d, (%d))" x k) fmt sol ;
+  Format.fprintf fmt ".@."
+(*
 let write_coq fmt model lmap proof_toks =
   write_prelude fmt ;
   write_coq_model fmt "p_model" model ; 
   write_coq_proof fmt "p_proof" model lmap proof_toks ;
-  Format.fprintf fmt "Theorem model_unsat : model.model_unsat p_model.@." ;
-  Format.fprintf fmt "Proof.@." ;
-  Format.fprintf fmt "  apply log.certify_unsat_list_valid with (ss := p_proof)." ;
-  Format.fprintf fmt "  now vm_compute.@." ;
-  Format.fprintf fmt "Qed.@."
+  write_unsat_theorem "p_model" "p_proof"
+  *)
     
+let write_coq fmt model opt_obj opt_sol opt_trace =
+  write_prelude fmt ;
+  write_coq_model fmt "p_model" model ;
+  match (opt_obj, opt_sol, opt_trace) with
+  | (Some obj, Some sol, Some (lmap, trace)) ->
+      begin
+        write_coq_sol fmt "p_solution" sol ;
+        write_coq_proof fmt "p_proof" model lmap trace ;
+        write_opt_theorem fmt "p_model" obj "p_solution" "p_proof"
+      end
+  | (None, Some _, Some _) ->
+      Format.fprintf err_fmt "ERROR: Solution and trace provided, but no objective.@."
+  | (_, Some sol, _) ->
+      begin
+        write_coq_sol fmt "p_solution" sol ;
+        write_sol_theorem fmt "p_model" "p_solution"
+      end
+  | (_, _, Some (lmap, trace)) ->
+      begin
+        write_coq_proof fmt "p_proof" model lmap trace ;
+        write_unsat_theorem fmt "p_model" "p_proof"
+      end
+  | _ -> ()
+
 let main () =
   (* Parse the command-line arguments *)
   Arg.parse
@@ -261,10 +235,7 @@ let main () =
       "check_cp <options> <model_file>"
   ;
   (* Parse the model specification *)
-  (*
-  init_parsers () ;
-  *)
-  (* Builtins.register () ; *)
+  Builtins.register () ;
   let model_channel = match !COption.infile with
       | None -> stdin
       | Some file -> open_in file
@@ -275,34 +246,36 @@ let main () =
   let model = Pr.parse_model_info tokens in
   debug_print "done.}@." ;
   (* Read the solution, if one provided. *)
-  (*
-  let opt_solution =
+  let opt_sol =
     match !COption.solfile with
     | None -> None
     | Some sf ->
         begin
           let asg_toks = Spec.lexer (Stream.of_channel (open_in sf)) in
-          Some (parse_asg model asg_toks)
+          Some (parse_sol model asg_toks)
   end in
-  *)
-  (* Read the literal semantics . *)
-  debug_print "{Reading literals..." ;
-  let lit_tokens = match !COption.litfile with
-    | None -> tokens
-    | Some lfile -> Spec.lexer (Stream.of_channel (open_in lfile))
+  let opt_trace =
+    match !COption.tracefile with
+    | Some tfile ->
+        begin
+          let ttoks = (Spec.lexer (Stream.of_channel (open_in tfile))) in
+          (* Read the literal semantics . *)
+          debug_print "{Reading literals..." ;
+          let lit_tokens = match !COption.litfile with
+            | None -> tokens
+            | Some lfile -> Spec.lexer (Stream.of_channel (open_in lfile))
+          in
+          let lmap = Pr.parse_lit_map model lit_tokens in
+          debug_print "done.}@." ;
+          Some (lmap, ttoks)
+        end
+    | _ -> None
   in
-  let lmap = Pr.parse_lit_map model lit_tokens in
-  debug_print "done.}@." ;
-  match !COption.tracefile with
-  | None -> Format.fprintf fmt "ERROR: No trace specified@."
-  | Some tfile ->
-    begin
-      debug_print "{Reading trace..." ;
-      let tchannel = open_in tfile in
-      (* let ttoks = Spec.lexer (Stream.of_channel tchannel) in *)
-      let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in
-      write_coq fmt model lmap ttoks ;
-      debug_print "done.}@."
-    end
+  let opt_obj =
+    match !COption.objective with
+    | Some v -> Some (Pr.get_ivar model v)
+    | _ -> None
+  in
+  write_coq fmt model opt_obj opt_sol opt_trace
 
 let _ = main () 

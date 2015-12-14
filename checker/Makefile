@@ -115,10 +115,12 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 #GHTMLFILES:=$(VFILES:.v=.g.html)
 BASE_MLFILES:=\
   cOption.ml\
+  utils.ml\
   mTypes.ml\
   spec.ml\
   parse.ml\
-  proofState.ml
+  proofState.ml\
+  builtins.ml
 
 AUTO_MLFILES:=checker_impl.ml
 

@@ -5,6 +5,8 @@ module A = DynArray
 module GL = Genlex
 module S = Spec
 
+open Utils
+
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
 (* let debug_print str = Format.fprintf fmt str *)
@@ -190,14 +192,10 @@ type _proof_state =
 type proof_state = _proof_state ref
 type t = proof_state
   
-let parse_int = parser
-  | [< 'GL.Kwd "-" ; 'GL.Int k >] -> (-k)
-  | [< 'GL.Int k >] -> k
-
 let parse_ilist =
   let rec aux ls = parser
     | [< 'GL.Int 0 >] -> List.rev ls
-    | [< k = parse_int ; ret = aux (k :: ls) >] -> ret in
+    | [< k = S.intconst ; ret = aux (k :: ls) >] -> ret in
  fun toks -> aux [] toks
 
 let parse_hint model = parser
@@ -256,26 +254,10 @@ let parse_proof minfo lmap toks =
 
 let parse_solution minfo toks =
   let rec aux = parser
-    | [< 'GL.Ident id ; 'GL.Kwd "="; k = parse_int >] -> (get_ivar minfo id, k)
+    | [< 'GL.Ident id ; 'GL.Kwd "="; k = S.intconst >] -> (get_ivar minfo id, k)
   in
   let alist = S.listof aux toks in
   C_impl.asg_of_alist alist
-
-let print_list ?sep:(sep=";") f fmt xs =
-  Format.fprintf fmt "[@[" ;
-  begin
-    match xs with
-    | [] -> ()
-    | (h :: tl) ->
-      begin
-        f fmt h ;
-        List.iter (fun x ->
-          Format.fprintf fmt "%s@ " sep ;
-          f fmt x
-        ) tl
-      end
-  end ;
-  Format.fprintf fmt "]@]"
 
 let print_vprop fmt v =
   match v with

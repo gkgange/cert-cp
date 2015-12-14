@@ -601,15 +601,14 @@ Definition certify_optimal (m : model) (obj : ivar) (sol : asg) (lim : Z) (T : T
   andb (certify_solution m sol) (state_unsat (apply_steps_gen bs (empty_state m) lim T x next)).
 
 Theorem certify_optimal_valid : forall m obj sol lim T x next,
-  certify_optimal m obj sol lim T x next = true ->
-    eval_model m sol /\ forall sol', eval_model m sol' -> (eval_ivar obj sol) <= (eval_ivar obj sol').
+  certify_optimal m obj sol lim T x next = true -> is_model_minimum m obj sol.
 Proof.
-  unfold certify_optimal; intros.
+  unfold certify_optimal, is_model_minimum, is_model_ub; intros.
   rewrite Bool.andb_true_iff in H.
   destruct H as [Hs Hp].
   split; [now apply certify_solution_valid | trivial].
 
-  intros.
+  intros sol' H.
   remember (bounds_domset (fst m)) as b0.
   remember (domset_apply_lt b0 obj (eval_ivar obj sol)) as bs.
   assert (Hs0 := empty_state_valid_bnd m bs).

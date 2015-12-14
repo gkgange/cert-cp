@@ -17,12 +17,23 @@ let intconst = parser
 let boolconst = parser
   | [< 'Ident s >] -> bool_of_string s
 
+(*
 let listof sub_parse =
   let rec tail = parser
     | [< 'Kwd "," ; k = sub_parse ; t = tail >] -> k :: t
     | [< >] -> [] in
   let aux = parser
     | [< k = sub_parse ; t = tail >] -> k :: t
+    | [< >] -> []
+  in parser
+    | [< 'Kwd "[" ; elts = aux ; 'Kwd "]" >] -> elts
+    *)
+let listof sub_parse =
+  let rec tail es = parser
+    | [< 'Kwd "," ; k = sub_parse ; xs = tail (k :: es) >] -> xs
+    | [< >] -> List.rev es in
+  let aux = parser
+    | [< k = sub_parse ; xs = tail [k] >] -> xs
     | [< >] -> []
   in parser
     | [< 'Kwd "[" ; elts = aux ; 'Kwd "]" >] -> elts

@@ -10,32 +10,16 @@ module P = Parse
 module Pr = ProofState
 module C_impl = Checker_impl
 
+open Utils
+
 type ident = Pr.ident
 type ivar = int
 
 let ident_list = S.listof S.ident
 let int_list = S.listof S.intconst
 
-(* Boolean variables are just integers with range [0, 1]. *)
-let print_list ?sep:(sep=";") f fmt xs =
-  Format.fprintf fmt "[@[" ;
-  begin
-    match xs with
-    | [] -> ()
-    | (h :: tl) ->
-      begin
-        f fmt h ;
-        List.iter (fun x ->
-          Format.fprintf fmt "%s@ " sep ;
-          f fmt x
-        ) tl
-      end
-  end ;
-  Format.fprintf fmt "]@]"
-
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
-(* let debug_print str = Format.fprintf fmt str *)
 let debug_print str = ()
   
 let string_of_token = function
@@ -51,30 +35,6 @@ let chomp tokens token =
       Format.fprintf fmt "Parse error: expected %s, got %s." (string_of_token token) (string_of_token next) ;
       failwith "Parse error"
     end
-
-let parse_ilist =
-  let rec aux ls = parser
-    | [< 'GL.Int 0 >] -> List.rev ls
-    | [< 'GL.Kwd "-" ; 'GL.Int k ; ret = aux ((-k) :: ls) >] -> ret
-    | [< 'GL.Int k ; ret = aux (k :: ls) >] -> ret in
- fun toks -> aux [] toks
-
-(*
-let parse_var_asg model = parser
-  | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] ->
-      (M.get_ivar model v, k)
-
-let parse_asg model tokens =
-  chomp tokens (GL.Kwd "[") ;
-  let asg = ref [] in
-  while Stream.peek tokens <> Some (GL.Kwd "]")
-  do
-    asg := (parse_var_asg model tokens) :: !asg ;
-    (if Stream.peek tokens = Some (GL.Kwd ",") then
-      Stream.junk tokens)
-  done ;
-  List.rev !asg
-  *)
 
 let check_inferences model_info lmap toks =
   let model = Pr.model_of_model_info model_info in
@@ -126,17 +86,15 @@ let main () =
       (begin fun infile -> COption.infile := Some infile end)
       "check_cp <options> <model_file>"
   ;
-  (* Parse the model specification *)
-  (* Builtins.register () ; *)
+  (* Register constraint parsers *)
+  Builtins.register () ;
   let model_channel = match !COption.infile with
       | None -> stdin
       | Some file -> open_in file
   in
-  (* Register any additional checker modules. *)
   debug_print "{Reading model..." ;
   let tokens = Spec.lexer (Stream.of_channel model_channel) in 
   let model_info = Pr.parse_model_info tokens in
-  (* let model = Pr.model_of_model_info model_info in *)
   debug_print "done.}@." ;
   (* Read the solution, if one provided. *)
   let opt_sol = match !COption.solfile with
