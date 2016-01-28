@@ -151,7 +151,7 @@ let get_model_bounds minfo =
       begin
         match k with
         | None -> aux (idx+1) ss ks
-        | Some (l, u) -> aux (idx+1) ( ((idx, l), u) :: ss) ks
+        | Some (l, u) -> aux (idx+1) ( (idx, (l, u)) :: ss) ks
       end
   in aux 0 [] (A.to_list minfo.bounds)
 

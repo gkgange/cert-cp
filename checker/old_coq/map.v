@@ -113,15 +113,3 @@ Fixpoint asg_map_of_alist (ls : list (Z * Z)) :=
   | nil => ZMaps.empty Z
   | cons (x, k) ls' => ZMaps.add x k (asg_map_of_alist ls')
   end.
-
-Ltac zmap_simpl :=
-  repeat
-    (match goal with
-       | [ H : ZMaps.find _ _ = Some _ |- _ ] => apply ZMaps.find_2 in H
-       | [ |- ZMaps.find _ _ = Some _ ] => apply ZMaps.find_1
-       | [ H1 : ZMaps.MapsTo ?X _ ?M , H2 : ZMaps.find ?X ?M = None |- _ ] =>
-         apply ZMaps.find_1 in H1; congruence
-       | [ H1 : ZMaps.MapsTo ?X _ ?M, H2 : ZMaps.MapsTo ?X _ ?M |- _] =>
-         let eq := fresh in assert (eq := ZMapProperties.F.MapsTo_fun H1 H2); clear H2
-(*       | [ H1 : ZMaps.MapsTo ?X ?E (ZMaps.add ?Y ?K ?D) H2 : ?X <> ?Y |- ZMaps.MapsTo ?X ?E ?D ] => *)
-     end).

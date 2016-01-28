@@ -1,15 +1,16 @@
 Require Import ZArith.
-Require Import Bool.
-Require Import prim. Require Import bounds.
-Require Import sol.
-Require Import map.
+Require Import assign.
+Require Import domain.
+Require Import range.
+Require Import range_properties.
+Require Import constraint.
 
 Definition linterm : Type := (Z * ivar)%type.
 
 (* c_1 x_1 + ... + c_n x_n <= k *)
 Definition lin_leq : Type := ((list linterm) * Z)%type.
 
-Definition eval_linterm term theta := (fst term)*(eval_ivar (snd term) theta).
+Definition eval_linterm (term : linterm) (theta : valuation) := (fst term)*(theta (snd term)).
 
 Fixpoint eval_linsum ts theta :=
   match ts with
@@ -17,90 +18,85 @@ Fixpoint eval_linsum ts theta :=
   | cons t ts' => (eval_linterm t theta) + (eval_linsum ts' theta)
   end.
 
-Definition linterm_db_from_negclause (t : linterm) (cl : clause) :=
-  mul_z_dbound (fst t) (db_from_negclause (snd t) cl).
+Definition linterm_db_from_dom (t : linterm) (ds : domset) :=
+  mul_z_dbound (fst t) (fst (var_dom ds (snd t))).
 
-Theorem linterm_db_from_negclause_valid :
-  forall (t : linterm) (cl : clause) (theta : asg),
-    ~eval_clause cl theta ->
-      sat_dbound (linterm_db_from_negclause t cl) (eval_linterm t theta).
+Theorem linterm_db_from_dom_valid :
+  forall (t : linterm) (ds : domset) (theta : valuation),
+    eval_domset ds theta ->
+      sat_dbound (linterm_db_from_dom t ds) (eval_linterm t theta).
 Proof.
-  intros. destruct t. unfold linterm_db_from_negclause.
-  apply mul_z_dbound_valid. apply db_from_negclause_valid. exact H.
+  intros. destruct t. unfold linterm_db_from_dom.
+  apply (eval_domset_vardom ds i) in H.
+  apply mul_z_dbound_valid. unfold eval_dom, sat_dom in H; tauto.
 Qed.
 
 (* Compute the lb of a linear sum implied by ~cl. *)
-Fixpoint linsum_db_from_negclause (ts : list linterm) (cl : clause) :=
+Fixpoint linsum_db_from_dom (ts : list linterm) (ds : domset) :=
   match ts with
   | nil => (Bounded 0%Z, Bounded 0%Z)
   | cons t ts' =>
-      db_add (linterm_db_from_negclause t cl)
-             (linsum_db_from_negclause ts' cl)
+      db_add (linterm_db_from_dom t ds)
+             (linsum_db_from_dom ts' ds)
   end.
 
-Theorem linsum_db_valid : forall (ts : list linterm) (cl : clause) (theta : asg),
-  ~ eval_clause cl theta ->
-      sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta).
+Theorem linsum_db_valid : forall (ts : list linterm) (ds : domset) (theta : valuation),
+    eval_domset ds theta ->
+      sat_dbound (linsum_db_from_dom ts ds) (eval_linsum ts theta).
 Proof.
   intros.
   induction ts.
-  unfold linsum_db_from_negclause, sat_dbound; simpl. omega.
+  unfold linsum_db_from_dom, sat_dbound; simpl. omega.
 
-  unfold linsum_db_from_negclause ; fold linsum_db_from_negclause.
+  unfold linsum_db_from_dom ; fold linsum_db_from_dom.
   unfold eval_linsum; fold eval_linsum.
   apply db_impl_adddb.
   split.
 
-  apply linterm_db_from_negclause_valid; exact H.
+  apply linterm_db_from_dom_valid; exact H.
   exact IHts.
 Qed.
 
-Theorem notlinsumdb_negcl_impl_clause : forall (ts : list linterm) (cl : clause) (theta : asg),
-  ~ sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta) -> eval_clause cl theta.
+(*
+Theorem notlinsumdb_negcl_impl_clause : forall (ts : list linterm) (ds : domset) (theta : valuation),
+  ~ sat_dbound (linsum_db_from_dom ts cl) (eval_linsum ts theta) -> eval_clause cl theta.
 Proof.
   intros.
   assert (eval_clause cl theta \/ ~ eval_clause cl theta). apply dec_evalclause.
   destruct H0.
   exact H0.
-  assert (sat_dbound (linsum_db_from_negclause ts cl) (eval_linsum ts theta)).
+  assert (sat_dbound (linsum_db_from_dom ts cl) (eval_linsum ts theta)).
   apply linsum_db_valid. exact H0.
   tauto.
 Qed.
+*)
 
-Definition eval_lincon lincon (theta : asg) :=
+Definition eval_lincon lincon (theta : valuation) :=
   (eval_linsum (fst lincon) theta) <= (snd lincon).
 
-Definition check_lincon (lincon : lin_leq) (cl : clause) : bool :=
-  negb (satb_lb (fst (linsum_db_from_negclause (fst lincon) cl)) (snd lincon)).
-
-Theorem check_lincon_valid : forall (lincon : lin_leq) (cl : clause),
-  check_lincon lincon cl = true ->
-    implies (eval_lincon lincon) (eval_clause cl).
-Proof.
-  unfold implies, check_lincon, eval_lincon.
-  intros lincon cl.
-  destruct lincon; simpl.
-  rewrite negb_true_iff.
-  rewrite satb_lb_false_iff_notlb.
-  intros.
-  apply notlinsumdb_negcl_impl_clause with (ts := l).
-  apply notsat_lb_impl_notdb.
-  destruct (linsum_db_from_negclause l cl); simpl in *.
-  apply Zle_notlb_trans with (k' := z).
-  exact H0.
-  exact H.
-Qed.
+Definition check_lincon_unsat (lincon : lin_leq) (ds : domset) : bool :=
+  negb (satb_lb (fst (linsum_db_from_dom (fst lincon) ds)) (snd lincon)).
 
 Definition LinearCon := mkConstraint lin_leq eval_lincon.
-Definition CheckLinear := mkChecker LinearCon check_lincon check_lincon_valid.
 
-Definition BoundedLinCheck := BoundedChecker LinearCon CheckLinear.
-Definition check_linear_bnd (x : lin_leq) (bs : list (ivar*Z*Z)) (cl : clause) :=
-  check (BoundedConstraint LinearCon) (BoundedChecker LinearCon CheckLinear) (bs, x) cl.
+Theorem check_lincon_unsat_valid : forall (lincon : lin_leq) (ds : domset),
+  check_lincon_unsat lincon ds = true -> cst_is_unsat LinearCon lincon ds.
+Proof.
+  unfold cst_is_unsat, check_lincon_unsat.
+  intros lincon ds;
+  destruct lincon; simpl; unfold eval_lincon; intros.
+  rewrite Bool.negb_true_iff in H.
+  rewrite satb_lb_false_iff_notlb in H.
+  apply linsum_db_valid with (ts := l) in H0.
+  unfold sat_dbound in H0; unfold sat_lb in *; destruct (linsum_db_from_dom l ds); destruct b, b0; simpl in *;
+    try (tauto || omega).
+Qed.  
+
+Definition CheckLinearUnsat := mkUnsatChecker LinearCon check_lincon_unsat check_lincon_unsat_valid.
 
 (* Computing solutions. *)
 Definition check_lincon_sol lincon theta :=
-  Z_leb (eval_linsum (fst lincon) theta) (snd lincon).
+  Z.leb (eval_linsum (fst lincon) theta) (snd lincon).
 
 Theorem check_lincon_sol_valid :
     forall lincon theta,
@@ -109,7 +105,7 @@ Proof.
   intros lincon zs; destruct lincon.
   unfold check_lincon_sol;  simpl.
   unfold eval_lincon; simpl.
-  intros; now apply Z_leb_iff_le.
+  intros; now apply Z.leb_le.
 Qed.
 
-Definition LinearSolCheck := mkSolCheck LinearCon check_lincon_sol check_lincon_sol_valid.
+Definition LinearSolCheck := mkSolChecker LinearCon check_lincon_sol check_lincon_sol_valid.

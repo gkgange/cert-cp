@@ -1,8 +1,9 @@
-Require Import prim.
+Require Import assign.
 Require Import ZArith.
 Require Lists.List.
 Require Import domain.
-Require Import domset.
+Require Import lit.
+Require Import clause_domain.
 
 (* Actually, we can get away with doing deduplication in a preprocess;
  * soundness doesn't rely on preserving the proof semantics, just the
@@ -18,10 +19,11 @@ Fixpoint dedup (cl : clause) :=
         cons l (dedup cl')
   end.
 
+(*
 Definition lit_unsatb (ds : domset) (l : lit) :=
   match lit_ivar l with
   | None => false
-  | Some x => dom_unsatb (dom_meet (dom_from_domset ds x) (dom_from_lit x l))
+  | Some x => dom_unsatb (dom_meet (var_dom ds x) (dom_from_lit x l))
   end.
 
 Theorem lit_unsatb_valid : forall ds l theta, lit_unsatb ds l = true ->
@@ -32,8 +34,8 @@ Proof.
   rewrite dom_unsatb_unsat.
   intros; intro.
   set (k := (eval_ivar i theta)).
-  assert (sat_dom (dom_from_domset ds i) k).
-    unfold dom_from_domset.
+  assert (sat_dom (var_dom ds i) k).
+    unfold var_dom.
     remember (map.ZMaps.find i ds) as f.
     destruct f; symmetry in Heqf.
     rewrite eval_domset_alt in H0.
@@ -44,11 +46,12 @@ Proof.
     apply dom_unconstrained_is_uncon.
   
   apply (dom_from_lit_valid i) in H1.
-  assert (sat_dom (dom_meet (dom_from_domset ds i) (dom_from_lit i l)) k).
+  assert (sat_dom (dom_meet (var_dom ds i) (dom_from_lit i l)) k).
   rewrite dom_meet_iff; split; [ assumption | assumption ].
   now apply H in H3.
   congruence.
 Qed.
+*)
 
 Fixpoint clauses_size (cs : list clause) :=
   match cs with
@@ -63,7 +66,7 @@ Fixpoint clause_unsatb ds cl :=
   end.
 
 Theorem clause_unsatb_valid : forall ds cl theta,
-  clause_unsatb ds cl = true -> eval_domset ds theta -> ~ eval_clause cl theta.
+  clause_unsatb ds cl = true -> eval_domset ds theta -> eval_clause cl theta -> False.
 Proof.
   induction cl.
     intros; tauto.
@@ -71,11 +74,10 @@ Proof.
   unfold clause_unsatb; fold clause_unsatb;
   unfold eval_clause; fold eval_clause;
   intros.
-  intro.
   rewrite Bool.andb_true_iff in H; destruct H as [Hl Hc].
-  destruct H1.
-    now apply (lit_unsatb_valid ds  a theta) in Hl.
-    now apply IHcl in H.
+  apply lit_unsatb_unsat in Hl; unfold lit_unsatb in Hl.
+  specialize (Hl theta); specialize (IHcl theta).
+  tauto.
 Qed.
 
 Fixpoint simplify_clause ds cl :=
@@ -95,8 +97,8 @@ Proof.
   induction cl; unfold eval_clause; intros; [contradiction | fold eval_clause in *].
   unfold simplify_clause; fold simplify_clause.
   remember (lit_unsatb ds a) as ul; symmetry in Hequl; destruct ul.  
-  apply lit_unsatb_valid with (theta := theta) in Hequl; try assumption.
-  destruct H0 as [Ha | Hcl]; [contradiction | ].
+  apply lit_unsatb_unsat in Hequl; specialize (Hequl theta).
+  destruct H0 as [Ha | Hcl]; [tauto | ].
   apply IHcl; assumption.
 
   unfold eval_clause; fold eval_clause.
@@ -117,25 +119,34 @@ Proof.
     rewrite H; omega.
     repeat (rewrite H); omega.
 Qed.
-                                    
+
+(*
 Definition dom_tighten ds l :=
   match lit_ivar l with
   | None => Some ds
   | Some x =>
-    let d := dom_meet (dom_from_domset ds x) (dom_from_lit x l) in
+    let d := dom_meet (var_dom ds x) (dom_from_lit x l) in
     if dom_unsatb d then
       None
     else
       Some (map.ZMaps.add x d ds)
   end.
+*)
 
+Definition map2_option (A B : Type) (f : A -> B -> option A) (ox : option A) (y : B) :=
+  match ox with
+  | None => None
+  | Some x => f x y
+  end.
+
+(*
 Theorem dom_tighten_valid_1 : forall ds ds' l theta,
   dom_tighten ds l = Some ds' ->
     eval_domset ds theta -> eval_lit l theta -> eval_domset ds' theta.
 Proof.
   unfold dom_tighten.
   intros; destruct (lit_ivar l); try congruence.
-  destruct (dom_unsatb (dom_meet (dom_from_domset ds i) (dom_from_lit i l))); try congruence.
+  destruct (dom_unsatb (dom_meet (var_dom ds i) (dom_from_lit i l))); try congruence.
     inversion H.
     rewrite eval_domset_alt; intros; simpl.
 
@@ -144,7 +155,7 @@ Proof.
 
     rewrite <- Hd, Hx; apply eval_dom_meet; split.
    
-    apply dom_from_domset_valid.
+    apply var_dom_valid.
     apply H0.
     now apply dom_from_lit_valid.
     
@@ -160,17 +171,18 @@ Theorem dom_tighten_valid_2 : forall ds l theta,
 Proof.
   unfold dom_tighten.
   intros ds l theta; destruct (lit_ivar l); try congruence.
-  remember (dom_unsatb (dom_meet (dom_from_domset ds i) (dom_from_lit i l))) as u;
+  remember (dom_unsatb (dom_meet (var_dom ds i) (dom_from_lit i l))) as u;
       destruct u; simpl.
 
     symmetry in Hequ; rewrite dom_unsatb_unsat in Hequ.
     intros; intro.
-    assert (sat_dom (dom_meet (dom_from_domset ds i) (dom_from_lit i l)) (eval_ivar i theta)).
-    apply dom_meet_iff; split; [now apply dom_from_domset_valid | now apply dom_from_lit_valid].
+    assert (sat_dom (dom_meet (var_dom ds i) (dom_from_lit i l)) (eval_ivar i theta)).
+    apply dom_meet_iff; split; [now apply var_dom_valid | now apply dom_from_lit_valid].
     now apply Hequ in H2. 
 
     congruence.
 Qed.
+*)
 
 Fixpoint prop_clause (ds : domset) (cl : clause) :=
   match cl with
@@ -180,220 +192,79 @@ Fixpoint prop_clause (ds : domset) (cl : clause) :=
       prop_clause ds cl'
     else
       if clause_unsatb ds cl' then
-        dom_tighten ds l
+        domset_with_lit ds l
       else
-        Some ds
+        ds
   end.
 
-Lemma prop_clause_valid_1 : forall (ds ds' : domset) (cl : clause) (theta : asg),
-    (prop_clause ds cl) = Some ds' -> eval_domset ds theta -> eval_clause cl theta -> eval_domset ds' theta.
+Lemma prop_clause_valid : forall (ds : domset) (cl : clause) (theta : valuation),
+    eval_domset ds theta -> eval_clause cl theta -> eval_domset (prop_clause ds cl) theta.                            
 Proof.
-  intros ds ds' cl theta; unfold prop_clause; induction cl; simpl;
-  intros; inversion H.
-  fold prop_clause in *.
-  remember (lit_unsatb ds a) as ul; destruct ul; try congruence.
-  destruct H1 as [Ha | Hcl].
-    symmetry in Hequl; now apply lit_unsatb_valid with (theta := theta) in Hequl.
+  intros ds cl theta; induction cl.
 
-    apply IHcl in H3; try assumption.
+  unfold prop_clause; tsimpl.
 
-    remember (clause_unsatb ds cl) as uc; destruct uc; try congruence.
-      destruct H1 as [Ha | Hcl].
+  unfold prop_clause, eval_clause; fold prop_clause; fold eval_clause.
+  ifelim; tsimpl.
 
-      apply dom_tighten_valid_1 with (theta := theta) in H3; assumption.
-      symmetry in Hequc; apply clause_unsatb_valid with (theta := theta) in Hequc;
-        [contradiction|assumption].
-      
-      inversion H3; now rewrite <- H4.
-Qed.
-
-Lemma prop_clause_valid_2 : forall (ds : domset) (cl : clause) (theta : asg),
-    (prop_clause ds cl) = None -> eval_domset ds theta -> ~ eval_clause cl theta.
-Proof.
-  unfold prop_clause; intros; induction cl.
-    now unfold eval_clause.
-
-    fold prop_clause in *.
-    unfold eval_clause; fold eval_clause; intro.
-
-    remember (lit_unsatb ds a) as ua; remember (clause_unsatb ds cl) as uc.
-    destruct ua; symmetry in Hequa.
-    destruct H1.
-      now apply lit_unsatb_valid with (theta := theta) in Hequa.
-
-      now apply IHcl in H.
-
-    destruct uc; symmetry in Hequc.
-      destruct H1 as [Ha | Hcl];
-      [now apply dom_tighten_valid_2 with (theta := theta) in H |
-       now apply clause_unsatb_valid with (theta := theta) in Hequc].
-    congruence.
+  destruct H1; [apply lit_unsatb_unsat in H0; specialize (H0 theta); tauto | tauto].
+  destruct H2; [ apply domset_with_lit_iff | apply clause_unsatb_valid with (theta := theta) in H1]; tauto.
 Qed.
 
 Fixpoint unit_prop_step (ds : domset) (cs : list clause) :=
   match cs with
-  | nil => Some ds
+  | nil => ds
   | cons cl cs' =>
     match unit_prop_step ds cs' with
     | None => None
-    | Some ds' => prop_clause ds' cl
+    | Some ds' => prop_clause (Some ds') cl
     end
   end.
 
-Lemma unit_prop_step_1 : forall (cs : list clause) (theta : asg),
+Lemma unit_prop_step_valid : forall (cs : list clause) (theta : valuation),
   eval_clauses cs theta -> forall ds, eval_domset ds theta ->
-    forall ds', unit_prop_step ds cs = Some ds' -> eval_domset ds' theta.
+    eval_domset (unit_prop_step ds cs) theta.
 Proof.
   induction cs;
   unfold unit_prop_step; intros; simpl in *; fold unit_prop_step in *.
-    inversion H1; now rewrite <- H3.
+    exact H0.
 
-  remember (unit_prop_step ds cs) as uds; destruct uds; try congruence.
-  destruct H as [Ha Hcs].
-  symmetry in Hequds.
-  apply prop_clause_valid_1 with (ds := d) (cl := a); try assumption.
-  apply IHcs with (ds := ds); try assumption.
-Qed.
+  eqelim (unit_prop_step ds cs).
+  apply prop_clause_valid; try tauto; rewrite <- H2.
+    apply IHcs; tauto.
 
-Lemma unit_prop_step_2 : forall (cs : list clause) (theta : asg),
-  eval_clauses cs theta -> forall ds, unit_prop_step ds cs = None -> eval_domset ds theta -> False.
-Proof.
-  induction cs; unfold eval_clauses; simpl; intros; fold eval_clauses in *.
-    discriminate.
-
-    destruct H as [Ha Hcs].
-    
-    remember (unit_prop_step ds cs) as uds; destruct uds; try congruence; symmetry in Hequds.
-
-    apply unit_prop_step_1 with (theta := theta) in Hequds; try assumption.
-    apply (prop_clause_valid_2 d a theta); try assumption.
-
-    apply IHcs with (theta := theta) (ds := ds); try assumption.
+  rewrite <- H2; apply IHcs; tauto.
 Qed.
 
 Fixpoint unit_prop_rep (ds : domset) (k : nat) (cs : list clause) :=
   match k with
-  | O => Some ds
+  | O => ds
   | (S k') =>
     match unit_prop_step ds cs with
     | None => None
-    | Some ds' => unit_prop_rep ds' k' cs
+    | Some ds' => unit_prop_rep (Some ds') k' cs
     end
   end.
-Lemma unit_prop_rep_1 : forall (cs : list clause) (ks : nat) (theta : asg),
-  eval_clauses cs theta -> forall ds, eval_domset ds theta ->
-    forall ds', unit_prop_rep ds ks cs = Some ds' -> eval_domset ds' theta.
+Lemma unit_prop_rep_1 : forall (cs : list clause) (ks : nat) (theta : valuation),
+  eval_clauses cs theta -> forall ds, eval_domset ds theta -> eval_domset (unit_prop_rep ds ks cs) theta.
 Proof.
   intros cs ks theta; induction ks; unfold unit_prop_rep in *; fold unit_prop_rep in *; intros.
-    inversion H1. rewrite <-H3; assumption.
+    exact H0.
 
-    remember (unit_prop_step ds cs) as u; symmetry in Hequ; destruct u; simpl in *.
-    apply IHks with (ds := d) (ds' := ds'); try assumption.
-    now apply unit_prop_step_1 with (cs := cs) (ds := ds).
+  eqelim (unit_prop_step ds cs); rewrite <- H2.
+    apply IHks; try tauto.
+    apply unit_prop_step_valid; try tauto.
 
-    discriminate.
-Qed.
-
-Lemma unit_prop_rep_2 : forall (cs : list clause) (ks : nat) (theta : asg),
-  eval_clauses cs theta -> forall ds, unit_prop_rep ds ks cs = None -> eval_domset ds theta -> False.
-Proof.
-  intros cs ks theta; induction ks.  
-
-  unfold unit_prop_rep; congruence.
-
-  unfold unit_prop_rep in *; fold unit_prop_rep in *.
-  intros.
-  remember (unit_prop_step ds cs) as s; symmetry in Heqs; destruct s; simpl in *.
-  apply IHks with (ds := d); try assumption.
-  apply unit_prop_step_1 with (cs := cs) (ds := ds); try assumption.
-  apply unit_prop_step_2 with (theta := theta) (cs := cs) (ds := ds); try assumption.
+    apply unit_prop_step_valid; try tauto.
 Qed.
 
 Definition unit_prop (ds : domset) (cs : list clause) := unit_prop_rep ds (List.length cs) cs.
-Lemma unit_prop_valid_1 : forall (cs : list clause) (theta : asg),
+Lemma unit_prop_valid : forall (cs : list clause) (theta : valuation),
   eval_clauses cs theta -> forall ds, eval_domset ds theta ->
-    forall ds', unit_prop ds cs = Some ds' -> eval_domset ds' theta.
+    eval_domset (unit_prop ds cs) theta.
 Proof.
   unfold unit_prop; intros; apply unit_prop_rep_1 with (theta := theta) (cs := cs) (ks := (List.length cs)) (ds := ds); assumption.
 Qed.
-
-Lemma unit_prop_valid_2 : forall (cs : list clause) (theta : asg),
-  eval_clauses cs theta -> forall ds, unit_prop ds cs = None -> eval_domset ds theta -> False.
-Proof.
-  unfold unit_prop; intros. apply unit_prop_rep_2 with (theta := theta) (cs := cs) (ks := (List.length cs)) (ds := ds); assumption.
-Qed.
-(*
-Fixpoint unit_prop (ds : domset) (cs : list clause) :=
-  match cs with
-  | nil => Some ds
-  | cons cl cs' =>
-    match unit_prop ds cs' with
-    | None => None
-    | Some ds' =>
-      match prop_clause ds' cl with
-      | None => None
-      | Some ds'' =>
-        unit_prop ds'' cs' 
-      end
-    end
-  end.
-
-Lemma unit_prop_valid_1 : forall (cs : list clause) (theta : asg),
-  eval_clauses cs theta -> forall ds, eval_domset ds theta ->
-    forall ds', unit_prop ds cs = Some ds' -> eval_domset ds' theta.
-Proof.
-  induction cs;
-  unfold unit_prop; intros; simpl in *; fold unit_prop in *.
-    inversion H1; now rewrite <- H3.
-
-  (*
-  remember (prop_clause ds a) as pds; destruct pds; try congruence.
-  remember (unit_prop t cs) as u; destruct u; try congruence.
-  destruct H as [Ha Hcs].
-  apply prop_clause_valid_1 with (ds := d) (cl := a); try assumption.
-  symmetry in Hequ, Heqpds.
-  apply IHcs with (ds := t); try assumption.
-  apply prop_clause_valid_1 with (ds := ds) (cl := a); assumption.
-  *)
-  remember (unit_prop ds cs) as uds; destruct uds; try congruence.
-  remember (prop_clause d a) as pds; destruct pds; try congruence.
-  destruct H as [Ha Hcs].
-  symmetry in Hequds, Heqpds.
-  apply IHcs with (ds := t); try assumption.
-  apply prop_clause_valid_1 with (ds := d) (cl := a); try assumption.
-  apply IHcs with (ds := ds); assumption.
-Qed.
-
-Lemma unit_prop_valid_2 : forall (cs : list clause) (theta : asg),
-  eval_clauses cs theta -> forall ds, unit_prop ds cs = None -> eval_domset ds theta -> False.
-Proof.
-  induction cs; unfold eval_clauses; simpl; intros; fold eval_clauses in *.
-    discriminate.
-
-    destruct H as [Ha Hcs].
-    (*
-    remember (prop_clause ds a) as pa; destruct pa; try congruence; symmetry in Heqpa.
-    remember (unit_prop t cs) as ut; destruct ut; try congruence; symmetry in Hequt.
-    assert (eval_domset d theta).
-      apply unit_prop_valid_1 with (ds := t) (ds' := d) (cs := cs); try assumption.
-      apply prop_clause_valid_1 with (ds := ds) (cl := a); try assumption.
-    assert (Hp := prop_clause_valid_2 d a theta).
-    tauto.
-   *)
-    remember (unit_prop ds cs) as uds; destruct uds; try congruence; symmetry in Hequds.
-    remember (prop_clause d a) as pa; destruct pa; try congruence; symmetry in Heqpa.
-
-    apply IHcs with (theta := theta) (ds := t); try assumption.
-    assert (eval_domset d theta).
-      apply unit_prop_valid_1 with (ds := ds) (ds' := d) (cs := cs); try assumption.
-    apply (prop_clause_valid_1 d t a); assumption.
-
-    apply (prop_clause_valid_2 d a theta); try assumption.
-      apply unit_prop_valid_1 with (ds := ds) (ds' := d) (cs := cs); try assumption.
-
-    apply IHcs with (theta := theta) (ds := ds); try assumption.
-Qed.
-*)
 
 (*
 Definition resolvable (cl : clause) (ants : list clause) := false.
@@ -405,6 +276,7 @@ Proof.
 Qed.
 *)
 
+(*
 Fixpoint unit_prop_simpl (ds : domset)  (ants acc : list clause) (iter : bool) :=
   match ants with
   | nil => Some (ds, acc, iter)
@@ -420,6 +292,7 @@ Fixpoint unit_prop_simpl (ds : domset)  (ants acc : list clause) (iter : bool) :
     | _ => unit_prop_simpl ds cs (cons c_simpl acc) iter
     end
   end.
+*)
 
 (*
 Lemma unit_prop_simpl_1 : forall theta ds ants acc iter,
@@ -440,7 +313,14 @@ Proof.
 *)
 
 Definition resolvable (cl : clause) (ants : list clause) :=
-  let ds := negcl_domset cl in
+  let ds := domset_of_prod (negclause cl) in
+  match unit_prop ds ants with
+  | None => true
+  | Some _ => false
+  end.
+
+Definition resolvable_under (ds : domset) (cl : clause) (ants : list clause) :=
+  let ds := domset_with_prod ds (negclause cl) in
   match unit_prop ds ants with
   | None => true
   | Some _ => false
@@ -450,16 +330,27 @@ Theorem resolvable_valid : forall cl ants,
   resolvable cl ants = true -> forall theta, eval_clauses ants theta -> eval_clause cl theta.
 Proof.
   unfold resolvable; intros.
-  remember (unit_prop (negcl_domset cl) ants) as u; symmetry in Hequ; destruct u;
-    simpl in *; try congruence.
+  eqelim (unit_prop (domset_of_prod (negclause cl)) ants); [congruence | trivial].
   clear H.
-  remember (negcl_domset cl) as ds.
-  assert (eval_domset ds theta -> False).
-  apply unit_prop_valid_2 with (cs := ants); try assumption.
-  apply evalclause_contra; intros.
-  apply H.
-  rewrite Heqds.
-  now apply eval_negcl_domset.
+  apply eval_clause_notprod.
+  intro.
+  apply domset_of_prod_iff in H.
+  apply unit_prop_valid with (cs := ants) in H.
+    now rewrite H2 in H.
+    assumption.
 Qed.
 
-(* *)
+Theorem resolvable_under_valid : forall ds cl ants,
+  resolvable_under ds cl ants = true -> forall theta, eval_domset ds theta -> eval_clauses ants theta -> eval_clause cl theta.
+Proof.
+  unfold resolvable_under; intros.
+  eqelim (unit_prop (domset_with_prod ds (negclause cl)) ants); [congruence | trivial].
+  clear H.
+  apply eval_clause_notprod.
+  intro.
+  assert (eval_domset (domset_with_prod ds (negclause cl)) theta).
+    apply domset_with_prod_iff; tauto.
+  apply unit_prop_valid with (cs := ants) in H2.
+    now rewrite H3 in H2.
+    assumption.
+Qed.

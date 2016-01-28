@@ -1,10 +1,10 @@
 Require Import ZArith.
 Require Import Bool.
-Require Import assign.
+Require Import List.
+Require Import prim.
+Require Import sol.
+Require Import bounds.
 Require Import domain.
-Require Import range.
-Require Import range_properties.
-Require Import constraint.
 
 (* Element constraint:
  * element x i [y_1, ..., y_n] <-> x = y_i.
@@ -13,20 +13,18 @@ Require Import constraint.
 Inductive element : Type :=
   | Element : ivar -> ivar -> list Z -> element.
 
-(*
 Definition eval_element_alt con theta :=
   match con with
   | Element x i ys =>
-    exists idx, (theta i) = Z.of_nat idx /\ nth_error ys idx = value (theta x) 
+    exists idx, (eval_ivar i theta) = Z.of_nat idx /\ nth_error ys idx = value (eval_ivar x theta) 
   end.
-*)
 
 (* This is kind of an awkward definition. *)
-Fixpoint eval_element_rec (x : ivar) (i : ivar) (ys : list (Z * Z)) theta :=
+Fixpoint eval_element_rec x i ys theta :=
   match ys with
   | nil => False
   | cons (k, y) ys' =>
-    (theta i = k /\ theta x = y)
+    (eval_ivar i theta = k /\ eval_ivar x theta = y)
       \/ eval_element_rec x i ys' theta
   end.
 
@@ -38,7 +36,7 @@ Fixpoint augment_rec (A : Type) (xs : list A) (k : Z) :=
 Definition augment (A : Type) (xs : list A) :=
   augment_rec A xs 0.
 
-Definition eval_element (con : element) (theta : valuation) :=
+Definition eval_element (con : element) (theta : asg) :=
   match con with
   | Element x i ys => eval_element_rec x i (augment Z ys) theta
   end.
@@ -61,66 +59,81 @@ Proof.
   apply IHl in H0.
 *)
   
-Fixpoint check_element_rec x i ys ds :=
+Fixpoint check_element_rec x i ys cl :=
   match ys with
   | nil => true
   | cons (k, y) ys' =>
     negb
-      ((satb_dom (var_dom ds i) k)
-        && (satb_dom (var_dom ds x) y))
+      ((satb_dom (dom_from_negclause i cl) k)
+        && (satb_dom (dom_from_negclause x cl) y))
       (*
       ((satb_dbound (db_from_negclause i cl) k)
         && (satb_dbound (db_from_negclause x cl) y))
       *)
-      && check_element_rec x i ys' ds
+      && check_element_rec x i ys' cl
   end.
+Definition check_element elem cl :=
+  match elem with
+  | Element x i ys => check_element_rec x i (augment Z ys) cl
+  end.
+
+Theorem check_element_valid :
+  forall (elem : element) (cl : clause),
+    check_element elem cl = true ->
+      implies (eval_element elem) (eval_clause cl).
+Proof.
+  unfold implies.
+  unfold eval_element, check_element. destruct elem.
+  generalize (augment Z l).
+  intros l0 cl; induction l0.
+  unfold eval_element_rec; tauto.
+
+  unfold check_element_rec, eval_element_rec;
+    fold check_element_rec; fold eval_element_rec.
+  destruct a; simpl.
+  rewrite andb_true_iff, negb_true_iff, andb_false_iff.
+  intros.
+  assert (eval_clause cl theta \/ ~eval_clause cl theta) as Hdec.
+    tauto.
+  destruct Hdec.
+    exact H1.
+
+    destruct H as [ Hf Hrec ].
+    apply IHl0. exact Hrec.
+    destruct H0.
+    destruct H as [Hi0 Hi].
+    rewrite satb_dom_false_iff_notdom in Hf.
+    rewrite satb_dom_false_iff_notdom in Hf.
+    destruct Hf.
+        apply dom_from_negclause_valid with
+          (x := i0) in H1.
+        rewrite Hi0 in H1.
+        tauto.
+
+        apply dom_from_negclause_valid with
+          (x := i) in H1.
+        rewrite Hi in H1.
+        tauto.
+        exact H.
+Qed.
 
 Definition ElemConstraint : Constraint :=
   mkConstraint (element) (eval_element).
+Definition ElemBnd := BoundedConstraint ElemConstraint.
+Definition ElemCheck := mkChecker ElemConstraint (check_element) (check_element_valid).
+Definition ElemBndCheck := BoundedChecker ElemConstraint ElemCheck.
+Definition check_element_bnd (x : element) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (check ElemBnd ElemBndCheck) (bs, x) cl.
 
-Definition check_element_unsat elem ds :=
-  match elem with
-  | Element x i ys => check_element_rec x i (augment Z ys) ds
-  end.
-
-Theorem check_element_unsat_valid : forall (elem : element) (ds : domset),
-    check_element_unsat elem ds = true -> cst_is_unsat ElemConstraint elem ds.
-Proof.
-  unfold cst_is_unsat, eval.
-  unfold ElemConstraint, eval_element, check_element_unsat; destruct elem.
-  generalize (augment Z l); intros l0 ds; induction l0.
-
-  intros; unfold eval_element_rec in H1; contradiction.
-
-  unfold check_element_rec, eval_element_rec, augment, augment_rec in *;
-    fold augment_rec in *; fold check_element_rec in *; fold eval_element_rec in *.
-  destruct a; simpl.
-  rewrite andb_true_iff, negb_true_iff, andb_false_iff in *.
-  intros.
-  destruct H.
-
-  destruct H1; [destruct H1 as [Hi0 Hi] | apply IHl0 with (theta := theta) in H2].
-
-    destruct H; [apply (eval_domset_vardom ds i0) in H0 | apply (eval_domset_vardom ds i) in H0];
-      unfold eval_dom in H0; simpl in H0; [rewrite Hi0 in H0 | rewrite Hi in H0];
-      apply satb_dom_iff in H0; congruence.
-
-    contradiction.
-    assumption.
-    assumption.
-Qed.
-
-Definition ElemCheckUnsat := mkUnsatChecker ElemConstraint (check_element_unsat) (check_element_unsat_valid).
-
-Fixpoint eval_element_sol_rec (x : ivar) (i : ivar) ys (theta : valuation) :=
+Fixpoint eval_element_sol_rec x i ys theta :=
   match ys with
   | nil => false
   | cons (k, y) ys' =>
-    (Z.eqb (theta i)  k) && (Z.eqb (theta x) y)
+    (Z_eqb (eval_ivar i theta)  k) && (Z_eqb (eval_ivar x theta) y)
       || eval_element_sol_rec x i ys' theta
   end.
 
-Definition eval_element_sol (con : element) (theta : valuation) :=
+Definition eval_element_sol (con : element) (theta : asg) :=
   match con with
   | Element x i ys => eval_element_sol_rec x i (augment Z ys) theta
   end.
@@ -137,7 +150,7 @@ Proof.
   destruct a; simpl in *.
   rewrite <- IHys.
   rewrite orb_true_iff; rewrite andb_true_iff.
-  now  repeat (rewrite Z.eqb_eq).
+  now  repeat (rewrite Z_eqb_iff_eq).
 Qed.
 Theorem eval_element_sol_valid :
     forall elt theta,
@@ -147,4 +160,4 @@ Proof.
   now rewrite eval_element_sol_rec_iff.
 Qed.
 
-Definition ElementSolCheck := mkSolChecker ElemConstraint eval_element_sol eval_element_sol_valid.
+Definition ElementSolCheck := mkSolCheck ElemConstraint eval_element_sol eval_element_sol_valid.

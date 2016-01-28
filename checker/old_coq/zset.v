@@ -2,12 +2,12 @@
 Require Import Bool.
 Require Import ZArith.
 Require MSets.
+Require Import prim.
 
 Require Import Orders.
 Require Import Relations.
 Require OrdersEx.
 
-Local Open Scope Z_scope.
 Module Z_as_Int := Int.Z_as_Int.
 Module Z_as_OT := OrdersEx.Z_as_OT.
 Module ZSets := MSetAVL.IntMake(Z_as_Int)(Z_as_OT).
@@ -29,12 +29,15 @@ Definition memb_false_iff_notmem : forall (s : zset) (k : Z),
   memb s k = false <-> ~ mem s k.
 Proof.
   intros; split; intros.
-  intro.
+  assert (~ mem s k \/ mem s k). tauto.
+  destruct H0. assumption.
   apply memb_iff_mem in H0.
-  now rewrite H in H0.
+  rewrite H in H0; discriminate.
 
-  apply Bool.not_true_is_false; intro.
-  now rewrite memb_iff_mem in H0.
+  assert (memb s k = true <-> mem s k).
+    apply memb_iff_mem.
+  destruct (memb s k).
+    tauto. trivial.
 Qed.
 
 Theorem notmem_empty : forall (k : Z),
@@ -68,12 +71,14 @@ Theorem notmem_add_if : forall (s : zset) (k k' : Z),
   ~ mem (add s k) k' -> k <> k' /\ ~ mem s k'.
 Proof.
   intros; split.
-  intro.
+  assert (k <> k' \/ k = k'). tauto.
+  destruct H0. assumption.
   rewrite H0 in H.
   assert (mem (add s k') k'). apply mem_k_addk.
   tauto.
 
-  intro.
+  assert (~ mem s k' \/ mem s k'). tauto.
+  destruct H0. assumption.
   now apply mem_mem_add with (k' := k) in H0.
 Qed.
   
@@ -96,7 +101,7 @@ Proof.
   intros xs k sz; induction sz.
   unfold zset_covers_nat.
   split.
-    intros; absurd (le sz' 0); omega.
+    intros; assert False. omega. tauto.
     intros; trivial.
 
   unfold zset_covers_nat; fold zset_covers_nat; rewrite andb_true_iff.
@@ -117,7 +122,7 @@ Proof.
     intros; apply H. clear IHsz; omega.
 Qed.
 Definition zset_covers (xs : zset) (lb ub : Z) :=
-  if Z.leb lb ub then
+  if Z_leb lb ub then
     zset_covers_nat xs lb (Zabs_nat (ub - lb + 1))
   else
     true.
@@ -127,9 +132,9 @@ Theorem zset_covers_spec : forall (xs : zset) (lb ub : Z),
 Proof.
   unfold zset_covers.
   intros xs lb ub.
-  assert (Z.leb lb ub = true <-> lb <= ub).
-    symmetry; apply Zle_is_le_bool.
-  destruct Z.leb.
+  assert (Z_leb lb ub = true <-> lb <= ub).
+    apply Z_leb_iff_le.
+  destruct Z_leb.
     assert (lb <= ub) as Hle. apply H; trivial. clear H.
 
     split.
@@ -197,16 +202,19 @@ Proof.
     apply ZSets.min_elt_spec2 with (y := n) in H0.
     assumption. assumption.
   intros.
-  intro.
+  assert (~mem xs k' \/ mem xs k'). tauto.
+  destruct H2. assumption.
   induction ZSets.min_elt.
   apply Z.min_glb_lt_iff in H1.
   destruct H1.
-  now apply H0 with (m := a) in H2.
+  assert (~ k' < a).
+    apply H0. trivial. assumption.
+  omega.
   
   assert (ZSets.Empty xs).
-    now apply H.
+    apply H; trivial.
   unfold ZSets.Empty in H3.
-  unfold mem in H2. now apply H3 in H2.
+  unfold mem. apply H3.
 Qed.
 
 Definition zset_max_ub (xs : zset) (k : Z) :=
@@ -235,7 +243,9 @@ Proof.
     intros.
     apply ZSets.max_elt_spec2 with (y := n) in H0.
     assumption. assumption.
-  intros; intro.
+  intros.
+  assert (~mem xs k' \/ mem xs k'). tauto.
+  destruct H2. assumption.
   induction ZSets.max_elt.
   apply Z.max_lub_lt_iff in H1.
   destruct H1.
@@ -246,25 +256,5 @@ Proof.
   assert (ZSets.Empty xs).
     apply H; trivial.
   unfold ZSets.Empty in H3.
-  unfold mem. now apply H3 in H2.
+  unfold mem. apply H3.
 Qed.
-
-Lemma mem_dec : forall s z, Decidable.decidable (mem s z).
-Proof.
-  unfold Decidable.decidable.
-  intros; rewrite <- memb_iff_mem.
-  remember (memb s z) as b; destruct b; [tauto | right; apply diff_false_true].
-Qed.
-
-Ltac zset_simpl :=
-  repeat (match goal with
-    | [ |- context[memb ?S ?X = true] ] => rewrite memb_iff_mem
-    | [ |- context[memb ?S ?X = false] ] => rewrite memb_false_iff_notmem
-    | [ H : context[memb ?S ?X = true] |- _ ] => rewrite memb_iff_mem in H
-    | [ H : context[memb ?S ?X = false] |- _ ] => rewrite memb_false_iff_notmem in H
-    | [ H : mem empty _ |- _ ] => apply notmem_empty in H; contradiction
-    | [ H : mem ?S1 ?X |- mem (union ?S1 _) ?X ] =>
-      apply mem_union_iff ; left ; exact H
-    | [ H : mem ?S2 ?X |- mem (union _ ?S2) ?X ] =>
-      apply mem_union_iff ; right; exact H
-    end).

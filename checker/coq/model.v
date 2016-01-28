@@ -1,159 +1,195 @@
+(* Model representation *)
 Require Import ZArith.
-Require Import prim.
-Require Import linear.
-Require Import element.
-Require Import cumulative.
-Require Import domset.
-Require Import bounds.
-Require Import sol.
-Require Import arith.
+Require Import assign.
+Require Import domain.
+Require Import constraint.
+Require linear.
+Require element.
+Require cumulative.
+Require arith.
 
-Require Import linear_dset.
-Require Import element_dset.
-Require Import cumul_dset.
+(* Model bound *)
+Definition model_bound := (ivar * (val * val))%type.
 
 (* Closed set of constraints. *)
 Inductive cst :=
-  | Lin : LinearCon.(T) -> cst
-  | Elem : ElemConstraint.(T) -> cst  
-  | Cumul : CumulConstraint.(T) -> cst  
+  | Tauto
+  | Lin : linear.LinearCon.(T) -> cst
+  | Elem : element.ElemConstraint.(T) -> cst  
+  | Cumul : cumulative.CumulConstraint.(T) -> cst  
+(*
   | Clause : ClauseCon.(T) -> cst
-  | Arith : ArithConstraint.(T) -> cst.
+*)
+  | Arith : arith.ArithConstraint.(T) -> cst.
 
 Definition make_linear xs k := Lin (xs, k).
 Definition make_element x y ks := Elem (element.Element x y ks).
-Definition make_cumul (c : cumul) := Cumul c.                                  
+Definition make_cumul (c : cumulative.cumul) := Cumul c.                                  
 
 Definition cst_id := Z.
 Definition csts := list (cst_id * cst).
 
-Definition eval_cst c theta := match c with
-  | Lin x => LinearCon.(eval) x theta
-  | Elem x => ElemConstraint.(eval) x theta
-  | Cumul x => CumulConstraint.(eval) x theta
+Definition eval_cst c (theta : valuation) := match c with
+  | Tauto => True
+  | Lin x => linear.LinearCon.(eval) x theta
+  | Elem x => element.ElemConstraint.(eval) x theta
+  | Cumul x => cumulative.CumulConstraint.(eval) x theta
+(*
   | Clause x => ClauseCon.(eval) x theta
-  | Arith x => ArithConstraint.(eval) x theta
+*)
+  | Arith x => arith.ArithConstraint.(eval) x theta
   end.
 
-Definition eval_cst_bnd b c theta :=
-  match c with
-  | Lin x => eval LinearDSet (b, x) theta                                            
-  | Elem x => eval ElemDbnd (b, x) theta                                            
-  | Cumul x => eval CumulDomBnd (b, x) theta                                            
-  | Clause x => eval (DomboundedConstraint ClauseCon) (b, x) theta
-  | Arith x => eval ArithDbnd (b, x) theta
+Definition check_cst_unsat c (ds : domset) := match c with
+  | Tauto =>
+    match ds with
+      | None => true
+      | _ => false
+    end
+  | Lin x => check_unsat linear.LinearCon linear.CheckLinearUnsat x ds
+  | Elem x => check_unsat element.ElemConstraint element.ElemCheckUnsat x ds
+  | Cumul x => check_unsat cumulative.CumulConstraint cumulative.CumulCheck x ds
+  | Arith x => check_unsat arith.ArithConstraint arith.ArithCheck x ds
   end.
 
-Fixpoint eval_csts (cs : csts) theta := 
+Lemma check_cst_unsat_valid : forall c ds,
+  check_cst_unsat c ds = true -> forall theta, eval_domset ds theta -> eval_cst c theta -> False.                                
+Proof.
+  unfold check_cst_unsat, eval_cst; intros; destruct c;
+    try (destruct ds; tsimpl);
+    apply check_unsat_valid in H; unfold cst_is_unsat in H; specialize (H theta); tauto.
+Qed.
+
+Fixpoint eval_csts (cs : csts) (theta : valuation) := 
   match cs with
   | nil => True
   | cons c cs' => (eval_cst (snd c) theta) /\ (eval_csts cs' theta)
   end.
 
-Definition eval_csts_bnd b cs theta :=
-  match cs with
-  | nil => True
-  | cons c cs' => (eval_cst_bnd b (snd c) theta) /\ (eval_csts cs' theta)
+Definition check_cst_sol c (sol : valuation) := match c with
+  | Tauto => true
+  | Lin x => check_sol linear.LinearCon linear.LinearSolCheck x sol
+  | Elem x => check_sol element.ElemConstraint element.ElementSolCheck x sol
+  | Cumul x => check_sol cumulative.CumulConstraint cumulative.CumulSolCheck x sol
+  | Arith x => check_sol arith.ArithConstraint arith.ArithSolCheck x sol
   end.
 
-Definition model := ((list model_bound) * csts)%type.
-
-Definition eval_model model theta :=
-  (eval_bounds (fst model) theta) /\ (eval_csts (snd model) theta).
-
-Definition model_unsat model := forall theta, ~ eval_model model theta.
-
-Definition ModelConstraint : Constraint := 
-  mkConstraint model eval_model.
-
-Definition check_cst_sol (c : cst) (s : asg) :=
-  match c with
-  | Lin x => sol_check LinearCon LinearSolCheck x s
-  | Elem x => sol_check ElemConstraint ElementSolCheck x s
-  | Cumul x => sol_check CumulConstraint CumulSolCheck x s
-  | Clause x => sol_check ClauseCon CheckClauseSol x s
-  | Arith x => sol_check ArithConstraint ArithSolCheck x s
-  end.
-
-Lemma check_cst_sol_sound : forall (c : cst) (s : asg),
-  check_cst_sol c s = true -> eval_cst c s.                              
+Lemma check_cst_sol_valid : forall c sol, check_cst_sol c sol = true -> eval_cst c sol.
 Proof.
-  unfold check_cst_sol, eval_cst; intros.
-  destruct c;
-    [apply (sol_check_valid LinearCon LinearSolCheck t s) |
-     apply (sol_check_valid ElemConstraint ElementSolCheck t s) in H |
-     apply (sol_check_valid CumulConstraint CumulSolCheck t s) in H |
-     apply (sol_check_valid ClauseCon CheckClauseSol t s) in H |
-     apply (sol_check_valid ArithConstraint ArithSolCheck t s) in H ]; assumption.
+  intros c sol; unfold check_cst_sol, eval_cst; destruct c; try (trivial || apply check_sol_valid). 
 Qed.
 
-Fixpoint check_csts_sol (cs : csts) (s : asg) :=
-  match cs with
+Fixpoint check_csts_sol (cs : csts) sol := match cs with
   | nil => true
-  | cons (_, c) cs' => andb (check_cst_sol c s) (check_csts_sol cs' s)
+  | cons (_, c) cs' => andb (check_cst_sol c sol) (check_csts_sol cs' sol)
+  end.
+Lemma check_csts_sol_valid : forall cs sol, check_csts_sol cs sol = true -> eval_csts cs sol.
+Proof.
+  intros cs sol; induction cs.
+
+  tsimpl.
+
+  unfold check_csts_sol, eval_csts; fold check_csts_sol; fold eval_csts.
+  destruct a; tsimpl.
+  now apply check_cst_sol_valid.
+Qed.
+  
+Definition eval_bound (b : model_bound) (theta : valuation) :=
+  match b with
+  | (x, (lb, ub)) => Zle lb (theta x) /\ Zle (theta x) ub
+  end.
+Definition evalb_bound (b : model_bound) (theta : valuation) :=
+  match b with
+  | (x, (lb, ub)) => andb (Z.leb lb (theta x)) (Z.leb (theta x) ub)
   end.
 
-Theorem check_csts_sol_sound : forall (cs : csts) (s : asg),
-  check_csts_sol cs s = true -> eval_csts cs s.                                 
+Lemma evalb_bound_iff : forall b theta, evalb_bound b theta = true <-> eval_bound b theta.
 Proof.
-  intros cs s; induction cs; unfold check_csts_sol, eval_csts; fold check_csts_sol; fold eval_csts; intros.
-    trivial.
-
-    destruct a; simpl in *.
-    rewrite Bool.andb_true_iff in H.
-    destruct H as [Hs Hcs].
-    apply check_cst_sol_sound in Hs.
-    apply IHcs in Hcs.
-    split; assumption.
+  intros; unfold evalb_bound, eval_bound; destruct b; destruct p; tsimpl.
 Qed.
 
-Definition check_cst (c : cst) (cl : clause) :=
-  match c with
-  | Lin x => check LinearCon CheckLinear x cl
-  | Elem x => check ElemConstraint ElemCheck x cl
-  | Cumul x => check CumulConstraint CumulCheck x cl
-  | Clause x => check ClauseCon CheckClause x cl
-  | Arith x => check ArithConstraint ArithCheck x cl
+Definition domset_with_bound (ds : domset) (b : model_bound) :=
+  match b with
+  | (x, (lb, ub)) => apply_vardom ds x (dom_range lb ub)
+  end.
+Lemma domset_with_bound_iff : forall ds b theta,
+  eval_domset ds theta /\ eval_bound b theta <-> eval_domset (domset_with_bound ds b) theta.
+Proof.
+  intros; unfold domset_with_bound; destruct b; destruct p.
+  split; intros.
+    destruct H as [Hd Hb]; apply apply_vardom_1; [assumption | trivial].
+    unfold eval_bound in Hb; now apply dom_range_spec.
+
+    assert (Hp := H). apply apply_vardom_2l in H; apply apply_vardom_2r in Hp.
+    split; [assumption | now apply dom_range_spec in Hp].
+Qed.
+
+Fixpoint domset_with_bounds (ds : domset) (bs : list model_bound) :=
+  match bs with
+  | nil => ds
+  | cons b bs' =>
+    match domset_with_bound ds b with
+    | None => None
+    | Some ds' => domset_with_bounds (Some ds') bs'
+    end
   end.
 
-Definition check_cst_bnd b (c : cst) (cl : clause) :=
-  match c with
-  | Lin x => check LinearDSet LinearDBCheck (b, x) cl
-  | Elem x => check ElemDbnd ElemDomCheck (b, x) cl
-  | Cumul x => check CumulDomBnd CumulTTDCheck (b, x) cl
-  | Arith x => check ArithDbnd ArithDomCheck (b, x) cl
-  (* GKG: FIXME *)
-  | Clause x => check ClauseCon CheckClause x cl
+Fixpoint eval_bounds bs theta :=
+  match bs with
+  | nil => True
+  | cons b bs' => eval_bound b theta /\ eval_bounds bs' theta
   end.
 
-Theorem check_cst_valid : forall (c : cst) (cl : clause),
-  check_cst c cl = true ->
-    forall theta, eval_cst c theta -> eval_clause cl theta.
+Fixpoint evalb_bounds bs theta :=
+  match bs with
+  | nil => true
+  | cons b bs' => andb (evalb_bound b theta) (evalb_bounds bs' theta)
+  end.
+Lemma evalb_bounds_iff : forall bs theta, evalb_bounds bs theta = true <-> eval_bounds bs theta.
 Proof.
-  unfold eval_cst, check_cst; destruct c; simpl; intros;
-    [apply (check_valid LinearCon CheckLinear t cl) |
-     apply (check_valid ElemConstraint ElemCheck t cl) in H |
-     apply (check_valid CumulConstraint CumulCheck t cl) in H |
-     apply (check_valid ClauseCon CheckClause t cl) in H |
-     apply (check_valid ArithConstraint ArithCheck t cl) in H ];
-  unfold implies in H; try apply H; try apply H0.
+  intros; induction bs.
+  tsimpl.
+
+  tsimpl; [apply evalb_bound_iff ; assumption | apply evalb_bound_iff ; assumption ].
 Qed.
 
-Theorem check_cst_bnd_valid : forall (b : domset) (c : cst) (cl : clause),
-  check_cst_bnd b c cl = true ->
-    forall theta, eval_domset b theta -> eval_cst c theta -> eval_clause cl theta.
+Lemma domset_with_bounds_valid : forall bs ds theta,
+  eval_domset ds theta -> eval_bounds bs theta -> eval_domset (domset_with_bounds ds bs) theta.                                   
 Proof.
-  unfold eval_cst, check_cst_bnd; destruct c; intros;
-  [apply (check_valid LinearDSet LinearDBCheck (b, t) cl) |
-   apply (check_valid ElemDbnd ElemDomCheck (b, t) cl) |
-   apply (check_valid CumulDomBnd CumulTTDCheck (b, t) cl) |
-   apply (check_valid ClauseCon CheckClause t cl) |
-   apply (check_valid ArithDbnd ArithDomCheck (b, t) cl) ];
-  try assumption; try (apply eval_dombounded_if; assumption).
+  intros bs; induction bs.
+
+  tsimpl.
+  unfold eval_bounds, domset_with_bounds; fold eval_bounds; fold domset_with_bounds.
+  intros; destruct H0.
+  assert (eval_domset (domset_with_bound ds a) theta).
+    apply domset_with_bound_iff; tauto.
+  eqelim (domset_with_bound ds a); intros.
+    apply IHbs; try tauto.
+    assumption.
 Qed.
 
-Definition is_model_ub (m : model) (o : ivar) (theta : asg) :=
-  forall theta', eval_model m theta' -> (eval_ivar o theta) <= (eval_ivar o theta').
+Definition domset_of_bounds bs := domset_with_bounds domset_empty bs.
+Lemma domset_of_bounds_valid : forall bs theta, eval_bounds bs theta -> eval_domset (domset_of_bounds bs) theta.
+Proof. unfold domset_of_bounds; intros; apply domset_with_bounds_valid; [apply eval_domset_empty | assumption]. Qed.
 
-Definition is_model_minimum (m : model) (o : ivar) (theta : asg) :=
-  eval_model m theta /\ is_model_ub m o theta.
+Definition model := (list model_bound * csts)%type.
+
+Definition eval_model m theta :=
+  match m with
+  | (bs, cs) => eval_bounds bs theta /\ eval_csts cs theta
+  end.
+
+Definition model_unsat m := forall theta, ~ eval_model m theta.
+
+Definition is_model_ub m obj sol := forall sol', eval_model m sol' -> (sol obj) <= (sol' obj).
+
+Definition is_model_minimum m obj sol := eval_model m sol /\ is_model_ub m obj sol.
+
+Definition check_model_sol m sol := andb (evalb_bounds (fst m) sol) (check_csts_sol (snd m) sol).
+Lemma check_model_sol_valid : forall m sol, check_model_sol m sol = true -> eval_model m sol.
+Proof.
+  intros m sol; unfold check_model_sol; destruct m; tsimpl.
+  now apply evalb_bounds_iff.
+  now apply check_csts_sol_valid.
+Qed.
+

@@ -1,28 +1,15 @@
 (* Types & code for proof logs. *)
 Require Import ZArith.
-Require Import assign.
+Require Import prim.
+Require Import sol.
+Require Import bounds.
 Require Import domain.
+Require Import domset.
 Require Import model.
+Require Import map.
 Require Import resolution.
 Require Import Recdef.
-Require Import map.
-Require Import lit.
-Require Import clause_domain.
 Module ZMapProperties := FMapFacts.WProperties(ZMaps).
-
-Definition asg := valuation.
-Fixpoint amap_with_alist (amap : ZMaps.t Z) asgs :=
-  match asgs with
-  | nil => amap
-  | cons (x, k) asgs' => amap_with_alist (ZMaps.add x k amap) asgs'
-  end.
-
-Definition asg_of_alist alist :=
-  let amap := amap_with_alist (ZMaps.empty Z) alist in
-  (fun x => match ZMaps.find x amap with
-     | None => 0%Z
-     | Some k => k
-     end).
 
 Definition clause_map := zmap clause.
 Definition cst_map := zmap cst.
@@ -51,7 +38,7 @@ Fixpoint cst_map_of_csts cs :=
   | cons (k, c) cs' =>
       ZMaps.add k c (cst_map_of_csts cs')
   end.
-Lemma cst_map_if_csts : forall (cs : list (Z * cst)) (theta : valuation),
+Lemma cst_map_if_csts : forall (cs : list (Z * cst)) (theta : asg),
   eval_csts cs theta -> eval_cstmap (cst_map_of_csts cs) theta.
 Proof.
   induction cs.
@@ -162,40 +149,13 @@ Proof.
   apply ZMaps.remove_3 in H0; now apply H with (id := id0).
 Qed.
 
-Definition check_tauto (bs : domset) (cl : clause) :=
-  match domset_with_prod bs (negclause cl) with
-  | None => true
-  | _ => false
-  end.
-Lemma check_tauto_valid : forall ds cl, check_tauto ds cl = true -> forall theta, eval_domset ds theta -> eval_clause cl theta.
-Proof.
-  intros ds cl; unfold check_tauto.
-  eqelim (domset_with_prod ds (negclause cl)); [discriminate | trivial].
-  intros; clear H.
-  apply eval_clause_notprod; intro.
-  assert (eval_domset (domset_with_prod ds (negclause cl)) theta).
-    apply domset_with_prod_iff; tauto.
-    now rewrite H0 in H2.
-Qed.
-
-Definition check_inf bs cst cl := check_cst_unsat cst (domset_with_prod bs (negclause cl)).
-Lemma check_inf_valid : forall bs cst cl, check_inf bs cst cl = true ->
-  forall theta, eval_domset bs theta -> eval_cst cst theta -> eval_clause cl theta.
-Proof.
-  intros bs cst cl; unfold check_inf; intros.
-  apply eval_clause_notprod; intro.
-  apply check_cst_unsat_valid with (theta := theta) in H.
-    contradiction.
-    apply domset_with_prod_iff; tauto.
-    assumption.
-Qed.
-
 Definition check_inference (bs : domset) (s : state) (cl : clause) :=
   match s with
   | (csts, clauses, hint) =>
     match ZMaps.find hint csts with
-    | None => check_tauto bs cl
-    | Some cst => check_inf bs cst cl
+    (* | None => false *)
+    | None => check_tauto_dbnd bs cl
+    | Some cst => check_cst_bnd bs cst cl
     end
   end.
 
@@ -205,8 +165,8 @@ Proof.
   unfold check_inference; destate s; unfold eval_cstmap; intros.
   remember (ZMaps.find h cs) as fh; destruct fh; simpl in *.
     symmetry in Heqfh; apply find_mapsto_iff in Heqfh.
-    apply check_inf_valid with (bs := bs) (cst := c). assumption. assumption. now apply H1 with (id := h).
-    now apply check_tauto_valid with (ds := bs).
+    apply check_cst_bnd_valid with (b := bs) (c := c). assumption. assumption. now apply H1 with (id := h).
+    now apply check_tauto_dbnd_valid with (ds := bs).
 Qed.
 
 Lemma check_inference_valid : forall (bs : domset) (s : state) (cl : clause),
@@ -363,7 +323,7 @@ CoInductive steps :=
   | Steps : step -> steps -> steps.
 
 Function apply_steps (bs : domset) (s : state) (lim : Z) (ds : steps) { measure Zabs_nat lim } :=
-  if Z.leb lim (0%Z) then
+  if Z_leb lim (0%Z) then
     s 
   else
     match ds with
@@ -372,20 +332,20 @@ Function apply_steps (bs : domset) (s : state) (lim : Z) (ds : steps) { measure 
        apply_steps bs (apply_step bs s d) (Zpred lim) ds'
     end.
   intros.
-  apply Z.leb_nle in teq.
+  apply Z_leb_false_iff_notle in teq.
   apply Zabs_nat_lt; omega.
 Defined.
 
 Function apply_steps_gen (bs : domset) (s : state) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T))
          { measure Zabs_nat lim } :=
-  if Z.leb lim (0%Z) then
+  if Z_leb lim (0%Z) then
     s
   else match next x with
     | None => s
     | Some (d, x') => apply_steps_gen bs (apply_step bs s d) (Zpred lim) T x' next
   end.
   intros.    
-  apply Z.leb_nle in teq.
+  apply Z_leb_false_iff_notle in teq.
   apply Zabs_nat_lt; omega.
 Defined.
 
@@ -490,8 +450,8 @@ Proof.
   unfold apply_step; try unfold apply_inference; simpl; try congruence.
   destruct d; simpl; try congruence.
   destruct (ZMaps.find (elt := cst) z z0); simpl; try congruence.
-  destruct (check_inf bs c0 c); try congruence.
-  destruct (check_tauto bs c); try congruence.
+  destruct (check_cst_bnd bs c0 c); try congruence.
+  destruct (check_tauto_dbnd bs c); try congruence.
   unfold apply_resolution.
     destruct (resolvable c (get_clauses (z0, z1, z) l));
       unfold add_clause; try congruence.
@@ -507,15 +467,15 @@ Proof.
   unfold apply_step; try unfold apply_inference; simpl; try congruence.
   destruct d; simpl; try congruence.
   destruct (ZMaps.find (elt := cst) z z0); simpl; try congruence.
-  destruct (check_inf bs c0 c); try congruence.
-  destruct (check_tauto bs c); try congruence.
+  destruct (check_cst_bnd bs c0 c); try congruence.
+  destruct (check_tauto_dbnd bs c); try congruence.
   unfold apply_resolution;
     destruct (resolvable c (get_clauses (z0, z1, z) l));
       unfold add_clause; try congruence.
 Qed.
   
 Definition certify_unsat_stream (m : model) (lim : Z) (s : steps) :=
-  state_unsat (apply_steps (domset_of_bounds (fst m)) (empty_state m) lim s). 
+  state_unsat (apply_steps (bounds_domset (fst m)) (empty_state m) lim s). 
 
 Theorem certify_unsat_stream_valid : forall m lim s,
   certify_unsat_stream m lim s = true -> model_unsat m.
@@ -523,26 +483,26 @@ Proof.
   intros m lim s.
   unfold certify_unsat_stream, model_unsat.
   intros.
-  remember (domset_of_bounds (fst m)) as bs.
+  remember (bounds_domset (fst m)) as bs.
   assert (Hs0 := empty_state_valid_bnd m bs).
   apply (apply_steps_valid bs (empty_state m) lim s) in Hs0.
   intros Hem.
-  destruct m.
   unfold eval_model in Hem; destruct Hem as [Hb Hcs].
   apply state_unsat_valid with (bs := bs) (theta := theta) in H.
   rewrite <- state_csts_const in H.
   clear Hs0.
-  unfold empty_state, state_csts in *; simpl in *.
+  destruct m; unfold empty_state, state_csts in *; simpl in *.
   apply cst_map_if_csts in Hcs.
   contradiction.
   assumption.
-  apply domset_of_bounds_valid in Hb.
+  apply negclause_of_bounds_valid in Hb.
+  unfold bounds_domset in Heqbs.
   rewrite Heqbs.
-  assumption.
+  now apply eval_negcl_domset.
 Qed.
 
 Definition certify_unsat (m : model) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
-  state_unsat (apply_steps_gen (domset_of_bounds (fst m)) (empty_state m) lim T x next). 
+  state_unsat (apply_steps_gen (bounds_domset (fst m)) (empty_state m) lim T x next). 
 
 Theorem certify_unsat_valid : forall m lim T x next,
   certify_unsat m lim T x next = true -> model_unsat m.                                
@@ -550,20 +510,22 @@ Proof.
   intros m lim T x next.
   unfold certify_unsat, model_unsat.
   intros.
-  remember (domset_of_bounds (fst m) ) as bs.
+  remember (bounds_domset (fst m) ) as bs.
   assert (Hs0 := empty_state_valid_bnd m).
   apply (apply_steps_gen_valid bs (empty_state m) lim T x next) in Hs0.
   intros Hem.
-  destruct m; unfold eval_model in Hem; destruct Hem as [Hb Hcs].
+  unfold eval_model in Hem; destruct Hem as [Hb Hcs].
   apply state_unsat_valid with (bs := bs) (theta := theta) in H.
   rewrite <- state_csts_const_gen in H.
   clear Hs0.
-  unfold empty_state, state_csts in *; simpl in *.
+  destruct m; unfold empty_state, state_csts in *; simpl in *.
   apply cst_map_if_csts in Hcs.
   contradiction.
   assumption.
-  apply domset_of_bounds_valid in Hb.
-  now rewrite Heqbs.
+  apply negclause_of_bounds_valid in Hb.
+  unfold bounds_domset in Heqbs.
+  rewrite Heqbs.
+  now apply eval_negcl_domset.
 Qed.
 
 Definition certify_unsat_list (m : model) (ss : list step) :=
@@ -579,7 +541,6 @@ Proof.
   intros m ss; unfold certify_unsat_list; apply certify_unsat_valid.
 Qed.
 
-(*
 Lemma eval_domset_if_bounds : forall bs theta,
   eval_bounds bs theta -> eval_domset (bounds_domset bs) theta.
 Proof.
@@ -588,7 +549,6 @@ Proof.
   rewrite negclause_of_bounds_valid in H.
   now apply eval_negcl_domset in H.
 Qed.
-*)
 
 (*
 Lemma eval_bounds_if_domset : forall bs theta,
@@ -603,49 +563,41 @@ Proof.
 Definition check_inference_model m hint cl :=
   let s0 := empty_state m in
   let sH := set_hint s0 hint in
-  check_inference (domset_of_bounds (fst m)) sH cl.
+  check_inference (bounds_domset (fst m)) sH cl.
 Lemma check_inference_model_valid : forall m hint cl,
   check_inference_model m hint cl = true -> forall theta, eval_model m theta -> eval_clause cl theta.
 Proof.
   intros m hint cl.
   unfold check_inference_model.
   intro.
-  apply (check_inference_valid (domset_of_bounds (fst m)) (set_hint (empty_state m) hint) cl) in H.
-  assert (Hv := empty_state_valid_bnd m (domset_of_bounds (fst m))).
+  apply (check_inference_valid (bounds_domset (fst m)) (set_hint (empty_state m) hint) cl) in H.
+  assert (Hv := empty_state_valid_bnd m (bounds_domset (fst m))).
   intros.
-  unfold eval_model in H0; destruct m; destruct H0 as [Hb Hc].
-  unfold empty_state, set_hint in *; simpl in *.
+  unfold eval_model in H0; destruct H0 as [Hb Hc].
+  unfold empty_state, set_hint in *; destruct m; simpl in *.
   apply H; try assumption.
-  apply domset_of_bounds_valid; assumption.
+  apply eval_domset_if_bounds; assumption.
   now apply cst_map_if_csts.
 Qed.
 
-Definition certify_solution m sol := check_model_sol m sol.
-(*
-Definition certify_solution (m : model) (sol : valuation) :=
+(* FIXME: Placeholder *)
+Definition certify_solution (m : model) (sol : asg) :=
   match m with
   | (bs, cs) => andb (evalb_bounds bs sol) (check_csts_sol cs sol)
   end.
-*)
 
 Theorem certify_solution_valid : forall m sol, certify_solution m sol = true -> eval_model m sol.
 Proof.
-  intros; now apply check_model_sol_valid.
+  intros m sol; unfold certify_solution, eval_model; destruct m; simpl in *; intros.
+  rewrite Bool.andb_true_iff in H.
+  destruct H as [Hb Hcs].
+  apply evalb_bounds_iff in Hb; apply check_csts_sol_sound in Hcs.
+  split; assumption.
 Qed.
 
-Definition domset_with_lt ds x k := apply_vardom ds x (dom_le k).
-Lemma domset_with_lt_iff : forall ds x k theta, eval_domset ds theta /\ (theta x <= k) <-> eval_domset (domset_with_lt ds x k) theta.
-Proof.
-  intros; unfold domset_with_lt; tsimpl.
-  apply apply_vardom_1; [exact H | now apply dom_le_spec].
-  now apply apply_vardom_2l with (x := x) (d := (dom_le k)).
-  apply apply_vardom_2r in H.
-  now apply dom_le_spec in H.
-Qed.
-
-Definition certify_optimal (m : model) (obj : ivar) (sol : valuation) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
-  let b0 := domset_of_bounds (fst m) in
-  let bs := domset_with_lt b0 obj (sol obj) in
+Definition certify_optimal (m : model) (obj : ivar) (sol : asg) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
+  let b0 := bounds_domset (fst m) in
+  let bs := domset_apply_lt b0 obj (eval_ivar obj sol) in
   andb (certify_solution m sol) (state_unsat (apply_steps_gen bs (empty_state m) lim T x next)).
 
 Theorem certify_optimal_valid : forall m obj sol lim T x next,
@@ -657,8 +609,8 @@ Proof.
   split; [now apply certify_solution_valid | trivial].
 
   intros sol' H.
-  remember (domset_of_bounds (fst m)) as b0.
-  remember (domset_with_lt b0 obj (sol obj)) as bs.
+  remember (bounds_domset (fst m)) as b0.
+  remember (domset_apply_lt b0 obj (eval_ivar obj sol)) as bs.
   assert (Hs0 := empty_state_valid_bnd m bs).
   remember (empty_state m) as s0.
   apply apply_steps_gen_valid with (lim := lim) (x := x) (next := next) in Hs0.
@@ -668,22 +620,21 @@ Proof.
     intros.
     apply state_unsat_valid with (bs := bs); try assumption.
 
-  unfold eval_model in H; destruct m; destruct H as [Hb Hcs].
-  assert (sol obj <= sol' obj \/ sol' obj < sol obj).
+  unfold eval_model in H; destruct H as [Hb Hcs].
+  assert (eval_ivar obj sol <= eval_ivar obj sol' \/ eval_ivar obj sol' < eval_ivar obj sol).
     omega.
   destruct H ; [assumption | trivial].
   assert (eval_domset bs sol').
     rewrite Heqbs.
-    apply domset_with_lt_iff.
-    apply domset_of_bounds_valid in Hb.
-    split.
+    apply domset_apply_lt_1.
+    apply eval_domset_if_bounds in Hb.
     now rewrite Heqb0.
-    omega.
 
+    assumption.
   apply H0 in H1.  
   apply cst_map_if_csts in Hcs.
   rewrite <- Hsc in H1.
   rewrite Heqs0 in H1.
-  unfold empty_state, state_csts in H1; simpl in *.
+  unfold empty_state, state_csts in H1; destruct m; simpl in *.
   contradiction.
 Qed.

@@ -94,10 +94,7 @@ VFILES:=assign.v\
   cumulative.v\
 	arith_ops.v\
 	arith.v\
-  resolution.v\
-  model.v\
-	log.v\
-	checker_impl.v
+  model.v
 
 -include $(addsuffix .d,$(VFILES))
 .SECONDARY: $(addsuffix .d,$(VFILES))

@@ -1,11 +1,12 @@
 Require Import ZArith.
 Require Import Bool.
-Require Import assign.
-Require Import domain.
-Require Import range.
-Require Import range_properties.
-Require Import constraint.
+Require Import bounds.
+Require Import prim.
+Require Import sol.
+Require Import domset.
+
 Require Import Psatz.
+
 
 Local Open Scope nat_scope.
 
@@ -28,30 +29,30 @@ Record cumul : Type := mkCumul {
   limit : nat
 }.
 
-Definition eval_start (t : task) (theta : valuation) :=
+Definition eval_start (t : task) (theta : asg) :=
   eval_ivar t.(svar) theta.
-Definition eval_end (t : task) (theta : valuation) :=
+Definition eval_end (t : task) (theta : asg) :=
   Zplus (eval_ivar t.(svar) theta) (Z_of_nat t.(duration)).
 
-Definition task_at_time (t : task) (time : Z) (theta : valuation) : nat :=
+Definition task_at_time (t : task) (time : Z) (theta : asg) : nat :=
   let tstart := eval_start t theta in
   let tend := eval_end t theta in
-  if Z.leb tstart time && Z.ltb time tend then
+  if Z_leb tstart time && Z_ltb time tend then
     t.(resource)
   else
     0%nat.
 
-Fixpoint eval_usage (ts : list task) (time : Z) (theta : valuation) : nat :=
+Fixpoint eval_usage (ts : list task) (time : Z) (theta : asg) : nat :=
   match ts with
   | nil => 0%nat
   | cons t ts' =>
       plus (task_at_time t time theta) (eval_usage ts' time theta)
   end.
 
-Definition eval_cumul (c : cumul) (theta : valuation) :=
+Definition eval_cumul (c : cumul) (theta : asg) :=
   forall (time : Z), le (eval_usage c.(tasks) time theta) c.(limit).
 
-Fixpoint span_usage (ts : list task) (start : Z) (sz : nat) (theta : valuation) :=
+Fixpoint span_usage (ts : list task) (start : Z) (sz : nat) (theta : asg) :=
   match sz with
   | O => 0%nat
   | S sz' =>
@@ -59,7 +60,7 @@ Fixpoint span_usage (ts : list task) (start : Z) (sz : nat) (theta : valuation) 
   end.
 
 Theorem  span_usage_lim :
-  forall (c : cumul) (start : Z) (sz : nat) (theta : valuation),
+  forall (c : cumul) (start : Z) (sz : nat) (theta : asg),
     eval_cumul c theta ->
       le (span_usage c.(tasks) start sz theta) (c.(limit) * sz).
 Proof.
@@ -73,13 +74,13 @@ Proof.
     lia.
 Qed.
 
-Definition span_usageZ (ts : list task) (lb ub : Z) (theta : valuation) :=
+Definition span_usageZ (ts : list task) (lb ub : Z) (theta : asg) :=
   if Z_le_dec lb ub then
     span_usage ts lb (Zabs_nat (Zminus ub lb)) theta 
   else O.
 
 Theorem span_usageZ_lim :
-  forall (c : cumul) (lb ub : Z) (theta : valuation),
+  forall (c : cumul) (lb ub : Z) (theta : asg),
     Zle lb ub /\ eval_cumul c theta ->
       le (span_usageZ c.(tasks) lb ub theta) (c.(limit)*(Zabs_nat (Zminus ub lb))).
 Proof.
@@ -92,7 +93,7 @@ Proof.
     omega.
 Qed.
 
-Theorem span_usage_split : forall (t : task) (ts : list task) (start : Z) (sz : nat) (theta : valuation),
+Theorem span_usage_split : forall (t : task) (ts : list task) (start : Z) (sz : nat) (theta : asg),
   span_usage (cons t ts) start sz theta =
     plus (span_usage (cons t nil) start sz theta) (span_usage ts start sz theta).
 Proof.
@@ -104,13 +105,13 @@ Proof.
     lia.
 Qed.
  
-Fixpoint task_usage (t : task) (start : Z) (sz : nat) (theta : valuation) :=
+Fixpoint task_usage (t : task) (start : Z) (sz : nat) (theta : asg) :=
   match sz with
   | O => 0%nat
   | S sz' =>
     plus (task_at_time t (start+(Z_of_nat sz)-1) theta) (task_usage t start sz' theta)
   end.
-Theorem task_usage_eq_span : forall (t : task) (start : Z) (sz : nat) (theta : valuation),
+Theorem task_usage_eq_span : forall (t : task) (start : Z) (sz : nat) (theta : asg),
   task_usage t start sz theta = span_usage (cons t nil) start sz theta.
 Proof.
   intros; induction sz.
@@ -119,24 +120,24 @@ Proof.
     unfold task_usage, span_usage. fold task_usage; fold span_usage.
     rewrite <- IHsz. unfold eval_usage. omega.
 Qed.
-Definition in_span (t : task) (time : Z) (theta : valuation) :=
+Definition in_span (t : task) (time : Z) (theta : asg) :=
   Zle (eval_start t theta) time /\ Zlt time (eval_end t theta).
 
-Theorem task_in_span : forall (t : task) (time : Z) (theta : valuation),
+Theorem task_in_span : forall (t : task) (time : Z) (theta : asg),
   in_span t time theta ->
       task_at_time t time theta = t.(resource).
 Proof.
   intros; destruct H as [Hs He].
   unfold in_span, task_at_time.
-  assert (Z.leb (eval_start t theta) time
-    && Z.ltb time (eval_end t theta) = true) as Ht.
-    apply andb_true_iff; rewrite Z.leb_le; rewrite Z.ltb_lt.
+  assert (Z_leb (eval_start t theta) time
+    && Z_ltb time (eval_end t theta) = true) as Ht.
+    apply andb_true_iff; rewrite Z_leb_iff_le; rewrite Z_ltb_iff_lt.
     omega.
   destruct andb.
     trivial.
     discriminate.
 Qed.
-Theorem task_duration_usage : forall (t : task) (sz : nat) (theta : valuation),
+Theorem task_duration_usage : forall (t : task) (sz : nat) (theta : asg),
   sz <= t.(duration) ->
     task_usage t (eval_start t theta) sz theta = t.(resource)*sz.
 Proof.
@@ -155,7 +156,7 @@ Proof.
 Qed.
 
 Theorem task_usage_split :
-  forall (t : task) (lb : Z) (sz sz' : nat) (theta : valuation),
+  forall (t : task) (lb : Z) (sz sz' : nat) (theta : asg),
   task_usage t lb sz theta +
     task_usage t (Zplus lb (Z_of_nat sz)) sz' theta
   = task_usage t lb (sz + sz') theta.
@@ -171,14 +172,14 @@ Proof.
   repeat (rewrite <- Zplus_assoc). omega.
 Qed.
 
-Definition task_usageZ (t : task) (lb ub : Z) (theta : valuation) :=
+Definition task_usageZ (t : task) (lb ub : Z) (theta : asg) :=
   if Z_le_dec lb ub then
     task_usage t lb (Zabs_nat (Zminus ub lb)) theta
   else
     O.
 
 Theorem task_usageZ_eq :
-  forall (t : task) (lb : Z) (sz : nat) (theta : valuation),
+  forall (t : task) (lb : Z) (sz : nat) (theta : asg),
     task_usage t lb sz theta = 
     task_usageZ t lb (Zplus lb (Z_of_nat sz)) theta.
 Proof.
@@ -191,7 +192,7 @@ Proof.
 Qed.
 
 Theorem task_usageZ_split :
-  forall (t : task) (lb mid ub : Z) (theta : valuation),
+  forall (t : task) (lb mid ub : Z) (theta : asg),
     Zle lb mid /\ Zle mid ub ->
     task_usageZ t lb mid theta + task_usageZ t mid ub theta
       = task_usageZ t lb ub theta.
@@ -214,12 +215,12 @@ Proof.
   omega.
 Qed.
   
-Definition task_bracketed (t : task) (lb ub : Z) (theta : valuation) :=
+Definition task_bracketed (t : task) (lb ub : Z) (theta : asg) :=
   Zle lb (eval_start t theta)
     /\ Zle (eval_end t theta) ub.
 
 Theorem task_bracketed_usageZ :
-  forall (t : task) (lb ub : Z) (theta : valuation),
+  forall (t : task) (lb ub : Z) (theta : asg),
     task_bracketed t lb ub theta ->
       mult t.(resource) t.(duration) <= task_usageZ t lb ub theta.
 Proof.
@@ -245,13 +246,13 @@ Proof.
   omega.
 Qed.
   
-Fixpoint span_usage_transp (ts : list task) (start : Z) (sz : nat) (theta : valuation) :=
+Fixpoint span_usage_transp (ts : list task) (start : Z) (sz : nat) (theta : asg) :=
   match ts with
   | nil => 0%nat
   | cons t ts' => plus (task_usage t start sz theta) (span_usage_transp ts' start sz theta)
   end.
 
-Theorem span_usage_eq_transp : forall (ts : list task) (start : Z) (sz : nat) (theta : valuation),
+Theorem span_usage_eq_transp : forall (ts : list task) (start : Z) (sz : nat) (theta : asg),
   span_usage ts start sz theta = span_usage_transp ts start sz theta.
 Proof.
   intros; induction ts.
@@ -271,20 +272,20 @@ Proof.
 Qed.
 
 (* Check whether the ~cl -> [| s[t] >= lb |] /\ [| s[t]+d[t] <= ub |]. *)
-Definition domset_bracketed (t : task) (lb ub : Z) (ds : domset) :=
-  db_contained (fst (var_dom ds t.(svar)))
+Definition negcl_bracketed (t : task) (lb ub : Z) (cl : clause) :=
+  db_contained (db_from_negclause t.(svar) cl)
     lb (Zminus ub (Z_of_nat t.(duration))).
 
-Definition domset_bracketedb (t : task) (lb ub : Z) (ds : domset) :=
-  db_containedb (fst (var_dom ds t.(svar)))
+Definition negcl_bracketedb (t : task) (lb ub : Z) (cl : clause) :=
+  db_containedb (db_from_negclause t.(svar) cl)
     lb (Zminus ub (Z_of_nat t.(duration))).
 
-Theorem domset_bracketed_valid :
-  forall (t : task) (lb ub : Z) (ds : domset) (theta : valuation),
-    eval_domset ds theta ->
-        domset_bracketed t lb ub ds -> task_bracketed t lb ub theta.
+Theorem negcl_bracketed_valid :
+  forall (t : task) (lb ub : Z) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta ->
+        negcl_bracketed t lb ub cl -> task_bracketed t lb ub theta.
 Proof.
-  unfold domset_bracketed, task_bracketed; intros.
+  unfold negcl_bracketed, task_bracketed; intros.
   unfold eval_start, eval_end.
   apply db_contained_impl_inbounds with
     (k := eval_ivar t.(svar) theta) in H0.
@@ -295,54 +296,55 @@ Proof.
     destruct H0 as [_ Hub];
     exact Hub.
 
-    apply eval_domset_vardom with (x := (svar t)) in H; unfold eval_dom, sat_dom in H; tauto.
+    apply db_from_negclause_valid; exact H.
 Qed.
-Theorem domset_bracketedb_iff : forall (t : task) (lb ub : Z) (ds : domset),
-  domset_bracketedb t lb ub ds = true <-> domset_bracketed t lb ub ds.
+Theorem negcl_bracketedb_iff : forall (t : task) (lb ub : Z) (cl : clause),
+  negcl_bracketedb t lb ub cl = true <-> negcl_bracketed t lb ub cl.
 Proof.
-  unfold domset_bracketed, domset_bracketedb; intros.
+  unfold negcl_bracketed, negcl_bracketedb; intros.
   rewrite db_containedb_iff_contained. tauto.
 Qed.
   
-Fixpoint domset_usage (ts : list task) (ds : domset) (lb ub : Z) :=
+Fixpoint negcl_usage (ts : list task) (cl : clause) (lb ub : Z) :=
   match ts with
   | nil => O
   | cons t ts' =>
-    if domset_bracketedb t lb ub ds then
-      mult t.(resource) t.(duration) + (domset_usage ts' ds lb ub)
+    if negcl_bracketedb t lb ub cl then
+      mult t.(resource) t.(duration) + (negcl_usage ts' cl lb ub)
     else
-      domset_usage ts' ds lb ub
+      negcl_usage ts' cl lb ub
   end.
   
-Theorem domset_usage_le_span_usage :
-  forall (ts : list task) (ds : domset) (lb ub : Z) (theta : valuation),
-    eval_domset ds theta -> Z.le lb ub ->
-        domset_usage ts ds lb ub <= span_usageZ ts lb ub theta.
+Theorem negcl_usage_le_span_usage :
+  forall (ts : list task) (cl : clause) (lb ub : Z) (theta : asg),
+    ~ eval_clause cl theta /\ Zle lb ub ->
+        negcl_usage ts cl lb ub <= span_usageZ ts lb ub theta.
 Proof.
   intros.
   unfold span_usageZ.
+  destruct H as [H Hlt].
   destruct Z_le_dec.
   (* assert (Zle 0 (ub - lb)). omega. *)
   rewrite span_usage_eq_transp.
   induction ts.
-    unfold domset_usage, span_usage_transp; omega.
+    unfold negcl_usage, span_usage_transp; omega.
 
-    unfold domset_usage, span_usage_transp;
-      fold domset_usage; fold span_usage_transp.
-    assert (domset_bracketedb a lb ub ds = true <-> domset_bracketed a lb ub ds) as Hbrak_iff.
-      apply domset_bracketedb_iff.
-    destruct domset_bracketedb.
-      assert (domset_bracketed a lb ub ds) as Hbrak. rewrite <- Hbrak_iff; trivial.
+    unfold negcl_usage, span_usage_transp;
+      fold negcl_usage; fold span_usage_transp.
+    assert (negcl_bracketedb a lb ub cl = true <-> negcl_bracketed a lb ub cl) as Hbrak_iff.
+      apply negcl_bracketedb_iff.
+    destruct negcl_bracketedb.
+      assert (negcl_bracketed a lb ub cl) as Hbrak. rewrite <- Hbrak_iff; trivial.
     clear Hbrak_iff.
     apply plus_le_compat.
     assert (task_bracketed a lb ub theta).
-      apply domset_bracketed_valid with (ds := ds).
+      apply negcl_bracketed_valid with (cl := cl).
       exact H. exact Hbrak.
     rewrite task_usageZ_eq.
     rewrite inj_Zabs_nat.
     rewrite Zabs_eq.
     rewrite Zplus_minus.
-    apply task_bracketed_usageZ. exact H1. omega.
+    apply task_bracketed_usageZ. exact H0. omega.
     exact IHts.
     rewrite plus_comm; apply le_plus_trans.
     exact IHts.
@@ -350,8 +352,8 @@ Proof.
 Qed.
 
 (* ~cl -> task t covers time. *)
-Definition domset_compulsory (t : task) (time : Z) (ds : domset) :=
-  match (fst (var_dom ds t.(svar))) with
+Definition negcl_compulsory (t : task) (time : Z) (cl : clause) :=
+  match db_from_negclause t.(svar) cl with
   | (Unbounded, Unbounded) => False
   | (Unbounded, Bounded _) => False
   | (Bounded _, Unbounded) => False
@@ -360,225 +362,248 @@ Definition domset_compulsory (t : task) (time : Z) (ds : domset) :=
   end.
 
 (* ~cl -> task t covers time. *)
-Definition domset_compulsoryb (t : task) (time : Z) (ds : domset) :=
-  match (fst (var_dom ds t.(svar))) with
+Definition negcl_compulsoryb (t : task) (time : Z) (cl : clause) :=
+  match db_from_negclause t.(svar) cl with
   | (Unbounded, Unbounded) => false
   | (Unbounded, Bounded _) => false
   | (Bounded _, Unbounded) => false
   | (Bounded lb, Bounded ub) =>
-    Z.ltb time (lb + (Z_of_nat t.(duration))) && Z.leb ub time
+    Z_ltb time (lb + (Z_of_nat t.(duration))) && Z_leb ub time
   end.
 
-Theorem domset_compulsoryb_true_iff : forall (t : task) (time : Z) (ds : domset),
-  domset_compulsoryb t time ds = true <-> domset_compulsory t time ds.
+Theorem negcl_compulsoryb_true_iff : forall (t : task) (time : Z) (cl : clause),
+  negcl_compulsoryb t time cl = true <-> negcl_compulsory t time cl.
 Proof.
-  unfold domset_compulsoryb, domset_compulsory.
+  unfold negcl_compulsoryb, negcl_compulsory.
   intros.
-  destruct var_dom.
-  destruct d; destruct b, b0; simpl; split; try discriminate; try tauto.
+  destruct db_from_negclause;
+  destruct b, b0; simpl; split; try discriminate; try tauto.
   rewrite andb_true_iff;
-    rewrite Z.ltb_lt; rewrite Z.leb_le; tauto.
+    rewrite Z_ltb_iff_lt; rewrite Z_leb_iff_le; tauto.
   rewrite andb_true_iff;
-    rewrite Z.ltb_lt; rewrite Z.leb_le; tauto.
+    rewrite Z_ltb_iff_lt; rewrite Z_leb_iff_le; tauto.
 Qed. 
 
 (*
-Theorem satdb_domset_domset : forall (ds : domset) (ds : domset) (x : ivar) (k : Z),
-  is_domset_domset_db ds cl ->
-    (sat_dbound (fst (dom_from_domset ds x)) k <-> sat_dbound (db_from_dom x cl) k).
+Theorem satdb_negcl_domset : forall (cl : clause) (ds : domset) (x : ivar) (k : Z),
+  is_negcl_domset_db ds cl ->
+    (sat_dbound (fst (dom_from_domset ds x)) k <-> sat_dbound (db_from_negclause x cl) k).
 Proof.
-  intros cl ds x k. intro; unfold is_domset_domset_db in H.
+  intros cl ds x k. intro; unfold is_negcl_domset_db in H.
   rewrite H. tauto.
 Qed.
 *)
 
-Lemma db_from_dom_valid : forall ds x theta,
-   eval_domset ds theta -> sat_dbound (fst (var_dom ds x)) (eval_ivar x theta).
-Proof. intros; apply eval_domset_vardom with (x := x) in H; unfold eval_dom, sat_dom in H; tauto. Qed.
-
-Theorem domset_compulsory_valid : forall (t : task) (time : Z) (ds : domset) (theta: valuation),
-  domset_compulsory t time ds -> eval_domset ds theta ->
+Theorem negcl_compulsory_valid : forall (t : task) (time : Z) (cl : clause) (theta: asg),
+  negcl_compulsory t time cl /\ ~ eval_clause cl theta ->
     Zle (eval_start t theta) time /\ Zlt time (eval_end t theta).
 Proof.
-  unfold domset_compulsory; intros t time ds theta Hb Hcl.
-  assert (sat_dbound (fst (var_dom ds (svar t))) (eval_ivar t.(svar) theta)).
-  apply db_from_dom_valid; exact Hcl.
+  unfold negcl_compulsory; intros.
+  destruct H as [Hb Hcl].
+  assert (sat_dbound (db_from_negclause (svar t) cl) (eval_ivar t.(svar) theta)).
+  apply db_from_negclause_valid; exact Hcl.
   unfold sat_dbound, sat_lb, sat_ub in H.
-  destruct var_dom; simpl in *.
-  destruct d; destruct b, b0; simpl in *.
+  destruct db_from_negclause; simpl in *.
+  destruct b, b0; simpl in *.
     tauto.
     tauto.
     tauto.
     destruct Hb; unfold eval_start, eval_end; omega.
 Qed.
 
-Theorem domset_compulsory_task_usage : forall (t : task) (time : Z) (ds : domset) (theta : valuation),
-  domset_compulsory t time ds -> eval_domset ds theta ->
+Theorem negcl_compulsory_task_usage : forall (t : task) (time : Z) (cl : clause) (theta : asg),
+  negcl_compulsory t time cl /\ ~ eval_clause cl theta ->
     task_at_time t time theta = t.(resource).
 Proof.
-  intros t time ds theta Hb Hcl;  apply task_in_span.
-  unfold in_span. Hint Resolve domset_compulsory_valid. eauto.
+  intros; destruct H as [Hb Hcl]; apply task_in_span.
+  unfold in_span. Hint Resolve negcl_compulsory_valid. eauto.
 Qed.
   
-Fixpoint domset_compulsory_usage' (ts : list task) (time : Z) (ds : domset) :=
+Fixpoint negcl_compulsory_usage' (ts : list task) (time : Z) (cl : clause) :=
   match ts with
   | nil => O
   | cons t ts' =>
-    if domset_compulsoryb t time ds then
-      plus t.(resource) (domset_compulsory_usage' ts' time ds)
+    if negcl_compulsoryb t time cl then
+      plus t.(resource) (negcl_compulsory_usage' ts' time cl)
     else
-      domset_compulsory_usage' ts' time ds
+      negcl_compulsory_usage' ts' time cl
   end.
 
-Definition domset_compulsory_usage (c : cumul) (time : Z) (ds : domset) :=
-  domset_compulsory_usage' c.(tasks) time ds.
+Definition negcl_compulsory_usage (c : cumul) (time : Z) (cl : clause) :=
+  negcl_compulsory_usage' c.(tasks) time cl.
+
     
-Theorem domset_compulsory_usage_bound :
-  forall (ts : list task) (time : Z) (ds : domset) (theta : valuation),
-    eval_domset ds theta -> 
-      (domset_compulsory_usage' ts time ds) <= (eval_usage ts time theta).
+Theorem negcl_compulsory_usage_bound :
+  forall (ts : list task) (time : Z) (cl : clause) (theta : asg),
+    ~ eval_clause cl theta -> 
+      (negcl_compulsory_usage' ts time cl) <= (eval_usage ts time theta).
 Proof.
   intros; induction ts.
-    unfold domset_compulsory_usage', eval_usage; omega.
-    unfold domset_compulsory_usage', eval_usage;
-      fold domset_compulsory_usage'; fold eval_usage.
-    assert (domset_compulsoryb a time ds = true <-> domset_compulsory a time ds).
-      apply domset_compulsoryb_true_iff.
-    destruct domset_compulsoryb.
-      assert (domset_compulsory a time ds). tauto.
+    unfold negcl_compulsory_usage', eval_usage; omega.
+    unfold negcl_compulsory_usage', eval_usage;
+      fold negcl_compulsory_usage'; fold eval_usage.
+    assert (negcl_compulsoryb a time cl = true <-> negcl_compulsory a time cl).
+      apply negcl_compulsoryb_true_iff.
+    destruct negcl_compulsoryb.
+      assert (negcl_compulsory a time cl). tauto.
       apply plus_le_compat.
-        rewrite domset_compulsory_task_usage with (ds := ds). clear H0; omega.
+        rewrite negcl_compulsory_task_usage with (cl := cl). clear H0; omega.
         tauto.
-        assumption.
       exact IHts.
       rewrite plus_comm; apply le_plus_trans; exact IHts.
 Qed.
   
-Definition check_cumul_moment (c : cumul) (ds : domset) (t : Z) :=
-  negb (Compare_dec.leb (domset_compulsory_usage c t ds) c.(limit)).
+Definition check_cumul_moment (c : cumul) (cl : clause) (t : Z) :=
+  negb (Compare_dec.leb (negcl_compulsory_usage c t cl) c.(limit)).
 
-Definition CumulConstraint : Constraint :=
-  mkConstraint (cumul) (eval_cumul).
-
-Theorem check_cumul_moment_valid : forall (c : cumul) (ds : domset) (t : Z) (theta : valuation),
-  check_cumul_moment c ds t = true -> eval_domset ds theta -> eval_cumul c theta -> False.
+Theorem check_cumul_moment_valid : forall (c : cumul) (cl : clause) (t : Z) (theta : asg),
+  check_cumul_moment c cl t = true -> eval_cumul c theta -> eval_clause cl theta.
 Proof.
-  intros c ds t theta.
+  intros c cl t theta.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta). tauto.
+  destruct H.
+    tauto.
   unfold check_cumul_moment. rewrite negb_true_iff.
-  intros. apply leb_iff_conv in H.
-  unfold eval_cumul in H1; specialize (H1 t). 
-  assert (domset_compulsory_usage c t ds <= (eval_usage (tasks c) t theta)).
-    apply domset_compulsory_usage_bound.
-    assumption.
-  omega.
+  intros. apply leb_iff_conv in H0.
+  unfold eval_cumul in H1. 
+  assert (negcl_compulsory_usage c t cl <= (eval_usage (tasks c) t theta)).
+    apply negcl_compulsory_usage_bound; exact H.
+  assert (eval_usage (tasks c) t theta <= limit c).
+    apply H1.
+  assert False.
+    omega.
+  tauto.
 Qed.
 
 (* Check the beginning of the (possibly empty) compulsory region for t. *)
-Definition check_cumul_tt_start (c : cumul) (ds : domset) (t : task) :=
-  match (fst (var_dom ds t.(svar))) with
+Definition check_cumul_tt_start (c : cumul) (cl : clause) (t : task) :=
+  match db_from_negclause t.(svar) cl with
   | (Bounded lb, Bounded ub) =>
-      Z.ltb ub (lb + (Z_of_nat t.(duration))) && check_cumul_moment c ds ub
+      Z_ltb ub (lb + (Z_of_nat t.(duration))) && check_cumul_moment c cl ub
   | _ => false
   end.
-Theorem check_cumul_tt_start_valid : forall (c : cumul) (ds : domset) (t : task) (theta : valuation),
-  check_cumul_tt_start c ds t = true -> eval_domset ds theta -> eval_cumul c theta -> False.
+Theorem check_cumul_tt_start_valid : forall (c : cumul) (cl : clause) (t : task) (theta : asg),
+  check_cumul_tt_start c cl t = true -> eval_cumul c theta -> eval_clause cl theta.
 Proof.
-  unfold check_cumul_tt_start. intros c ds t theta; generalize (fst (var_dom ds (svar t))).
+  unfold check_cumul_tt_start. intros c cl t theta; generalize (db_from_negclause (svar t) cl).
   intro p; destruct p. destruct b, b0.
     intros; discriminate.
     intros; discriminate.
     intros; discriminate.
     rewrite andb_true_iff.
     intros; destruct H as [_ H].
-    now apply check_cumul_moment_valid with (c := c) (t := z0) (theta := theta) in H.
+    apply check_cumul_moment_valid with (c := c) (t := z0).
+    exact H. exact H0.
 Qed.
   
-Fixpoint check_cumul_timetable (c : cumul) (ds : domset) (ts : list task) :=
+Fixpoint check_cumul_timetable (c : cumul) (cl : clause) (ts : list task) :=
   match ts with
   | nil => false
   | cons t ts' =>
-    check_cumul_tt_start c ds t || check_cumul_timetable c ds ts'
+    check_cumul_tt_start c cl t || check_cumul_timetable c cl ts'
   end.
-Theorem check_cumul_timetable_valid : forall (c : cumul) (ds : domset) (ts : list task) (theta : valuation),
-  check_cumul_timetable c ds ts = true ->
-    eval_domset ds theta -> eval_cumul c theta -> False.
+Theorem check_cumul_timetable_valid : forall (c : cumul) (cl : clause) (ts : list task) (theta : asg),
+  check_cumul_timetable c cl ts = true ->
+    eval_cumul c theta -> eval_clause cl theta.
 Proof.
-  intros c ds ts theta; induction ts.
+  intros c cl ts theta; induction ts.
     unfold check_cumul_timetable, eval_cumul. intros; discriminate.
 
     unfold check_cumul_timetable; fold check_cumul_timetable.
     rewrite orb_true_iff; intros. destruct H.
-    now apply check_cumul_tt_start_valid with (c := c) (t := a) (theta := theta) in H.
+    apply check_cumul_tt_start_valid with (c := c) (t := a).
+    exact H.
+    exact H0.
 
     apply IHts.
       exact H.
       exact H0.
-      exact H1.
 Qed.
 
-Definition check_cumul_pair (c : cumul) (tx ty : task) (ds : domset) :=
-  let (lb, ub) := fst (var_dom ds tx.(svar)) in
-  match lb with
+Definition check_cumul_pair (c : cumul) (tx ty : task) (cl : clause) :=
+  match fst (db_from_negclause tx.(svar) cl) with
   | Unbounded => false
   | Bounded lb =>
-    match ub with
+    match snd (db_from_negclause ty.(svar) cl) with
     | Unbounded => false
     | Bounded ub_y =>
       let ub := (Zplus ub_y (Z_of_nat (S ty.(duration)))) in
       (* Clause is trivial. *)
-      (Z.leb lb ub) &&
+      (Z_leb lb ub) &&
         (Compare_dec.leb
           (S (mult c.(limit) (Zabs_nat (ub - lb))))
-          (domset_usage c.(tasks) ds lb ub))
+          (negcl_usage c.(tasks) cl lb ub))
     end
   end.
-
-Theorem check_cumul_pair_valid :
-  forall (c : cumul) (tx ty : task) (ds : domset) (theta : valuation),
-    check_cumul_pair c tx ty ds = true ->
-      eval_domset ds theta -> eval_cumul c theta -> False.
+Theorem check_cumul_pair_true_impl_negcl :
+  forall (c : cumul) (tx ty : task) (cl : clause) (theta : asg),
+    check_cumul_pair c tx ty cl = true ->
+      ~ eval_clause cl theta -> ~ eval_cumul c theta.
 Proof.
   unfold check_cumul_pair.
-  intros c tx ty ds theta.
-  (*
+  intros c tx ty cl theta.
   assert (eval_cumul c theta \/ ~ eval_cumul c theta).
     tauto.
-*)
-  generalize (fst (var_dom ds (svar tx))); destruct d; destruct b, b0;
-    try (intros; discriminate).
+  generalize (fst (db_from_negclause (svar tx) cl)).
+  generalize (snd (db_from_negclause (svar ty) cl)).
+  intros b b0; destruct b, b0.
+    intros; discriminate. 
+    intros; discriminate.
+    intros; discriminate.
     (* generalize (Zplus z (Z_of_nat (duration ty))); intro. *)
-    generalize (Zplus z0 (Z_of_nat (S (duration ty)))); intro.
+    generalize (Zplus z (Z_of_nat (S (duration ty)))); intro.
     rewrite andb_true_iff.
-    rewrite Z.leb_le.
+    rewrite Z_leb_iff_le.
     rewrite Compare_dec.leb_iff.
     intro H'. destruct H' as [Hlu Hlim].
-    assert (limit c * (Zabs_nat (z1 - z)) <= domset_usage (tasks c) ds z z1) as Hlim'.
+    assert (limit c * (Zabs_nat (z1 - z0)) <= negcl_usage (tasks c) cl z0 z1) as Hlim'.
       omega.
-    intros Hnotcl H.
-      assert (span_usageZ (tasks c) z z1 theta <= (limit c)*(Zabs_nat (Zminus z1 z))).
+    intro Hnotcl.
+    destruct H.
+      assert (Hbound := H).
+      assert (span_usageZ (tasks c) z0 z1 theta <= (limit c)*(Zabs_nat (Zminus z1 z0))).
         apply span_usageZ_lim.
         split.
           exact Hlu.
           exact H.
-      assert (domset_usage (tasks c) ds z z1 <= span_usageZ (tasks c) z z1 theta).
-        apply domset_usage_le_span_usage.
-        assumption.
-        omega.
-        omega.
+      assert (negcl_usage (tasks c) cl z0 z1 <= span_usageZ (tasks c) z0 z1 theta).
+        apply negcl_usage_le_span_usage.
+        split.
+          exact Hnotcl.
+          exact Hlu.
+      omega.
+      exact H.
+Qed.
+
+Theorem check_cumul_pair_valid :
+  forall (c : cumul) (tx ty : task) (cl : clause) (theta : asg),
+    check_cumul_pair c tx ty cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
+Proof.
+  intros.
+  assert (eval_clause cl theta \/ ~ eval_clause cl theta).
+    tauto.
+  destruct H1.
+    exact H1.
+    apply check_cumul_pair_true_impl_negcl with
+      (theta := theta) in H.
+    tauto.
+
+    exact H1.
 Qed.
 
 Fixpoint check_cumul_pairs
-  (c : cumul) (tx : task) (tail : list task) (ds : domset) :=
+  (c : cumul) (tx : task) (tail : list task) (cl : clause) :=
   match tail with
   | nil => false
   | cons ty tail' =>
-      (check_cumul_pair c tx ty ds) || (check_cumul_pairs c tx tail' ds)
+      (check_cumul_pair c tx ty cl) || (check_cumul_pairs c tx tail' cl)
   end.
 Theorem check_cumul_pairs_valid :
   forall (c : cumul) (tx : task) (tail : list task)
-    (ds : domset) (theta : valuation),
-    check_cumul_pairs c tx tail ds = true ->
-      eval_domset ds theta -> eval_cumul c theta -> False.
+    (cl : clause) (theta : asg),
+    check_cumul_pairs c tx tail cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
 Proof.
   intros; induction tail.
     unfold check_cumul_pairs in H.
@@ -591,20 +616,20 @@ Proof.
       exact H.
       exact H0.
 
-      assumption.
-      tauto.
+      apply IHtail in H.
+      exact H.
 Qed.
     
-Fixpoint check_cumul_rec (c : cumul) (tail : list task) (ds : domset) :=
+Fixpoint check_cumul_rec (c : cumul) (tail : list task) (cl : clause) :=
   match tail with
   | nil => false
   | cons t tail' =>
-      (check_cumul_pairs c t c.(tasks) ds) || (check_cumul_rec c tail' ds)
+      (check_cumul_pairs c t c.(tasks) cl) || (check_cumul_rec c tail' cl)
   end.
 Theorem check_cumul_rec_valid :
-  forall (c : cumul) (tail : list task) (ds : domset) (theta : valuation),
-    check_cumul_rec c tail ds = true ->
-      eval_domset ds theta -> eval_cumul c theta -> False.
+  forall (c : cumul) (tail : list task) (cl : clause) (theta : asg),
+    check_cumul_rec c tail cl = true ->
+      eval_cumul c theta -> eval_clause cl theta.
 Proof.
   intros; induction tail.
     unfold check_cumul_rec in H; discriminate.
@@ -613,60 +638,74 @@ Proof.
     destruct H.
       apply check_cumul_pairs_valid with (theta := theta) in H.
       exact H. exact H0.
-      tauto.
-      tauto.
+
+      apply IHtail in H. exact H.
 Qed.
   
-Definition check_cumul_e (c : cumul) (ds : domset) :=
-  check_cumul_rec c c.(tasks) ds.
+Definition check_cumul_e (c : cumul) (cl : clause) :=
+  check_cumul_rec c c.(tasks) cl.
 
-Theorem check_cumul_e_valid : forall (c : cumul) (ds : domset),
-  check_cumul_e c ds = true -> cst_is_unsat CumulConstraint c ds.
+Theorem check_cumul_e_valid : forall (c : cumul) (cl : clause),
+  check_cumul_e c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  unfold cst_is_unsat, CumulConstraint, eval, check_cumul_e. intros.
-  apply check_cumul_rec_valid with (c := c) (tail := tasks c) (theta := theta) in H; tauto.
+  unfold implies, check_cumul_e. intros.
+  apply check_cumul_rec_valid with (c := c) (tail := tasks c).
+  exact H. exact H0.
 Qed.
 
-Definition check_cumul_tt (c : cumul) (ds : domset) :=
+Definition check_cumul_tt (c : cumul) (cl : clause) :=
   (* check_cumul c cl || check_cumul_timetable c cl c.(tasks). *)
-  check_cumul_timetable c ds c.(tasks) || check_cumul_e c ds.
-Theorem check_cumul_tt_valid : forall (c : cumul) (ds : domset),
-  check_cumul_tt c ds = true -> cst_is_unsat CumulConstraint c ds.
+  check_cumul_timetable c cl c.(tasks) || check_cumul_e c cl.
+Theorem check_cumul_tt_valid : forall (c : cumul) (cl : clause),
+  check_cumul_tt c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  unfold check_cumul_tt; intros c ds; rewrite orb_true_iff.
+  unfold check_cumul_tt; intros c cl; rewrite orb_true_iff.
   intro. destruct H.
 
-    unfold cst_is_unsat, CumulConstraint, eval, check_cumul_timetable. intros.
-    now apply check_cumul_timetable_valid with (c := c) (ts := tasks c) (theta := theta) in H.
+    unfold implies. intros.
+    apply check_cumul_timetable_valid with (c := c) (ts := tasks c).
+    exact H. exact H0.
 
-    now apply check_cumul_e_valid.
+    apply check_cumul_e_valid; exact H.
 Qed.
   
-Definition check_cumul_ttonly (c : cumul) (ds : domset) :=
-  check_cumul_timetable c ds c.(tasks).
-Theorem check_cumul_ttonly_valid : forall (c : cumul) (ds : domset),
-  check_cumul_ttonly c ds = true -> cst_is_unsat CumulConstraint c ds.
+Definition check_cumul_ttonly (c : cumul) (cl : clause) :=
+  check_cumul_timetable c cl c.(tasks).
+Theorem check_cumul_ttonly_valid : forall (c : cumul) (cl : clause),
+  check_cumul_ttonly c cl = true -> implies (eval_cumul c) (eval_clause cl).
 Proof.
-  unfold check_cumul_ttonly, cst_is_unsat, CumulConstraint; intros.
-  now apply check_cumul_timetable_valid with (c := c) (ts := tasks c) (theta := theta) in H.
+  unfold check_cumul_ttonly, implies; intros.
+  apply check_cumul_timetable_valid with (c := c) (ts := tasks c).
+  assumption. assumption.
 Qed.
 (*
 Definition CumulConstraint (C : Constraint) : Constraint :=
   mkConstraint (cumul) (eval_cumul) (check_cumul) (check_cumul_valid).
   *)
-Definition CumulCheck := mkUnsatChecker
+Definition CumulConstraint : Constraint :=
+  mkConstraint (cumul) (eval_cumul).
+Definition CumulBnd := BoundedConstraint CumulConstraint.
+  
+Definition CumulCheck := mkChecker
   CumulConstraint (check_cumul_tt) (check_cumul_tt_valid).
+Definition CumulBndCheck := BoundedChecker CumulConstraint CumulCheck.
+Definition check_cumul_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (check CumulBnd CumulBndCheck) (bs, c) cl.
 
-Definition CumulTTCheck := mkUnsatChecker
+Definition CumulTTCheck := mkChecker
   CumulConstraint (check_cumul_ttonly) (check_cumul_ttonly_valid).
+Definition CumulBndTTCheck := BoundedChecker CumulConstraint CumulTTCheck.
 
-Fixpoint min_start (ts : list task) (theta : valuation) :=
+Definition check_cumul_tt_bnd (c : cumul) (bs : list (ivar*Z*Z)) (cl : clause) := 
+  (check CumulBnd CumulBndTTCheck) (bs, c) cl.
+
+Fixpoint min_start (ts : list task) (theta : asg) :=
   match ts with
   | nil => 0%Z
   | cons t ts' => Z.min (eval_start t theta) (min_start ts' theta)
   end.
 
-Theorem min_start_empty : forall (ts : list task) (theta : valuation) (time : Z),
+Theorem min_start_empty : forall (ts : list task) (theta : asg) (time : Z),
   Zlt time (min_start ts theta) -> eval_usage ts time theta = 0.
 Proof.
   intros ts theta time; induction ts; unfold min_start, eval_usage; fold min_start; fold eval_usage; intros; try trivial.
@@ -676,9 +715,9 @@ Proof.
   omega.
   rewrite IHts.
   unfold task_at_time.
-  remember (Z.leb (eval_start a theta) time) as ple.
+  remember (Z_leb (eval_start a theta) time) as ple.
   destruct ple.
-  apply eq_sym in Heqple; rewrite Z.leb_le in Heqple.
+  apply eq_sym in Heqple; rewrite Z_leb_iff_le in Heqple.
   clear IHts; omega.
   rewrite andb_false_l; omega.
   assert (Zle (Z.min (eval_start a theta) (min_start ts theta)) (min_start ts theta)).
@@ -686,12 +725,12 @@ Proof.
   omega.
 Qed.
 
-Fixpoint max_end (ts : list task) (theta : valuation) :=
+Fixpoint max_end (ts : list task) (theta : asg) :=
   match ts with
   | nil => 0%Z
   | cons t ts' => Z.max (eval_end t theta) (max_end ts' theta)
   end.
- Theorem max_end_empty : forall (ts : list task) (theta : valuation) (time : Z),
+ Theorem max_end_empty : forall (ts : list task) (theta : asg) (time : Z),
   Zlt (max_end ts theta) time -> eval_usage ts time theta = 0.
 Proof.
   intros ts theta time; induction ts; unfold max_end, eval_usage; fold max_end; fold eval_usage; intros; try trivial.
@@ -701,9 +740,9 @@ Proof.
   omega.
   rewrite IHts.
   unfold task_at_time.
-  remember (Z.ltb time (eval_end a theta)) as ple.
+  remember (Z_ltb time (eval_end a theta)) as ple.
   destruct ple.
-  apply eq_sym in Heqple; rewrite Z.ltb_lt in Heqple.
+  apply eq_sym in Heqple; rewrite Z_ltb_iff_lt in Heqple.
   clear IHts; omega.
   rewrite andb_false_r; omega.
   assert (Zle (max_end ts theta) (Z.max (eval_end a theta) (max_end ts theta))).
@@ -711,14 +750,14 @@ Proof.
   omega.
 Qed.
 
-Fixpoint span_max (ts : list task) (start : Z) (sz : nat) (theta : valuation) :=
+Fixpoint span_max (ts : list task) (start : Z) (sz : nat) (theta : asg) :=
   match sz with
   | O => 0%nat
   | S sz' =>
      max (eval_usage ts (start+(Zpred (Z_of_nat sz))) theta) (span_max ts start sz' theta)
   end.
 
-Theorem span_max_ub_nat : forall (ts : list task) (start : Z) (sz : nat) (k : nat) (theta : valuation),
+Theorem span_max_ub_nat : forall (ts : list task) (start : Z) (sz : nat) (k : nat) (theta : asg),
   lt k sz ->
     (eval_usage ts (Zplus start (Z_of_nat k)) theta) <= span_max ts start sz theta.
 Proof.
@@ -742,7 +781,7 @@ Proof.
     apply Max.le_max_l.
 Qed.
 
-Theorem span_max_ub_range : forall (ts : list task) (lb ub k : Z) (theta : valuation),
+Theorem span_max_ub_range : forall (ts : list task) (lb ub k : Z) (theta : asg),
   Zle lb k /\ Zle k ub ->
     le (eval_usage ts k theta) (span_max ts lb (S (Zabs_nat (Zminus ub lb))) theta).
 Proof.
@@ -762,11 +801,11 @@ Proof.
   omega.
 Qed.
   
-Definition check_cumul_sol (c : cumul) (theta : valuation) :=
+Definition check_cumul_sol (c : cumul) (theta : asg) :=
   let start := min_start (tasks c) theta in
   let last := max_end (tasks c) theta in
   Compare_dec.leb (span_max (tasks c) start (S (Zabs_nat (Zminus last start))) theta) (limit c).
-Theorem check_cumul_sol_valid : forall (c : cumul) (theta : valuation),
+Theorem check_cumul_sol_valid : forall (c : cumul) (theta : asg),
   check_cumul_sol c theta = true -> eval_cumul c theta.
 Proof.
   intros c theta; destruct c;
@@ -792,4 +831,4 @@ Proof.
     omega.
 Qed.    
 
-Definition CumulSolCheck := mkSolChecker CumulConstraint check_cumul_sol check_cumul_sol_valid.
+Definition CumulSolCheck := mkSolCheck CumulConstraint check_cumul_sol check_cumul_sol_valid.

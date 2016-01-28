@@ -1,9 +1,9 @@
 (* Operations on domains/intervals. *)
 Require Import ZArith.
 Require Import Psatz.
-Require Import range.
-Require Import range_properties.
+Require Import bounds.
 Require Import domain.
+(* Require Import Psatz. *)
 
 Ltac unfold_satdb := unfold sat_dbound, sat_lb, sat_ub in *; simpl.
 
