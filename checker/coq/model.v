@@ -7,6 +7,8 @@ Require linear.
 Require element.
 Require cumulative.
 Require arith.
+Require lit.
+Require clause_domain.
 
 (* Model bound *)
 Definition model_bound := (ivar * (val * val))%type.
@@ -17,14 +19,13 @@ Inductive cst :=
   | Lin : linear.LinearCon.(T) -> cst
   | Elem : element.ElemConstraint.(T) -> cst  
   | Cumul : cumulative.CumulConstraint.(T) -> cst  
-(*
-  | Clause : ClauseCon.(T) -> cst
-*)
+  | Clause : clause_domain.ClauseCst.(T) -> cst
   | Arith : arith.ArithConstraint.(T) -> cst.
 
 Definition make_linear xs k := Lin (xs, k).
 Definition make_element x y ks := Elem (element.Element x y ks).
 Definition make_cumul (c : cumulative.cumul) := Cumul c.                                  
+Definition make_clause (cl : lit.clause) := Clause cl.
 
 Definition cst_id := Z.
 Definition csts := list (cst_id * cst).
@@ -34,9 +35,7 @@ Definition eval_cst c (theta : valuation) := match c with
   | Lin x => linear.LinearCon.(eval) x theta
   | Elem x => element.ElemConstraint.(eval) x theta
   | Cumul x => cumulative.CumulConstraint.(eval) x theta
-(*
-  | Clause x => ClauseCon.(eval) x theta
-*)
+  | Clause x => clause_domain.ClauseCst.(eval) x theta
   | Arith x => arith.ArithConstraint.(eval) x theta
   end.
 
@@ -49,6 +48,7 @@ Definition check_cst_unsat c (ds : domset) := match c with
   | Lin x => check_unsat linear.LinearCon linear.CheckLinearUnsat x ds
   | Elem x => check_unsat element.ElemConstraint element.ElemCheckUnsat x ds
   | Cumul x => check_unsat cumulative.CumulConstraint cumulative.CumulCheck x ds
+  | Clause x => check_unsat clause_domain.ClauseCst clause_domain.ClauseCheckUnsat x ds
   | Arith x => check_unsat arith.ArithConstraint arith.ArithCheck x ds
   end.
 
@@ -71,6 +71,7 @@ Definition check_cst_sol c (sol : valuation) := match c with
   | Lin x => check_sol linear.LinearCon linear.LinearSolCheck x sol
   | Elem x => check_sol element.ElemConstraint element.ElementSolCheck x sol
   | Cumul x => check_sol cumulative.CumulConstraint cumulative.CumulSolCheck x sol
+  | Clause x => check_sol clause_domain.ClauseCst clause_domain.ClauseSolCheck x sol
   | Arith x => check_sol arith.ArithConstraint arith.ArithSolCheck x sol
   end.
 

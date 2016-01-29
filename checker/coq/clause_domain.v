@@ -3,6 +3,7 @@ Require Import assign.
 Require Import lit.
 Require Import domain.
 Require Import range.
+Require Import constraint.
 Require map.
 
 Local Open Scope Z_scope.
@@ -81,6 +82,33 @@ Proof.
   split; intros H; [destruct H ; assumption | split ; [ apply eval_domset_empty | assumption] ].
 Qed.
 
+Definition ClauseCst := mkConstraint clause eval_clause.
+
+Fixpoint check_clause_unsat cl ds :=
+  match cl with
+  | nil => true
+  | cons l cl' =>
+    if lit_unsatb ds l then check_clause_unsat cl' ds else false
+  end.
+
+Lemma check_clause_unsat_valid : forall cl ds, check_clause_unsat cl ds = true -> cst_is_unsat ClauseCst cl ds.
+Proof.
+  intros cl ds; unfold ClauseCst, cst_is_unsat, eval; induction cl.
+
+  tsimpl. 
+
+  unfold check_clause_unsat, eval_clause; fold check_clause_unsat; fold eval_clause; ifelim.
+  apply lit_unsatb_unsat in H0; unfold lit_unsat in H0.
+  tsimpl.
+  destruct H2; [apply H0 with (theta := theta) | apply IHcl with (theta := theta) ]; tauto.
+  congruence.
+Qed.
+
+Definition ClauseCheckUnsat := mkUnsatChecker ClauseCst check_clause_unsat check_clause_unsat_valid.
+
+Lemma evalb_clause_sol : forall cl sol, evalb_clause cl sol = true -> eval_clause cl sol.
+Proof. intros; apply evalb_clause_iff; exact H. Qed.
+Definition ClauseSolCheck := mkSolChecker ClauseCst evalb_clause evalb_clause_sol.
 (*
 Lemma domset_with_prod_iff : forall ds p theta, 
   eval_domset (domset_with_prod ds p) theta <-> eval_domset ds theta /\ eval_prod p theta.

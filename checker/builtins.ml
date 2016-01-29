@@ -33,10 +33,28 @@ let minfo_parse_linear_le minfo tokens =
 
 
 (* FIXME: Add clause parser *)
-(*
+let minfo_parse_vprop minfo = 
+  let aux x = parser
+    | [< 'GL.Kwd "<=" ; k = S.intconst >] -> C_impl.Pos (C_impl.ILeq (x, k))
+    | [< 'GL.Kwd "<" ; k = S.intconst >] -> C_impl.Pos (C_impl.ILeq (x, (k-1)))
+    | [< 'GL.Kwd "=" ; k = S.intconst >] -> C_impl.Pos (C_impl.IEq (x, k))
+    | [< 'GL.Kwd ">" ; k = S.intconst >] -> C_impl.Neg (C_impl.ILeq (x, k))
+    | [< 'GL.Kwd ">=" ; k = S.intconst >] -> C_impl.Neg (C_impl.ILeq (x, (k-1)))
+  in
+  parser
+    | [< 'GL.Ident x ; vp = aux (Pr.get_ivar minfo x) >] -> vp
+
+let neglit = function
+  | C_impl.Pos vp -> C_impl.Neg vp
+  | C_impl.Neg vp -> C_impl.Pos vp
+            
+let minfo_parse_lit minfo = parser
+  | [< 'GL.Kwd "~" ; vp = minfo_parse_vprop minfo >] -> neglit vp
+  | [< vp = minfo_parse_vprop minfo >] -> vp
+
 let minfo_parse_clause minfo toks =
-  let cl0 = 
-    *)
+  let cl0 = S.listof (minfo_parse_lit minfo) toks in 
+  C_impl.make_clause cl0
 
 let parse_element minfo tokens =
   let (x, (i, ys)) =

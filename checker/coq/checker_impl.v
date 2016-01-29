@@ -15,6 +15,7 @@ Extraction "checker_impl.ml"
   model.make_linear
   model.make_cumul
   model.make_element
+  model.make_clause
 
   resolution.resolvable
 
