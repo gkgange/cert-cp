@@ -633,14 +633,14 @@ Proof.
   intros; now apply check_model_sol_valid.
 Qed.
 
-Definition domset_with_lt ds x k := apply_vardom ds x (dom_le k).
-Lemma domset_with_lt_iff : forall ds x k theta, eval_domset ds theta /\ (theta x <= k) <-> eval_domset (domset_with_lt ds x k) theta.
+Definition domset_with_lt ds x k := apply_vardom ds x (dom_le (k-1)).
+Lemma domset_with_lt_iff : forall ds x k theta, eval_domset ds theta /\ (theta x < k) <-> eval_domset (domset_with_lt ds x k) theta.
 Proof.
   intros; unfold domset_with_lt; tsimpl.
-  apply apply_vardom_1; [exact H | now apply dom_le_spec].
-  now apply apply_vardom_2l with (x := x) (d := (dom_le k)).
+  apply apply_vardom_1; [exact H | apply dom_le_spec; omega].
+  now apply apply_vardom_2l with (x := x) (d := (dom_le (k-1))).
   apply apply_vardom_2r in H.
-  now apply dom_le_spec in H.
+  apply dom_le_spec in H; omega.
 Qed.
 
 Definition certify_optimal (m : model) (obj : ivar) (sol : valuation) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
