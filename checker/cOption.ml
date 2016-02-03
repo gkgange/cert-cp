@@ -9,6 +9,7 @@ let objective = ref None
 let verbosity = ref 0
 
 let stream = ref false
+let no_resolve = ref false
 
 type trace_kind =
   | IDrup (* DRUP with axiom introduction. *)
@@ -33,6 +34,10 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
      ("-stream",
       Arg.Unit(fun () -> stream := true),
       " avoid storing inferences; check them immediately on reading."
+     ) ;
+     ("-no-resolve",
+      Arg.Unit (fun () -> no_resolve := true),
+      " check inferences, but not resolution steps."
      ) ;
      ("-trace",
       Arg.String(fun f -> tracefile := Some f),

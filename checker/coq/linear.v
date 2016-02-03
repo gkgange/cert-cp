@@ -57,20 +57,6 @@ Proof.
   exact IHts.
 Qed.
 
-(*
-Theorem notlinsumdb_negcl_impl_clause : forall (ts : list linterm) (ds : domset) (theta : valuation),
-  ~ sat_dbound (linsum_db_from_dom ts cl) (eval_linsum ts theta) -> eval_clause cl theta.
-Proof.
-  intros.
-  assert (eval_clause cl theta \/ ~ eval_clause cl theta). apply dec_evalclause.
-  destruct H0.
-  exact H0.
-  assert (sat_dbound (linsum_db_from_dom ts cl) (eval_linsum ts theta)).
-  apply linsum_db_valid. exact H0.
-  tauto.
-Qed.
-*)
-
 Definition eval_lincon lincon (theta : valuation) :=
   (eval_linsum (fst lincon) theta) <= (snd lincon).
 

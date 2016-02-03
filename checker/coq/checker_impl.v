@@ -16,13 +16,19 @@ Extraction "checker_impl.ml"
   model.make_cumul
   model.make_element
   model.make_clause
+  model.domset_of_bounds
 
   resolution.resolvable
 
   log.asg
   log.asg_of_alist
+  log.cst_map_of_csts
   log.certify_unsat
   log.certify_optimal
   log.check_inference_model
+  log.check_inference_domset
+
+  log.domset_with_lt
+  log.check_inference
 
   nat_of_int int_of_nat.

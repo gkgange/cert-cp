@@ -579,6 +579,23 @@ Proof.
   intros m ss; unfold certify_unsat_list; apply certify_unsat_valid.
 Qed.
 
+Definition check_inference_domset (ds : domset) (cs : cst_map) (hint : Z) (cl : clause) :=
+  match ZMaps.find hint cs with
+  | None => check_tauto ds cl
+  | Some cst => check_inf ds cst cl
+  end.
+
+Lemma check_inference_domset_valid : forall ds cs hint cl,
+  check_inference_domset ds cs hint cl = true -> forall theta,
+    eval_domset ds theta -> eval_cstmap cs theta -> eval_clause cl theta.
+Proof.
+  unfold check_inference_domset; intros.
+  eqelim (ZMaps.find hint cs); zmap_simpl.
+  unfold eval_cstmap in H1; specialize (H1 hint c).
+  apply check_inf_valid with (bs := ds) (cst := c); tauto.
+  apply check_tauto_valid with (ds := ds); tauto.
+Qed.
+
 (*
 Lemma eval_domset_if_bounds : forall bs theta,
   eval_bounds bs theta -> eval_domset (bounds_domset bs) theta.
@@ -621,12 +638,6 @@ Proof.
 Qed.
 
 Definition certify_solution m sol := check_model_sol m sol.
-(*
-Definition certify_solution (m : model) (sol : valuation) :=
-  match m with
-  | (bs, cs) => andb (evalb_bounds bs sol) (check_csts_sol cs sol)
-  end.
-*)
 
 Theorem certify_solution_valid : forall m sol, certify_solution m sol = true -> eval_model m sol.
 Proof.

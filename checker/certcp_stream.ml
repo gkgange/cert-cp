@@ -51,6 +51,28 @@ let check_inferences model_info lmap toks =
     | C_impl.Del _ -> ()
   done
 
+let check_inferences_opt model_info obj k lmap toks =
+  let (bs, csts) = Pr.model_of_model_info model_info in 
+  let cst_map = C_impl.cst_map_of_csts csts in
+  let ds = C_impl.domset_with_lt (C_impl.domset_of_bounds bs) obj k in
+  let hint = ref (-1) in
+  let okay = ref true in
+  while !okay && Stream.peek toks <> None
+  do
+    match Pr.parse_step model_info lmap toks
+    with
+    | C_impl.Intro (id, cl) ->
+        if not (C_impl.check_inference_domset ds cst_map !hint cl) then
+          (okay := false; Format.fprintf fmt "Inference failed.@.")
+    | C_impl.Hint h -> hint := h
+    | C_impl.Resolve _ -> ()
+    | C_impl.Del _ -> ()
+  done ;
+  !okay
+
+let check_no_resolve model_info sol obj lmap toks =
+  C_impl.certify_solution (Pr.model_of_model_info model_info) sol && check_inferences_opt model_info obj (sol obj) lmap toks
+
 let check_resolution model_info lmap toks =
   let clause_db = H.create 17 in
   let okay = ref true in
@@ -119,14 +141,23 @@ let main () =
     let obj = Pr.get_ivar model_info ovar in
     let step0 = Pr.create model_info lmap ttoks in
     let next_step = Pr.next in
-    begin
-      Format.fprintf fmt "Checking optimality...@." ;
-      let okay = C_impl.certify_optimal model obj sol max_int step0 next_step in
-      if okay then
-        Format.fprintf fmt "@ successful.@."
-      else
-        Format.fprintf fmt "@ failed.@."
-    end
+    if !COption.no_resolve then
+      begin
+        let okay = check_no_resolve model_info sol obj lmap ttoks in
+        if okay then
+          Format.fprintf fmt "OKAY@."
+        else
+          Format.fprintf fmt "FAILED@."
+      end
+    else
+      begin
+        Format.fprintf fmt "Checking optimality...@." ;
+        let okay = C_impl.certify_optimal model obj sol max_int step0 next_step in
+        if okay then
+          Format.fprintf fmt "OKAY@."
+        else
+          Format.fprintf fmt "FAILED@."
+      end
   | (None, Some sol, Some tfile) ->
     Format.fprintf fmt "ERROR: Solution and trace provided, but no objective.@."
   | (_, Some sol, _) ->
@@ -134,9 +165,9 @@ let main () =
       Format.fprintf fmt "Checking solution...@." ;
       let okay = C_impl.certify_solution model sol in
       if okay then
-        Format.fprintf fmt "@ successful.@."
+        Format.fprintf fmt "OKAY@."
       else
-        Format.fprintf fmt "@ failed.@."
+        Format.fprintf fmt "FAILED@."
     end
   | (_, _, Some tfile) ->
     begin
@@ -151,9 +182,9 @@ let main () =
       Format.fprintf fmt "Checking unsatisfiability...@." ;
       let okay = C_impl.certify_unsat model max_int step0 next_step in
       if okay then
-        Format.fprintf fmt "@ successful.@."
+        Format.fprintf fmt "OKAY@."
       else
-        Format.fprintf fmt "@ failed.@."
+        Format.fprintf fmt "FAILED@."
     end
   | _ -> Format.fprintf fmt "ERROR: No solution or trace specified.@."
 

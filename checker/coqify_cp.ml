@@ -124,8 +124,9 @@ let write_coq_cst fmt id cst =
     | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
     | C_impl.Elem obj -> let (x, y, ks) = Obj.magic obj in write_elem fmt x y ks
     | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
-    (* | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs *)
+    | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
     | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
+    | C_impl.Tauto -> ()
   end ;
   Format.fprintf fmt ")@]"
     

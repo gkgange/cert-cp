@@ -7,6 +7,7 @@ val litfile : string option ref
 val modules : string list ref
 val verbosity : int ref
 val stream : bool ref
+val no_resolve : bool ref
 
 type trace_kind =
   | IDrup (* DRUP with axiom introduction. *)
