@@ -6,6 +6,8 @@
 #include "boolset.h"
 
 struct fdres_env {
+  fdres_env(void) { }
+
   fdres_env(int sz)
     : dom(sz, domain()), dom_0(sz, domain()), changes(sz) {
 
@@ -27,6 +29,7 @@ struct fdres_env {
   }
 
   bool post(atom at) {
+    growTo(at.var+1);
     changes.insert(at.var);
     return dom[at.var].apply(at.kind, at.val);
   }

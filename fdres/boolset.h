@@ -25,7 +25,7 @@ public:
 
   void grow(void) { is_touched.push(false); }
   void growTo(int newsz) {
-    while(size() < newsz)
+    while(limit() < newsz)
       grow();
   }
 
@@ -34,6 +34,7 @@ public:
 
   int* begin(void) { return touched.begin(); }
   int* end(void) { return touched.end(); }
+  int operator[](int i) { return touched[i]; }
 
   vec<bool> is_touched;
   vec<int> touched;

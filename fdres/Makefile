@@ -50,5 +50,5 @@ clean :
 -include $(DEPS)
 -include $(TARGETDEPS)
 
-%.d: %.c
-	@$(CXX) -MM -MT  $(subst .d,.o,$@) -MT $@ $(CXXFLAGS) $< > $@
+#%.d : %.cpp
+#	@$(CXX) -MM -MT  $(subst .d,.o,$@) -MT $@ $(CXXFLAGS) $< > $@

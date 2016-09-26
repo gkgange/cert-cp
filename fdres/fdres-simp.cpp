@@ -10,19 +10,18 @@
 
 // Inline literal semantics and discard any tautologies.
 // i.e. x < 3 => x < 4.
-struct atom_t { int var; AtKind op; int val; };
-// typedef std::unordered_map<int, atom_t> atom_table;
 
 struct opts {
   enum out_t { O_Bool, O_Sem };
 
   opts(void)
     : infile(nullptr), outfile(nullptr),
-      outmode(O_Sem) {
+      out_mode(O_Sem), drop_unit(false) {
   }
   const char* infile;
   const char* outfile; 
-  out_t outmode;
+  out_t out_mode;
+  bool drop_unit;
 };
 
 bool is_tauto(fdres_env& env, vec<atom>& lemma) {
@@ -38,13 +37,13 @@ bool is_tauto(fdres_env& env, vec<atom>& lemma) {
 
 const char* op_str[] = { ">", "<=", "!=", "=" };
 void print_atom(atom at) {
-  fprintf(stdout, " x%d%s%d", at.var, op_str[at.kind], at.val);
+  fprintf(stdout, " v%d%s%d", at.var, op_str[at.kind], at.val);
 }
 void print_intro(int id, vec<atom>& lemma) {
   fprintf(stdout, "%d", id);
   for(atom at : lemma)
     print_atom(at);
-  fprintf(stdout, " 0\n");
+  fprintf(stdout, " 0 0\n");
 }
 
 void print_del(int id) {
@@ -68,8 +67,25 @@ void print_comment(std::string& comment) {
 
 struct clause_info_t { int id ; int count; };
 
+int parse_options(opts& o, int argc, char** argv) {
+  int jj = 1;
+  for(int ii = 1; ii < argc; ++ii) {
+    if(strcmp(argv[ii], "-drop-unit") == 0) {
+      fprintf(stderr, "WARNING: -drop-unit not yet implemented\n");
+      o.drop_unit = true;
+    } else if(strcmp(argv[ii], "-bool") == 0) {
+      o.out_mode = opts::O_Bool;
+    } else {
+      argv[jj++] = argv[ii];
+    }
+  }
+  return jj;
+}
+
 int main(int argc, char** argv) {
   // Load the proof file. 
+  opts o;
+  argc = parse_options(o, argc, argv);
 
   // gzFile in_file = (argc == 1) ? gzdopen(0, "rb") : gzopen(argv[1], "rb");
   gzFile lit_file = gzopen(argv[1], "rb");
@@ -81,7 +97,7 @@ int main(int argc, char** argv) {
 
   gzclose(lit_file);
 
-  // Allocate teh environment
+  // Allocate the environment
   fdres_env env(atable.nvars());
 
   // Now, read the proof directives
@@ -91,6 +107,7 @@ int main(int argc, char** argv) {
 
   std::unordered_map<int, int> live_clauses;
   vec<clause_info_t> clause_info;
+  clause_info.push(clause_info_t { 0, 0 });
 
   vec<int> live_ants;
 
@@ -103,10 +120,10 @@ int main(int argc, char** argv) {
         break;
       case S_Intro:
         // Dump tautologies
-        if(!is_tauto(env, parser.lits)) {
+        if(!is_tauto(env, parser.atoms)) {
           int id = clause_info.size();
           clause_info.push(clause_info_t { id, 1 });
-          print_intro(id, parser.lits);
+          print_intro(id, parser.atoms);
           live_clauses.insert(std::make_pair(parser.id, id));
         }
         break; 
@@ -138,14 +155,14 @@ int main(int argc, char** argv) {
               live_clauses.insert(std::make_pair(parser.id, live_ants[0]));
             } else {
               // Actually a derivation
-              print_infer(parser.id, parser.lits, live_ants);
               int id = clause_info.size();
               clause_info.push(clause_info_t { id, 1 });
+              print_infer(id, parser.atoms, live_ants);
               live_clauses.insert(std::make_pair(parser.id, id));
             }
           } else {
             // Resolving tautologies _should_ still be a tautology
-            if(!is_tauto(env, parser.lits))
+            if(!is_tauto(env, parser.atoms))
               ERROR;
           }
         }

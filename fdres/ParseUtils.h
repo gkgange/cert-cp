@@ -25,6 +25,7 @@ OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWA
 #include <stdio.h>
 
 #include <zlib.h>
+#include <cassert>
 
 namespace Parse {
 
@@ -86,7 +87,7 @@ static int parseInt(B& in) {
     skipWhitespace(in);
     if      (*in == '-') neg = true, ++in;
     else if (*in == '+') ++in;
-    if (*in < '0' || *in > '9') fprintf(stderr, "PARSE ERROR! Unexpected char: %c\n", *in), exit(3);
+    if (*in < '0' || *in > '9') fprintf(stderr, "PARSE ERROR! Unexpected char: %c\n", *in), assert(0 && "FAIL"), exit(3);
     while (*in >= '0' && *in <= '9')
         val = val*10 + (*in - '0'),
         ++in;

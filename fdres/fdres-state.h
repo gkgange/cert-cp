@@ -2,6 +2,7 @@
 #define __FDRES_STATE_H__
 #include <unordered_map>
 #include "fdres-types.h"
+#include "fdres-env.h"
 
 typedef std::unordered_map<int, Clause*> ClauseTable;
 
@@ -12,15 +13,16 @@ public:
 
   // Check a clause is implied by its antecedents
   bool check_clause(vec<atom>& cl, vec<int>& ants);
+  bool check_clause_linear(vec<atom>& cl, vec<int>& ant_ids);
   // Add a clause
-  void add_clause(int cl_id, vec<atom>& cl);
+  bool add_clause(int cl_id, vec<atom>& cl);
   void remove_clause(int cl_id);
-  Clause* pop_clause(int cl_id);
 
   void free_clause(Clause* cl);
   bool is_used(Clause* cl);
 
 protected:
+  Clause* pop_clause(int cl_id);
 //  void attachClause(Clause* c);
 //  void detachWatch(lit l, Clause* c);
 //  void detachClause(Clause* c);
@@ -38,19 +40,14 @@ protected:
   void grow_to(int nvars);
   void grow_to(vec<atom>& ps);
 
-//  void undo_until(int trail_sz);
-//  void clear_trail(void);
-
-  vec<domain> domains;
+  fdres_env env;
 
   vec<atom> trail;
 
-  vec<unsigned int> touched;
-  vec<bool> is_touched; 
+  boolset touched;
 
   vec< vec<Clause*> > watches;
 
   ClauseTable table;
-  vec<atom> units;
 };
 #endif

@@ -2,18 +2,53 @@
 #include "fdres-state.h"
 #include "log-parser.h"
 
+struct opts {
+  enum in_t { I_Bool, I_Sem };
+
+  opts(void)
+    : infile(nullptr), outfile(nullptr),
+      in_mode(I_Sem), drop_unit(false) {
+  }
+  const char* infile;
+  const char* outfile; 
+  int verbosity;
+  in_t in_mode;
+  bool drop_unit;
+};
+
+int parse_options(opts& o, int argc, char** argv) {
+  int jj = 1;
+  for(int ii = 1; ii < argc; ++ii) {
+    if(strcmp(argv[ii], "-drop-unit") == 0) {
+      fprintf(stderr, "WARNING: -drop-unit not yet implemented\n");
+      o.drop_unit = true;
+    } else if(strcmp(argv[ii], "-bool") == 0) {
+      o.in_mode = opts::I_Bool;
+    } else if(strcmp(argv[ii], "-sem") == 0) {
+      o.in_mode = opts::I_Sem;
+    } else {
+      argv[jj++] = argv[ii];
+    }
+  }
+  return jj;
+}
+
+
 template<class P>
-bool verify_unsat(P& gen, int verbosity)
-{
+bool verify_unsat(P& gen, int verbosity) {
   FDres res;
 
-  StepT next;
-  while((next = gen.next()) != S_None)
-  {
-    switch(next)
-    {
+  // StepT next;
+  // while((next = gen.next()) != S_None)
+  while(!gen.isEof()) {
+    switch(gen.next()) {
+      case S_Comm:
+        // Ignore coments in resolution checking
+        break;
       case S_Intro:
-        res.add_clause(gen.id, gen.clause);
+        // Any unit clauses will be permanently added.
+        if(!res.add_clause(gen.id, gen.atoms))
+          return true;
         break;
 
       case S_Del:
@@ -21,18 +56,17 @@ bool verify_unsat(P& gen, int verbosity)
         break;
       
       case S_Infer:
-        if(!res.check_clause(gen.clause, gen.ants))
-        {
+//        if(!res.check_clause(gen.atoms, gen.ants)) {
+        if(!res.check_clause_linear(gen.atoms, gen.ants)) {
           if(verbosity > 0)
-            fprintf("Error: derivation of clause %d failed.\n", gen.id);
+            fprintf(stderr, "Error: derivation of clause %d failed.\n", gen.id);
           return false;
-
         }
         // Empty clause derived
-        if(gen.clause.size() == 0)
+        if(gen.atoms.size() == 0)
           return true;
 
-        res.add_clause(gen.id, gen.clause);
+        res.add_clause(gen.id, gen.atoms);
         break;
       default:
         assert (0 && "Unreachable.");
@@ -44,9 +78,40 @@ bool verify_unsat(P& gen, int verbosity)
   return false;
 }
 
+
 int main(int argc, char** argv)
 {
-  // Construct the     
-   
+  opts o;
+  argc = parse_options(o, argc, argv);
+
+  if(o.in_mode == opts::I_Bool) {
+    // In the bool case, we need to parse
+    // the atom table.
+    gzFile lit_file = gzopen(argv[1], "rb");
+    Parse::StreamBuffer lit_stream(lit_file);
+
+    // Read in the atom semantics
+    AtomTable atable;
+    read_atoms(lit_stream, atable);
+
+    gzclose(lit_file);
+
+    // Now, read the proof directives
+    gzFile proof_file = gzopen(argv[2], "rb");
+    Parse::StreamBuffer proof_stream(proof_file);
+    LogParser<Parse::StreamBuffer> parser(proof_stream, atable);
+    if(verify_unsat(parser, o.verbosity))
+      return 0;
+    return 1;
+  } else {
+    // In the sem case, we skip directly to reading the proof
+    // directives
+    gzFile proof_file = gzopen(argv[1], "rb");
+    Parse::StreamBuffer proof_stream(proof_file);
+    SemParser<Parse::StreamBuffer> parser(proof_stream);
+    if(verify_unsat(parser, o.verbosity))
+      return 0;
+    return 1;
+  }
 
 }

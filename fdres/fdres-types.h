@@ -57,7 +57,7 @@ public:
       if(k < lb)
         res = l_False;
       else if(ub <= k)
-        res = l_False;
+        res = l_True;
     }
   
     return (op&1) ? res : ((-1)*res);
@@ -136,16 +136,25 @@ public:
     // Trim the domain. Urgh -- complexity here is log(n).
     while(it != holes.rend() && ub < (*it))
     {
+      /*
       auto t = it;
       ++it;
       holes.erase(--t.base());
+      */
+      ++it;
+      it = iset::reverse_iterator(holes.erase(it.base())); 
     }
 
     while(it != holes.rend() && (*it) == ub)
     {
+      /*
       auto t = it;
       ++it;
       holes.erase(--t.base());
+      */
+      ++it;
+      it = iset::reverse_iterator(holes.erase(it.base())); 
+
       ub--;
     }
   }
@@ -228,6 +237,7 @@ public:
     free(data);
   }
   
+  // WARNING: growTo allocates capacity; doesn't initialize
   void growTo(int new_max) {
     if(maxsz >= new_max) return;
     assert(maxsz >= 1);

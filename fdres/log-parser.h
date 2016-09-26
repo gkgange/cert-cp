@@ -47,6 +47,7 @@ void chomp(In& in, const char* str) {
     assert(0 && "Match failed.");
   }
 }
+
 template<class In>
 void wchomp(In& in, const char* str) {
   Parse::skipWhitespace(in);
@@ -82,16 +83,47 @@ OpT read_op(In& in) {
 }
 
 template<class In>
-void read_atom(In& in, AtomTable& tbl) {
-  int id = Parse::parseInt(in); 
-  
-  wchomp(in, "["); wchomp(in, "v");
+atom read_satom(In& in) {
+  Parse::skipWhitespace(in);
+  wchomp(in, "v");
   int var = Parse::parseInt(in);
   OpT op = read_op(in);
   int val = Parse::parseInt(in);
-  wchomp(in, "]");  
+
+  switch(op) {
+    case Op_Eq:  
+      return atom { var, Eq, val };
+    case Op_Ne:  
+      return atom { var, Neq, val };
+      break;
+    case Op_Lt:  
+      return atom { var, Le, val-1 };
+    case Op_Le:  
+      return atom { var, Le, val };
+    case Op_Gt:  
+      return atom { var, Gt, val };
+    case Op_Ge:
+      return atom { var, Gt, val-1 };
+  }
+}
+
+
+template<class In>
+void read_atomdef(In& in, AtomTable& tbl) {
+  int id = Parse::parseInt(in); 
+  
+  wchomp(in, "[");
+  /*
+  wchomp(in, "v");
+  int var = Parse::parseInt(in);
+  OpT op = read_op(in);
+  int val = Parse::parseInt(in);
+  */
+  atom at(read_satom(in));
+  wchomp(in, "]");
 
   // printf("[|x%d op %d|]\n", var, val);
+  /*
   switch(op) {
     case Op_Eq:  
       tbl.set(id, atom { var, Eq, val });
@@ -112,12 +144,14 @@ void read_atom(In& in, AtomTable& tbl) {
       tbl.set(id, atom { var, Gt, val-1 });
       break;
   }
+  */
+  tbl.set(id, at);
 }
 
 template<class In>
 void read_atoms(In& in, AtomTable& tbl) {
   while(!Parse::isEof(in)) {
-    read_atom(in, tbl);
+    read_atomdef(in, tbl);
     if(!Parse::isEof(in))
       Parse::skipWhitespace(in);
   }
@@ -140,7 +174,7 @@ class LogParser {
     }
 
     int id;
-    vec<atom> lits;
+    vec<atom> atoms;
     vec<int> ants;
     std::string comment;
   protected:    
@@ -149,6 +183,17 @@ class LogParser {
     In& in;
     AtomTable& at;
 };
+
+/*
+template<class In>
+void read_atoms(In& in, AtomTable& tbl) {
+  while(!Parse::isEof(in)) {
+    read_atom(in, tbl);
+    if(!Parse::isEof(in))
+      Parse::skipWhitespace(in);
+  }
+}
+*/
 
 // Assumes a textual form with atomic
 // constraints directly included.
@@ -159,6 +204,12 @@ public:
     : in(_in) { }
 
   StepT next(void);
+  bool isEof(void) {
+    Parse::skipWhitespace(in);
+    return *in == EOF;
+  }
+
+  void read_clause(void);
 
   // Temporary storage for
   // the most recent token.
@@ -173,11 +224,11 @@ protected:
 
 template<class In>
 void LogParser<In>::read_clause(void) {
-  lits.clear();   
+  atoms.clear();   
   Parse::skipWhitespace(in);
   while(*in != '0') {
     int lid = Parse::parseInt(in);
-    lits.push(at[lid]);
+    atoms.push(at[lid]);
     Parse::skipWhitespace(in);
   }
   ++in;
@@ -242,4 +293,51 @@ StepT LogParser<In>::next(void) {
   }
   Parse::skipWhitespace(in);
 }
+
+template<class In>
+void SemParser<In>::read_clause(void) {
+  atoms.clear();
+  Parse::skipWhitespace(in);
+  while(*in != '0') {
+    atoms.push(read_satom(in));
+    Parse::skipWhitespace(in);
+  }
+  ++in;
+}
+
+template<class In>
+StepT SemParser<In>::next(void) {
+  Parse::skipWhitespace(in);
+  char c = *in;
+  if(c == 'c')
+  {
+    // Comment (or hint) line
+    ++in;
+    Parse::skipWhitespace(in);
+    comment = read_line(in);
+    return S_Comm;
+  } else if (c == 'd') {
+    // Deletion line.
+    ++in;
+    id = Parse::parseInt(in);
+    return S_Del;
+  } else {
+    // Either introduction or derivation
+    id = Parse::parseInt(in);
+    read_clause();
+    Parse::skipWhitespace(in);
+    if(*in == '0')
+    {
+      // Axiom
+      ++in;
+      return S_Intro;
+    } else {
+      readInts(in, ants);
+      return S_Infer;
+    }
+  }
+  Parse::skipWhitespace(in);
+}
+
+
 #endif
