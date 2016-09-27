@@ -80,8 +80,8 @@ let emit_step fmt step =
   end ;
   Format.pp_close_box fmt ()
   
-let parse_and_emit_steps fmt model lmap tokens =
-  emit_stream fmt (fun fmt toks -> emit_step fmt (Pr.parse_step model lmap toks)) tokens
+let parse_and_emit_steps fmt model p_step tokens =
+  emit_stream fmt (fun fmt toks -> emit_step fmt (p_step toks)) tokens
 
 let parse_var_asg minfo = parser
   | [< 'GL.Ident v ; 'GL.Kwd "=" ; 'GL.Int k >] -> (Pr.get_ivar minfo v, k)
@@ -154,9 +154,9 @@ let write_coq_model fmt ident model =
   Format.fprintf fmt ".@]@." ;
   Format.fprintf fmt "@[Definition %s@ :=@ (%s_bounds, %s_csts).@]@." ident ident ident
 
-let write_coq_proof fmt ident model lmap proof_toks =
+let write_coq_proof fmt ident model p_step proof_toks =
   Format.fprintf fmt "@[Definition %s@ :=@ @[" ident ;
-  parse_and_emit_steps fmt model lmap proof_toks ;
+  parse_and_emit_steps fmt model p_step proof_toks ;
   Format.fprintf fmt ".@]@]@."
 
 let write_prelude fmt =
@@ -208,10 +208,10 @@ let write_coq fmt model opt_obj opt_sol opt_trace =
   write_prelude fmt ;
   write_coq_model fmt "p_model" model ;
   match (opt_obj, opt_sol, opt_trace) with
-  | (Some obj, Some sol, Some (lmap, trace)) ->
+  | (Some obj, Some sol, Some (p_step, trace)) ->
       begin
         write_coq_sol fmt "p_solution" sol ;
-        write_coq_proof fmt "p_proof" model lmap trace ;
+        write_coq_proof fmt "p_proof" model p_step trace ;
         write_opt_theorem fmt "p_model" obj "p_solution" "p_proof"
       end
   | (None, Some _, Some _) ->
@@ -221,9 +221,9 @@ let write_coq fmt model opt_obj opt_sol opt_trace =
         write_coq_sol fmt "p_solution" sol ;
         write_sol_theorem fmt "p_model" "p_solution"
       end
-  | (_, _, Some (lmap, trace)) ->
+  | (_, _, Some (p_step, trace)) ->
       begin
-        write_coq_proof fmt "p_proof" model lmap trace ;
+        write_coq_proof fmt "p_proof" model p_step trace ;
         write_unsat_theorem fmt "p_model" "p_proof"
       end
   | _ -> ()
@@ -261,14 +261,18 @@ let main () =
         begin
           let ttoks = (Spec.lexer (Stream.of_channel (open_in tfile))) in
           (* Read the literal semantics . *)
-          debug_print "{Reading literals..." ;
-          let lit_tokens = match !COption.litfile with
-            | None -> tokens
-            | Some lfile -> Spec.lexer (Stream.of_channel (open_in lfile))
-          in
-          let lmap = Pr.parse_lit_map model lit_tokens in
-          debug_print "done.}@." ;
-          Some (lmap, ttoks)
+          let p_step = match !COption.litfile with
+            | None -> Pr.parse_step_fd model
+            | Some lfile ->
+              begin
+                debug_print "{Reading literals..." ;
+                let lit_tokens =
+                      Spec.lexer (Stream.of_channel (open_in lfile)) in
+                let lmap = Pr.parse_lit_map model lit_tokens in
+                debug_print "done.}@." ;
+                Pr.parse_step model lmap
+              end
+          in Some (p_step, ttoks)
         end
     | _ -> None
   in

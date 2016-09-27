@@ -4,7 +4,7 @@ open Genlex
 
 type 'a spec = (token S.t -> 'a)
 
-let keywords = ["(";")";";";",";":=";"|-";">=";"<=";"<";"=";"-";"~";"[";"]"]
+let keywords = ["(";")";";";",";":=";"|-";">=";">";"<=";"<";"=";"-";"~";"[";"]"]
 
 let lexer stream =
   make_lexer keywords stream

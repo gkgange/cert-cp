@@ -164,13 +164,21 @@ type literal_map = (int, Checker_impl.lit) H.t
 let parse_vprop minfo =
   let aux ivar = parser
   | [< 'GL.Kwd "<=" ; 'GL.Int k >] -> C_impl.Pos (C_impl.ILeq (ivar, k))
+  | [< 'GL.Kwd "<" ; 'GL.Int k >] -> C_impl.Pos (C_impl.ILeq (ivar, k-1))
   | [< 'GL.Kwd "=" ; 'GL.Int k >] -> C_impl.Pos (C_impl.IEq (ivar, k))
   | [< 'GL.Kwd ">=" ; 'GL.Int k >] -> C_impl.Neg (C_impl.ILeq (ivar, k-1))
+  | [< 'GL.Kwd ">" ; 'GL.Int k >] -> C_impl.Neg (C_impl.ILeq (ivar, k))
   | [< 'GL.Kwd "!=" ; 'GL.Int k >] -> C_impl.Neg (C_impl.IEq (ivar, k))
   in parser
   | [< 'GL.Ident x ; prop = aux (get_ivar minfo x) >] -> prop
   | [< 'GL.Int k1 ; 'GL.Kwd "=" ; 'GL.Int k2 >] ->
       if k1 = k2 then C_impl.Pos C_impl.CTrue else C_impl.Neg C_impl.CTrue
+
+let parse_atoms model =
+  let rec aux ts = parser
+  | [< 'GL.Int 0 >] -> List.rev ts
+  | [< k = parse_vprop model ; l = aux (k :: ts) >] -> l
+  in fun toks -> (* Format.printf "BBB@."; *) aux [] toks
 
 let get_litsem model = parser
   | [< 'GL.Int v ; 'GL.Kwd "[" ; l = parse_vprop model ; 'GL.Kwd "]" >]
@@ -185,8 +193,10 @@ let parse_lit_map model tokens =
   done ;
     lmap
 
+type step_parser = Genlex.token Stream.t -> C_impl.step
+
 type _proof_state =
-| Open of (model_info * literal_map * Genlex.token Stream.t)
+| Open of (model_info * step_parser * Genlex.token Stream.t)
 | Closed of (C_impl.step * (_proof_state ref)) option
 
 type proof_state = _proof_state ref
@@ -224,17 +234,28 @@ let parse_inf model lmap = parser
       | [] -> C_impl.Intro (cid, coqlits_of_ilist lmap cl)
       | _ -> C_impl.Resolve (cid, coqlits_of_ilist lmap cl, ants)
 
+let parse_inf_fd model = parser
+  | [< 'GL.Ident "d" ; 'GL.Int cid >] -> C_impl.Del cid
+  | [< 'GL.Ident "c" ; hint = parse_hint model >] -> hint
+  | [< 'GL.Ident "h" ; hint = parse_hint model >] -> hint
+  | [< 'GL.Int cid ; cl = parse_atoms model ; ants = parse_ilist >] ->
+      match ants with
+      | [] -> C_impl.Intro (cid, cl)
+      | _ -> C_impl.Resolve (cid, cl, ants)
 
-let create info lmap toks = ref (Open (info, lmap, toks))
+(* let create info lmap toks = ref (Open (info, lmap, toks)) *)
+let create info p_step toks = ref (Open (info, p_step, toks))
 let parse_step info lmap toks = parse_inf info lmap toks
+let parse_step_fd info toks = parse_inf_fd info toks
+
 let next state =
   match !state with
-  | Open (model, lmap, toks) ->
+  | Open (model, p_step, toks) ->
     let step = 
         if Stream.peek toks = None then
           None
         else
-          Some ((parse_inf model lmap toks), ref (Open (model, lmap, toks)))
+          Some ((p_step toks), ref (Open (model, p_step, toks)))
     in
     begin
       state := Closed step ;
@@ -243,12 +264,13 @@ let next state =
   | Closed step -> step
 
 (* Eagerly build a list of proof steps. *)
-let parse_proof minfo lmap toks =
+(* let parse_proof minfo lmap toks = *)
+let parse_proof p_step toks =
   let rec aux ss =
     if Stream.peek toks = None then
       List.rev ss
     else
-      aux ((parse_inf minfo lmap toks) :: ss)
+      aux ((p_step toks) :: ss)
   in
   aux []
 
