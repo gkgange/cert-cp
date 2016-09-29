@@ -104,6 +104,9 @@ atom read_satom(In& in) {
       return atom { var, Gt, val };
     case Op_Ge:
       return atom { var, Gt, val-1 };
+    default:
+      assert (0 && "Unreachable");
+      return atom { };
   }
 }
 

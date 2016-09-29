@@ -8,7 +8,10 @@ typedef std::unordered_map<int, Clause*> ClauseTable;
 
 class FDres {
 public:
-  FDres(void)
+  FDres(void) { }
+
+  FDres(int sz)
+    : env(sz)
   { }
 
   // Check a clause is implied by its antecedents
@@ -32,19 +35,10 @@ protected:
   lbool value(atom l);
   bool enqueue(atom l);
 
-//  bool queue_units(Clause*& confl);
-
-//  bool propagate(Clause*& confl);
-//  void mark_conflict(Clause* cl);
-
   void grow_to(int nvars);
   void grow_to(vec<atom>& ps);
 
   fdres_env env;
-
-  vec<atom> trail;
-
-  boolset touched;
 
   vec< vec<Clause*> > watches;
 

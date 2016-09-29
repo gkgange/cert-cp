@@ -1,3 +1,4 @@
+#include <cstring>
 #include "fdres-types.h"
 #include "fdres-state.h"
 #include "log-parser.h"
@@ -24,6 +25,9 @@ int parse_options(opts& o, int argc, char** argv) {
       o.drop_unit = true;
     } else if(strcmp(argv[ii], "-bool") == 0) {
       o.in_mode = opts::I_Bool;
+    } else if (strcmp(argv[ii], "-verbosity") == 0) {
+      ++ii;
+      o.verbosity = atoi(argv[ii]);
     } else if(strcmp(argv[ii], "-sem") == 0) {
       o.in_mode = opts::I_Sem;
     } else {
@@ -57,8 +61,11 @@ bool verify_unsat(P& gen, int verbosity) {
       
       case S_Infer:
 //        if(!res.check_clause(gen.atoms, gen.ants)) {
+        if(verbosity > 2) 
+          fprintf(stderr, "> clause %d\n", gen.id);
+
         if(!res.check_clause_linear(gen.atoms, gen.ants)) {
-          if(verbosity > 0)
+          if(verbosity > 1)
             fprintf(stderr, "Error: derivation of clause %d failed.\n", gen.id);
           return false;
         }
@@ -100,8 +107,13 @@ int main(int argc, char** argv)
     gzFile proof_file = gzopen(argv[2], "rb");
     Parse::StreamBuffer proof_stream(proof_file);
     LogParser<Parse::StreamBuffer> parser(proof_stream, atable);
-    if(verify_unsat(parser, o.verbosity))
+    if(verify_unsat(parser, o.verbosity)) {
+      if(o.verbosity > 0)
+        printf("s VERIFIED\n");
       return 0;
+    }
+    if(o.verbosity > 0)
+      printf("s INCOMPLETE\n");
     return 1;
   } else {
     // In the sem case, we skip directly to reading the proof
@@ -109,8 +121,15 @@ int main(int argc, char** argv)
     gzFile proof_file = gzopen(argv[1], "rb");
     Parse::StreamBuffer proof_stream(proof_file);
     SemParser<Parse::StreamBuffer> parser(proof_stream);
-    if(verify_unsat(parser, o.verbosity))
+    if(verify_unsat(parser, o.verbosity)) {
+      if(o.verbosity > 0)
+        printf("s VERIFIED\n");
       return 0;
+    }
+    if(o.verbosity > 0)
+      printf("s INCOMPLETE\n");
+    return 1;
+
     return 1;
   }
 

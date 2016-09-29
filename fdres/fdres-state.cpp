@@ -27,7 +27,7 @@ bool FDres::add_clause(int cl_id, vec<atom>& ps) {
   Clause* cl = NULL;
   if(ps.size() == 1) {
     if(!env.post(ps[0]))
-      return false;;
+      return false;
     env.commit();
   } else {
     cl = Clause_new(ps);
@@ -46,6 +46,9 @@ bool FDres::check_clause_linear(vec<atom>& cl, vec<int>& ant_ids) {
   }
 
   for(int cl_id : ant_ids) {
+//  for(int ii = ant_ids.size()-1; ii >= 0; ii--) {
+//    int cl_id = ant_ids[ii];
+
     Clause* cl = find_clause(cl_id);
     if(cl) {
       // Find 'watches'
@@ -68,8 +71,10 @@ bool FDres::check_clause_linear(vec<atom>& cl, vec<int>& ant_ids) {
       // Check that the clause is unit
       atom* at = w;
       for(++at; at != end; ++at) {
-        if(env.value(*at) != l_False)
+        if(env.value(*at) != l_False) {
+          fprintf(stderr, "WARNING: Clause not %d yet unit.\n", cl_id);
           goto clause_done;
+        }
       }
 
       // Clause is unit; first watch is true
@@ -77,6 +82,7 @@ bool FDres::check_clause_linear(vec<atom>& cl, vec<int>& ant_ids) {
         env.clear();
         return true;
       }
+
     }
 
 clause_done:
@@ -149,7 +155,6 @@ clause_done:
 void FDres::clear_state()
 {
   env.clear();
-  touched.clear();
 }
 
 bool FDres::enqueue(atom l)
@@ -192,7 +197,7 @@ void FDres::grow_to(int nvars)
     watches.push();
   }
   env.growTo(nvars);
-  touched.growTo(nvars);
+  // touched.growTo(nvars);
 }
 
 void FDres::grow_to(vec<atom>& cl)

@@ -33,13 +33,13 @@ struct fdres_env {
     changes.insert(at.var);
     return dom[at.var].apply(at.kind, at.val);
   }
-  
+
   // Evaluate an atom under a domain 
   lbool value(atom at) {
     return dom[at.var].value(at.kind, at.val); 
   }
 
-  domain operator[](int xi) const {
+  const domain& operator[](int xi) const {
     return dom[xi];
   }
 
