@@ -100,69 +100,178 @@ void print_comment(std::string& comment) {
 
 struct clause_info_t { int id ; int count; bool seen; bool used; };
 
-/*
 class clause_set {
 public:
   clause_set(void) : count(0), next_id(1) { }
 
-  struct info_t { int id; int pos; int count; bool seen; bool uses };
-  struct ref_t { int idx; };
+  struct info_t { int id; int pos; int count; bool seen; bool emitted; };
+  struct ref_t { int idx; int id; };
 
+  void set_hint(std::string s) {
+    active_hint = s;
+  }
+  std::string hint(ref_t r) { return _hint[r.idx]; }
+
+  ref_t add(vec<atom>& cl_atoms) {
+    vec<ref_t> ants;
+    return add(cl_atoms, ants);
+  }
   ref_t add(vec<atom>& cl_atoms, vec<ref_t>& cl_ants) {
     if(count == dense.size()) {
       dense.push(count);
-      info.push();
+      _info.push();
       _atoms.push();
       _ants.push();
+      _uses.push();
+      _hint.push();
     }
+
     int idx = dense[count];
-    info[idx] = { next_id++, count, 1, false, false };
+    int id = next_id++;
+    _info[idx] = { id, count, 1, false, false };
+    count++;
+
+    ref_t r { idx, id };
       
     for(atom at : cl_atoms)
       _atoms[idx].push(at);
     for(ref_t ant : cl_ants) {
-      _ants[idx].push(ant.idx);
-      info[ant.idx].uses++;
+      _ants[idx].push(ant);
+      _uses[ant.idx].push(r);
     }
 
-    return ref_t { idx };
+    if(cl_ants.size() == 0)
+      _hint[idx] = active_hint;
+
+    return r;
   };
 
-  void remove(ref_t r) {
-    info[r.idx].count--;
-    if(info[r.idx].count > 0)
-      return;
-      
-    int rep = dense[--count];
-    int r_pos = info[r.idx].pos;
+  void inc_ref(ref_t r) {
+    _info[r.idx].count++;
+  }
 
-    // Maintain the cross-references and
-    // de-facto free-list 
-    info[rep].pos = r_pos;
-    dense[r_pos] = rep;
-    info[r.idx].pos = count;
-    dense[count] = r.idx;
+  // Returns true if no references remain
+  bool dec_ref(ref_t r) {
+    assert(!is_stale(r));
+    assert(count > 0);
 
+    assert(_info[r.idx].count > 0);
+    _info[r.idx].count--;
+    if(_info[r.idx].count > 0)
+      return false;
+     
+    /*
     _atoms[r.idx].clear();
+    for(int ant_idx : _ants[r.idx]) {
+      _uses[ant_idx]--;
+    }
     _ants[r.idx].clear();
+    */
+    pending_deletes.push(r.idx);
+    return true;
   }
 
   info_t& operator[](ref_t r) { return _info[r.idx]; }
-  vec<atom>& ants(ref_t r) { return _ants[r.idx]; } 
-  vec<int>& atoms(ref_t r) { return _atoms[r.idx]; } 
+  vec<ref_t>& ants(ref_t r) { return _ants[r.idx]; } 
+  vec<atom>& atoms(ref_t r) { return _atoms[r.idx]; } 
 
+  bool is_stale(ref_t r) { return r.id != _info[r.idx].id; }
+
+  void flush_deletions(void);
 protected:
+  void real_delete(int ci) {
+    int rep = dense[--count];
+    int r_pos = _info[ci].pos;
+
+    // Maintain the cross-references and
+    // de-facto free-list 
+    _info[rep].pos = r_pos;
+    dense[r_pos] = rep;
+    _info[ci].pos = count;
+    dense[count] = ci;
+
+    _ants[ci].clear();
+    _uses[ci].clear();
+    _atoms[ci].clear();
+  }
+
   vec<info_t> _info;
   vec< vec<atom> > _atoms;
-  vec< vec<int> > _ants;
+  vec< vec<ref_t> > _ants;
+  vec< vec<ref_t> > _uses;
+  vec<std::string> _hint;
 
   vec<int> dense;
   int count;
 
   int next_id;
-};
-*/
+  vec<int> pending_deletes;
 
+public:
+  std::string active_hint;
+  std::string last_hint;
+};
+
+
+void emit_clause(clause_set& cs, clause_set::ref_t cl) {
+  clause_set::info_t& cinfo(cs[cl]);
+  // If the clause has already been
+  // output, terminate
+  if(cinfo.emitted)
+    return;
+  // Assuming deletion handling is correct, there
+  // shouldn't be any stale references
+  assert(cinfo.id == cl.id);
+
+  cinfo.emitted = true;
+  vec<clause_set::ref_t>& ants(cs.ants(cl));
+  for(clause_set::ref_t ant : cs.ants(cl)) {
+    emit_clause(cs, ant);
+  }
+  if(ants.size() == 0 && cs.last_hint != cs.hint(cl)) {
+    fprintf(stdout, "c %s\n", cs.hint(cl).c_str());
+    cs.last_hint = cs.hint(cl);
+  }
+  fprintf(stdout, "%d", cl.id);
+  for(atom at : cs.atoms(cl))
+    print_atom(at);
+  fprintf(stdout, " 0");
+
+  for(clause_set::ref_t ant : ants)
+    fprintf(stdout, " %d", ant.id);
+  fprintf(stdout, " 0\n");
+}
+
+void clause_set::flush_deletions(void) {
+  // For each deleted clause, check whether some
+  // reference survives
+  for(int ci : pending_deletes) {
+    assert(_info[ci].pos < count);
+
+    // If so, the subtree rooted at that use
+    // must be emitted
+    for(ref_t use : _uses[ci]) {
+      if(!is_stale(use) && _info[use.idx].count > 0) {
+        emit_clause(*this, use);
+      }
+    }
+  }
+  // Now, emit deletion information for any clause
+  // that has been emitted,
+  // and clear expired data
+  for(int ci : pending_deletes) {
+    if(_info[ci].emitted) {
+      fprintf(stdout, "d %d\n", _info[ci].id);
+    }
+    real_delete(ci);
+    /*
+    _ants[ci].clear();
+    _uses[ci].clear();
+    _atoms[ci].clear();
+    */
+  }
+  pending_deletes.clear();
+}
 
 int parse_options(opts& o, int argc, char** argv) {
   int jj = 1;
@@ -204,77 +313,93 @@ int main(int argc, char** argv) {
   Parse::StreamBuffer proof_stream(proof_file);
   LogParser<Parse::StreamBuffer> parser(proof_stream, atable);
 
-  std::unordered_map<int, int> live_clauses;
-  vec<clause_info_t> clause_info;
-  clause_info.push(clause_info_t { 0, 0, false, false });
+  std::unordered_map<int, clause_set::ref_t> live_clauses;
+  // vec<clause_info_t> clause_info;
+  clause_set clause_info;
+  // clause_info.push(clause_info_t { 0, 0, false, false });
 
-  vec<int> live_ants;
-
-  int unused_clauses = 0;
+  vec<clause_set::ref_t> live_ants;
 
   while(!parser.isEof()) {
     StepT step = parser.next();
     
     switch(step) {
       case S_Comm:
-        print_comment(parser.comment);
+        // print_comment(parser.comment);
+        clause_info.set_hint(parser.comment);
         break;
       case S_Intro:
         // Dump tautologies
+        clause_info.flush_deletions();
         if(!is_tauto(env, parser.atoms)) {
           simplify(env, parser.atoms);
-          int id = clause_info.size();
-          clause_info.push(clause_info_t { id, 1, false, false });
-          print_intro(id, parser.atoms);
-          live_clauses.insert(std::make_pair(parser.id, id));
+          // int id = clause_info.size();
+          // clause_info.push(clause_info_t { id, 1, false, false });
+          clause_set::ref_t ref(clause_info.add(parser.atoms));
+          // print_intro(id, parser.atoms);
+          // live_clauses.insert(std::make_pair(parser.id, id));
+          live_clauses.insert(std::make_pair(parser.id, ref));
         }
         break; 
       case S_Del:
         {
           auto it = live_clauses.find(parser.id);
           if(it != live_clauses.end()) {
-            int id = (*it).second;
+            clause_set::ref_t id = (*it).second;
+            // Printing is now handled by
+            // flush_deletions
+            /*
             if(clause_info[id].count == 1) {
               if(!clause_info[id].used)
                 unused_clauses++;
-
-              print_del(id);
+              // print_del(id);
+              live_clauses.erase(it);
             }
             clause_info[id].count--;
-            live_clauses.erase(it);
+            */
+            if(clause_info.dec_ref(id)) {
+              live_clauses.erase(it);
+            }
           }
         }
         break;
       case S_Infer:
         {
+          clause_info.flush_deletions();
+          
+          // Resolve non-tautology antecedents to the
+          // corresponding references
           live_ants.clear();
           for(int ant : parser.ants) {
             auto it = live_clauses.find(ant);
             if(it != live_clauses.end()) {
-              int id = (*it).second;
+              clause_set::ref_t id = (*it).second;
+              // Don't duplicate antecedents
               if(!clause_info[id].seen)
                 live_ants.push((*it).second);
               clause_info[id].seen = true;
             }
           }
-          for(int c_id : live_ants)
+          for(clause_set::ref_t c_id : live_ants)
             clause_info[c_id].seen = false;
 
           if(live_ants.size() > 0) {
             if(!o.keep_alias && live_ants.size() == 1) {
               // Alias
-              clause_info[live_ants[0]].count++;
+              // clause_info[live_ants[0]].count++;
+              clause_info.inc_ref(live_ants[0]);
               live_clauses.insert(std::make_pair(parser.id, live_ants[0]));
             } else {
               // Actually a derivation
+              // Perform self-subsumption
               simplify(env, parser.atoms);
-              for(int ant : live_ants)
-                clause_info[ant].used = true;
 
-              int id = clause_info.size();
-              clause_info.push(clause_info_t { id, 1, false, false });
-              print_infer(id, parser.atoms, live_ants);
-              live_clauses.insert(std::make_pair(parser.id, id));
+              clause_set::ref_t ref(clause_info.add(parser.atoms, live_ants));
+              live_clauses.insert(std::make_pair(parser.id, ref));
+
+              if(parser.atoms.size() == 0) {
+                emit_clause(clause_info, ref);
+              }
             }
           } else {
             // Resolving tautologies _should_ still be a tautology
@@ -287,7 +412,5 @@ int main(int argc, char** argv) {
   }
   gzclose(proof_file);
     
-  fprintf(stderr, "Unused: %d clauses\n", unused_clauses);
-
   return 0;
 }

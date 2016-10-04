@@ -46,9 +46,6 @@ bool FDres::check_clause_linear(vec<atom>& cl, vec<int>& ant_ids) {
   }
 
   for(int cl_id : ant_ids) {
-//  for(int ii = ant_ids.size()-1; ii >= 0; ii--) {
-//    int cl_id = ant_ids[ii];
-
     Clause* cl = find_clause(cl_id);
     if(cl) {
       // Find 'watches'
@@ -82,7 +79,6 @@ bool FDres::check_clause_linear(vec<atom>& cl, vec<int>& ant_ids) {
         env.clear();
         return true;
       }
-
     }
 
 clause_done:
@@ -91,64 +87,148 @@ clause_done:
   return false;
 }
 
-bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids)
-{
-  /*
+// Returns l_False on inconsistent; l_True on propagation
+lbool trim_and_apply(fdres_env& e, vec<atom>& cl) {
+  while(cl.size() > 0) {
+    switch(e.value(cl[0])) {
+      case l_False:
+        cl[0] = cl.last();
+        cl.pop();
+      case l_True:
+        cl._dropTo(1);
+        return l_Undef;
+      case l_Undef:
+        goto watch_found;
+    }
+  }
+  return l_False; 
+
+watch_found: 
+  while(cl.size() > 1) {
+    switch(e.value(cl[1])) {
+      case l_True:
+        cl[0] = cl[1];
+        cl._dropTo(1);
+        return l_Undef;
+      case l_False: 
+        cl[1] = cl.last();
+        cl.pop();
+      case l_Undef:
+        // Found two unfixed atoms
+        return l_Undef;
+    }
+  }
+  if(!e.post(cl[0]))
+    return l_False;
+  return l_True;   
+}
+
+// Does a linear scan first, _then_ collects remaining occurrences.
+bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids) {
   for(atom at : cl) {
-    if(!env.post(~at))
+    if(!env.post(~at)) {
+      env.clear();
       return true;
+    }
   }
 
-  vec<Clause*> ants;
-  for(int cl_id : ant_ids)
-  {
+  vec<Clause*> pending_clauses;
+
+  for(int cl_id : ant_ids) {
     Clause* cl = find_clause(cl_id);
     if(cl) {
       // Find 'watches'
-      atom* at = cl->begin();
+      atom* w = cl->begin();
       atom* end = cl->end();
       // Find the first watch
-      atom* w = cl->begin();
-      for(; at != end; ++at) {
-        if(env.value(*at) == l_True)
+      for(; w != end; ++w) {
+        if(env.value(*w) == l_True)
           goto clause_done;
-        if(env.value(*at) == l_Undef) {
-          std::swap(*at, *w); ++w;
+        if(env.value(*w) == l_Undef) {
           break;
         }
       }
-      if(at == end) {
+      if(w == end) {
         // Already unsat.
         env.clear();
         return true;
       }
-
-      // Now the second watch
-      for(; at != end; ++at) {
-        if(env.value(*at) == l_True)
-          goto clause_done; 
-        if(env.value(*at) == l_Undef) {
-          std::swap(*at, *w); ++w;
-          break;
+     
+      // Check that the clause is unit
+      atom* at = w;
+      for(++at; at != end; ++at) {
+        if(env.value(*at) != l_False) {
+          pending_clauses.push(cl);
+          goto clause_done;
         }
       }
-      if(at == end) {
-        // Clause is unit; first watch is true
-        if(!env.post((*cl)[0])) {
-          env.clear();
-          return true;
-        }
-      } else {
-        watches[(*cl)[0]].push(cl);
-        watches[(*cl)[1]].push(cl);
+
+      // Clause is unit; first watch is true
+      if(!env.post((*cl)[0])) {
+        env.clear();
+        return true;
       }
     }
 
 clause_done:
     continue;
   }
-  */
-  //FIXME
+
+  // Failed on a linear scan; now do it (semi-)properly
+  // FIXME: Use occurrence lists
+  vec< vec<atom> > pending;
+  vec<int> remaining;
+  for(Clause* cl : pending_clauses) {
+    pending.push();
+    vec<atom>& p_curr(pending.last());
+
+    for(atom at : *cl) {
+      switch(env.value(at)) {
+        case l_False:
+          continue;
+        case l_True:
+          pending.pop();
+          goto pend_skip;
+        case l_Undef:
+          p_curr.push(at);
+      }
+    }
+    if(p_curr.size() == 0) {
+      env.clear();
+      return true;
+    }
+    if(p_curr.size() == 1) {
+      if(!env.post(p_curr[0])) {
+        // Should be unreachable
+        env.clear();
+        return true;
+      }
+      pending.pop();
+    } else {
+      remaining.push(pending.size()-1);
+    }
+pend_skip:
+    continue;
+  }
+
+  while(true) {
+    int jj = 0;
+    for(int pi : remaining) {
+      switch(trim_and_apply(env, pending[pi])) {
+        case l_True:
+          continue;
+        case l_False:
+          env.clear();
+          return true;
+        case l_Undef:
+          remaining[jj++] = pi;
+      }
+    }
+    if(jj == remaining.size())
+      return false;
+    remaining._dropTo(jj);
+  }
+
   return false;
 }
 

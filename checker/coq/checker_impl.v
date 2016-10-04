@@ -6,7 +6,9 @@ Require resolution.
 Require log.
 
 (*
-Extract Constant prim.Z_eqb => "(=)".
+Extract Constant Z.eqb => "(=)".
+Extract Constant Z.leb => "(<=)".
+Extract Constant Z.ltb => "(<)".
 *)
 
 Set Extraction Optimize.

@@ -60,6 +60,7 @@ let check_inferences_opt model_info obj k p_step toks =
   let ds = C_impl.domset_with_lt (C_impl.domset_of_bounds bs) obj k in
   let hint = ref (-1) in
   let okay = ref true in
+  (* *)
   while !okay && Stream.peek toks <> None
   do
     (* match Pr.parse_step model_info lmap toks *)
@@ -72,10 +73,12 @@ let check_inferences_opt model_info obj k p_step toks =
     | C_impl.Resolve _ -> ()
     | C_impl.Del _ -> ()
   done ;
+  (* *)
   !okay
 
 let check_no_resolve model_info sol obj p_step toks =
-  C_impl.certify_solution (Pr.model_of_model_info model_info) sol && check_inferences_opt model_info obj (sol obj) p_step toks
+  (C_impl.certify_solution (Pr.model_of_model_info model_info) sol) &&
+    (check_inferences_opt model_info obj (sol obj) p_step toks)
 
 let check_resolution model_info p_step toks =
   let clause_db = H.create 17 in
@@ -149,7 +152,6 @@ let main () =
   | (Some ovar, Some sol, Some tfile) ->
     let tchannel = open_in tfile in
     let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in
-    (* let p_step = Pr.parse_step model_info lmap in *)
     let obj = Pr.get_ivar model_info ovar in
     let step0 = Pr.create model_info p_step ttoks in
     let next_step = Pr.next in
@@ -163,7 +165,7 @@ let main () =
       end
     else
       begin
-        Format.fprintf fmt "Checking optimality...@." ;
+        (* Format.fprintf fmt "Checking optimality...@." ; *)
         let okay = C_impl.certify_optimal model obj sol max_int step0 next_step in
         if okay then
           Format.fprintf fmt "OKAY@."
@@ -191,12 +193,13 @@ let main () =
       (* *)
       let step0 = Pr.create model_info p_step ttoks in
       let next_step = Pr.next in
-      Format.fprintf fmt "Checking unsatisfiability...@." ;
+      (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
       let okay = C_impl.certify_unsat model max_int step0 next_step in
       if okay then
         Format.fprintf fmt "OKAY@."
       else
         Format.fprintf fmt "FAILED@."
+      (* *)
     end
   | _ -> Format.fprintf fmt "ERROR: No solution or trace specified.@."
 

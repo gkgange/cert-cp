@@ -64,7 +64,9 @@ bool verify_unsat(P& gen, int verbosity) {
         if(verbosity > 2) 
           fprintf(stderr, "> clause %d\n", gen.id);
 
-        if(!res.check_clause_linear(gen.atoms, gen.ants)) {
+//        if(!res.check_clause_linear(gen.atoms, gen.ants))
+        if(!res.check_clause(gen.atoms, gen.ants))
+        {
           if(verbosity > 1)
             fprintf(stderr, "Error: derivation of clause %d failed.\n", gen.id);
           return false;
@@ -73,7 +75,9 @@ bool verify_unsat(P& gen, int verbosity) {
         if(gen.atoms.size() == 0)
           return true;
 
-        res.add_clause(gen.id, gen.atoms);
+        if(!res.add_clause(gen.id, gen.atoms))
+          return true;
+//        res.add_clause(gen.id, gen.atoms);
         break;
       default:
         assert (0 && "Unreachable.");

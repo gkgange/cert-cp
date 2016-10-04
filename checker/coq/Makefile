@@ -80,6 +80,8 @@ endif
 #                    #
 ######################
 
+MODEL_FILES:=$(wildcard models/*.v)
+
 VFILES:=assign.v\
   domain.v\
   constraint.v\
@@ -109,6 +111,9 @@ VIFILES:=$(VFILES:.v=.vi)
 GFILES:=$(VFILES:.v=.g)
 HTMLFILES:=$(VFILES:.v=.html)
 GHTMLFILES:=$(VFILES:.v=.g.html)
+
+MODEL_VOFILES=$(MODEL_FILES:.v=.vo)
+
 ifeq '$(HASNATDYNLINK)' 'true'
 HASNATDYNLINK_OR_EMPTY := yes
 else
@@ -122,6 +127,7 @@ endif
 #######################################
 
 all: $(VOFILES) 
+models: $(MODEL_VOFILES)
 
 spec: $(VIFILES)
 
