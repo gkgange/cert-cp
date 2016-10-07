@@ -68,7 +68,7 @@ public:
     switch(op)
     {
       case Le:
-        return set_ub(k); 
+        return set_ub(k);
       case Gt:
         return set_lb(k+1);
       case Eq:
@@ -99,7 +99,8 @@ public:
     else if(k == ub)
       return set_ub(k-1);
 
-    holes.insert(k);
+    if(lb < k && k < ub)
+      holes.insert(k);
     return true;
   }
 

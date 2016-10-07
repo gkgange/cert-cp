@@ -39,6 +39,10 @@ bool is_tauto(fdres_env& env, vec<atom>& lemma) {
 
 void extract_dom(fdres_env& env, int var, vec<atom>& lemmas) {
   const domain& d(env[var]);
+  if(d.lb == d.ub) {
+    lemmas.push(atom { var, Eq, d.lb });
+    return;
+  }
   if(d.lb > INT_MIN)
     lemmas.push(atom { var, Gt, d.lb-1 });
   if(d.ub < INT_MAX)

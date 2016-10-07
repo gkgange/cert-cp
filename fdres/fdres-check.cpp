@@ -50,6 +50,8 @@ bool verify_unsat(P& gen, int verbosity) {
         // Ignore coments in resolution checking
         break;
       case S_Intro:
+        if(verbosity > 2)
+          fprintf(stderr, "intro|> %d\n", gen.id);
         // Any unit clauses will be permanently added.
         if(!res.add_clause(gen.id, gen.atoms))
           return true;
