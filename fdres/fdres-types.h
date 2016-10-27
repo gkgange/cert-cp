@@ -299,6 +299,7 @@ public:
 
   bool used;
   int count;
+  int ident;
 protected:
   int sz;
   atom data[0];

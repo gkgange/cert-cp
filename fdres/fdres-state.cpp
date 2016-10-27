@@ -1,5 +1,8 @@
 #include <cassert>
+#include <sstream>
 #include "fdres-state.h"
+
+// #define CHECK_VERBOSE
 
 static vec<atom> empty;
 
@@ -21,16 +24,43 @@ lbool FDres::value(atom l)
   return env.value(l);
 }
 
+std::string atom_str(atom at) {
+  std::stringstream ss; 
+  ss << "x" << at.var; 
+  switch(at.kind) {
+    case Gt:
+      ss << " > ";
+      break;
+    case Le:
+      ss << " <= ";
+      break;
+    case Neq:
+      ss << " != ";
+      break;
+    case Eq:
+      ss << " == ";
+      break;
+  }
+  ss << at.val;
+  return ss.str();
+}
+
 bool FDres::add_clause(int cl_id, vec<atom>& ps) {
   grow_to(ps);
 
   Clause* cl = NULL;
   if(ps.size() == 1) {
+#ifdef CHECK_VERBOSE
+    fprintf(stderr, "%s <- [%d]\n", atom_str(ps[0]).c_str(), cl_id);
+#endif
     if(!env.post(ps[0]))
       return false;
     env.commit();
   } else {
     cl = Clause_new(ps);
+#ifdef CHECK_VERBOSE
+    cl->ident = cl_id;
+#endif
     table.insert(std::make_pair(cl_id, cl));
   }
   return true;
@@ -94,6 +124,7 @@ lbool trim_and_apply(fdres_env& e, vec<atom>& cl) {
       case l_False:
         cl[0] = cl.last();
         cl.pop();
+        continue;
       case l_True:
         cl._dropTo(1);
         return l_Undef;
@@ -113,6 +144,7 @@ watch_found:
       case l_False: 
         cl[1] = cl.last();
         cl.pop();
+        continue;
       case l_Undef:
         // Found two unfixed atoms
         return l_Undef;
@@ -126,6 +158,9 @@ watch_found:
 // Does a linear scan first, _then_ collects remaining occurrences.
 bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids) {
   for(atom at : cl) {
+#ifdef CHECK_VERBOSE
+    fprintf(stderr, "%s <~\n", atom_str(~at).c_str());
+#endif
     if(!env.post(~at)) {
       env.clear();
       return true;
@@ -150,6 +185,9 @@ bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids) {
       }
       if(w == end) {
         // Already unsat.
+#ifdef CHECK_VERBOSE
+        fprintf(stderr, "_|_ <- [%d]\n", cl_id);
+#endif
         env.clear();
         return true;
       }
@@ -164,6 +202,9 @@ bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids) {
       }
 
       // Clause is unit; first watch is true
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str((*cl)[0]).c_str(), cl->ident);
+#endif
       if(!env.post((*cl)[0])) {
         env.clear();
         return true;
@@ -195,9 +236,15 @@ clause_done:
     }
     if(p_curr.size() == 0) {
       env.clear();
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "_|_ <- [%d]\n", cl->ident);
+#endif
       return true;
     }
     if(p_curr.size() == 1) {
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str(p_curr[0]).c_str(), cl->ident);
+#endif
       if(!env.post(p_curr[0])) {
         // Should be unreachable
         env.clear();
