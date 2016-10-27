@@ -8,6 +8,7 @@ struct opts {
 
   opts(void)
     : infile(nullptr), outfile(nullptr),
+      verbosity(1),
       in_mode(I_Sem), drop_unit(false) {
   }
   const char* infile;
@@ -25,6 +26,8 @@ int parse_options(opts& o, int argc, char** argv) {
       o.drop_unit = true;
     } else if(strcmp(argv[ii], "-bool") == 0) {
       o.in_mode = opts::I_Bool;
+    } else if(strcmp(argv[ii], "-q") == 0) {
+      o.verbosity = 0;
     } else if (strcmp(argv[ii], "-verbosity") == 0) {
       ++ii;
       o.verbosity = atoi(argv[ii]);
@@ -101,6 +104,10 @@ int main(int argc, char** argv)
     // In the bool case, we need to parse
     // the atom table.
     gzFile lit_file = gzopen(argv[1], "rb");
+    if(!lit_file) {
+      fprintf(stderr, "Failed to open literal file: %s\n", argv[1]);
+      return 2;
+    }
     Parse::StreamBuffer lit_stream(lit_file);
 
     // Read in the atom semantics
@@ -111,6 +118,10 @@ int main(int argc, char** argv)
 
     // Now, read the proof directives
     gzFile proof_file = gzopen(argv[2], "rb");
+    if(!proof_file) {
+      fprintf(stderr, "Failed to open trace file: %s\n", argv[2]);
+      return 2;
+    }
     Parse::StreamBuffer proof_stream(proof_file);
     LogParser<Parse::StreamBuffer> parser(proof_stream, atable);
     if(verify_unsat(parser, o.verbosity)) {
@@ -125,6 +136,10 @@ int main(int argc, char** argv)
     // In the sem case, we skip directly to reading the proof
     // directives
     gzFile proof_file = gzopen(argv[1], "rb");
+    if(!proof_file) {
+      fprintf(stderr, "Failed to open trace file: %s\n", argv[1]);
+      return 2;
+    }
     Parse::StreamBuffer proof_stream(proof_file);
     SemParser<Parse::StreamBuffer> parser(proof_stream);
     if(verify_unsat(parser, o.verbosity)) {
