@@ -279,6 +279,158 @@ pend_skip:
   return false;
 }
 
+#ifdef VAR_WATCH
+inline void enqueue_var(FDres* r, int var) {
+  if(r->var_is_queued[var])
+    return;
+  r->var_is_queued[var] = true;
+  r->var_queue.push(var);
+}
+
+inline void add_watch(FDres* r, atom at, Clause* cl) {
+  r->touched_vars.insert(at.var);
+  r->watches[at.var].push({ at, cl } );
+}
+
+inline void cleanup(FDres* r) {
+  for(int var : r->var_queue) {
+    r->var_is_queued[var] = false;
+  }
+  
+  for(int var : r->touched_vars) {
+    r->watches[var].clear();     
+  }
+  r->touched_vars.clear();
+  r->env.clear();
+}
+
+bool FDres::check_clause_watch(vec<atom>& cl, vec<int>& ant_ids) {
+  for(atom at : cl) {
+#ifdef CHECK_VERBOSE
+    fprintf(stderr, "%s <~\n", atom_str(~at).c_str());
+#endif
+    if(!env.post(~at)) {
+      env.clear();
+      return true;
+    }
+  }
+
+  for(int cl_id : ant_ids) {
+    Clause* cl = find_clause(cl_id);
+    if(cl) {
+      // Find 'watches'
+      atom* w = cl->begin();
+      atom* end = cl->end();
+      // Find the first watch
+      for(; w != end; ++w) {
+        if(env.value(*w) == l_True)
+          goto clause_prep_done;
+        if(env.value(*w) == l_Undef) {
+          break;
+        }
+      }
+      if(w == end) {
+        // Already unsat.
+#ifdef CHECK_VERBOSE
+        fprintf(stderr, "_|_ <- [%d]\n", cl_id);
+#endif
+        cleanup(this);
+        return true;
+      }
+      // Move first watch to cl[0]
+      std::swap((*cl)[0], *w);
+     
+      // Check that the clause is unit
+      atom* at = w;
+      for(++at; at != end; ++at) {
+        switch(env.value(*at)) {
+          case l_True:
+            goto clause_prep_done;
+          case l_False:
+            continue;
+          case l_Undef:
+            /* Not unit; set up watches. */
+            std::swap((*cl)[1], *at);
+            add_watch(this, *w, cl);
+            add_watch(this, *at, cl);
+            goto clause_prep_done;
+        }
+      }
+
+      // Clause is unit; first watch is true
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str((*cl)[0]).c_str(), cl->ident);
+#endif
+      if(!env.post((*cl)[0])) {
+        cleanup(this);
+        return true;
+      }
+      enqueue_var(this, (*cl)[0].var);
+    }
+
+clause_prep_done:
+    continue;
+  }
+  
+  while(var_queue.size() > 0) {
+    int var = var_queue.last(); var_queue.pop();
+    
+    watch* wj = watches[var].begin();
+    for(watch& wi : watches[var]) {
+      // If the watch is still indeterminate, save it.
+      if(env.value(wi.at) == l_Undef) {
+        *wj = wi; ++wj;
+        continue;
+      }
+      // Make sure the watch is cl[0].
+      Clause& cl(*(wi.cl));
+      if(cl[1] != wi.at) {
+        cl[0] = cl[1];
+        cl[1] = wi.at;
+      }
+      if(env.value(cl[0]) == l_True) {
+        // Clause is satisfied
+        continue;
+      }
+      for(int ii = 2; ii < cl.size(); ii++) {
+        atom at(cl[ii]);
+        switch(env.value(at)) {
+          case l_True:
+            goto clause_done;
+          case l_False:
+            continue;
+          case l_Undef:
+            // Watch found
+            // If the watch is on the current var,
+            // add_watch may invalidate the iterator.
+            if(at.var == var) {
+              *wj = { at, &cl }; ++wj;
+            } else {
+              add_watch(this, at, &cl);
+            }
+            cl[1] = at;
+            cl[ii] = wi.at;
+            goto clause_done;
+        }
+      }
+      // If we reach here, clause is unit
+      if(!env.post(cl[0])) {
+        cleanup(this);
+        return true;
+      }
+      enqueue_var(this, cl[0].var);
+        
+clause_done:
+      continue;
+    }
+  }
+
+  // Reached fixpoint without concluding unsat
+  cleanup(this);
+  return false;
+}
+#endif
+
 void FDres::clear_state()
 {
   env.clear();
@@ -320,11 +472,14 @@ Clause* FDres::pop_clause(int cl_id)
 
 void FDres::grow_to(int nvars)
 {
+#ifdef VAR_WATCH
   while(watches.size() < nvars) {
     watches.push();
+    var_is_queued.push(false);        
   }
+  touched_vars.growTo(nvars);
+#endif
   env.growTo(nvars);
-  // touched.growTo(nvars);
 }
 
 void FDres::grow_to(vec<atom>& cl)

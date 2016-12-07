@@ -7,6 +7,8 @@ CXX_DEBUGFLAGS = -O0 -g -I .
 CXXFLAGS = -Wall -Wno-unused-function -Wno-deprecated -ffast-math -std=c++11
 LFLAGS = -lz
 
+# CXXFLAGS += -DVAR_WATCH
+
 SRCS = fdres-state.cpp log-parser.cpp
 OBJS = $(addsuffix .o, $(basename $(SRCS)))
 DEBUG_OBJS = $(addsuffix .debug.o, $(basename $(SRCS)))

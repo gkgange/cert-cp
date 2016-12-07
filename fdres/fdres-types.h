@@ -21,6 +21,10 @@ struct atom {
   atom operator~(void) const {
     return atom { var, (AtKind) (kind^1), val };
   }
+
+  bool operator!=(const atom& o) {
+    return var != o.var || kind != o.kind || val != o.val;
+  }
 };
 
 //inline unsigned int var(atom a) { return a.info>>2; }

@@ -17,6 +17,9 @@ public:
   // Check a clause is implied by its antecedents
   bool check_clause(vec<atom>& cl, vec<int>& ants);
   bool check_clause_linear(vec<atom>& cl, vec<int>& ant_ids);
+#ifdef VAR_WATCH
+  bool check_clause_watch(vec<atom>& cl, vec<int>& ant_ids);
+#endif
   // Add a clause
   bool add_clause(int cl_id, vec<atom>& cl);
   void remove_clause(int cl_id);
@@ -38,9 +41,19 @@ protected:
   void grow_to(int nvars);
   void grow_to(vec<atom>& ps);
 
+#ifdef VAR_WATCH
+public:
+#endif
   fdres_env env;
 
-  vec< vec<Clause*> > watches;
+#ifdef VAR_WATCH
+  struct watch { atom at; Clause* cl; };
+  vec< vec<watch> > watches;
+  vec<bool> var_is_queued;
+  vec<int> var_queue;
+
+  boolset touched_vars;
+#endif
 
   ClauseTable table;
 };

@@ -70,7 +70,11 @@ bool verify_unsat(P& gen, int verbosity) {
           fprintf(stderr, "> clause %d\n", gen.id);
 
 //        if(!res.check_clause_linear(gen.atoms, gen.ants))
+#ifdef VAR_WATCH
+        if(!res.check_clause_watch(gen.atoms, gen.ants))
+#else
         if(!res.check_clause(gen.atoms, gen.ants))
+#endif
         {
           if(verbosity > 1)
             fprintf(stderr, "Error: derivation of clause %d failed.\n", gen.id);
