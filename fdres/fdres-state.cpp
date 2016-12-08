@@ -150,8 +150,15 @@ watch_found:
         return l_Undef;
     }
   }
-  if(!e.post(cl[0]))
+  if(!e.post(cl[0])) {
+#ifdef CHECK_VERBOSE
+    fprintf(stderr, "_|_ <~ [?]\n");
+#endif
     return l_False;
+  }
+#ifdef CHECK_VERBOSE
+  fprintf(stderr, "%s <- [?]\n", atom_str(cl[0]).c_str());
+#endif
   return l_True;   
 }
 
@@ -202,13 +209,16 @@ bool FDres::check_clause(vec<atom>& cl, vec<int>& ant_ids) {
       }
 
       // Clause is unit; first watch is true
+      if(!env.post(*w)) {
 #ifdef CHECK_VERBOSE
-      fprintf(stderr, "%s <- [%d]\n", atom_str((*cl)[0]).c_str(), cl->ident);
+        fprintf(stderr, "_|_ <- [%d]\n", cl->ident);
 #endif
-      if(!env.post((*cl)[0])) {
         env.clear();
         return true;
       }
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str(*w).c_str(), cl->ident);
+#endif
     }
 
 clause_done:
@@ -242,14 +252,17 @@ clause_done:
       return true;
     }
     if(p_curr.size() == 1) {
-#ifdef CHECK_VERBOSE
-      fprintf(stderr, "%s <- [%d]\n", atom_str(p_curr[0]).c_str(), cl->ident);
-#endif
       if(!env.post(p_curr[0])) {
         // Should be unreachable
+#ifdef CHECK_VERBOSE
+        fprintf(stderr, "_|_ <- [%d] <UNREACH?> \n", cl->ident);
+#endif
         env.clear();
         return true;
       }
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str(p_curr[0]).c_str(), cl->ident);
+#endif
       pending.pop();
     } else {
       remaining.push(pending.size()-1);
@@ -287,15 +300,23 @@ inline void enqueue_var(FDres* r, int var) {
   r->var_queue.push(var);
 }
 
+inline int dequeue_var(FDres* r) {
+  int v = r->var_queue.last();
+  r->var_queue.pop();
+  r->var_is_queued[v] = false;
+  return v;
+}
+
 inline void add_watch(FDres* r, atom at, Clause* cl) {
   r->touched_vars.insert(at.var);
-  r->watches[at.var].push({ at, cl } );
+  r->watches[at.var].push(FDres::watch { at, cl });
 }
 
 inline void cleanup(FDres* r) {
   for(int var : r->var_queue) {
     r->var_is_queued[var] = false;
   }
+  r->var_queue.clear();
   
   for(int var : r->touched_vars) {
     r->watches[var].clear();     
@@ -315,12 +336,15 @@ bool FDres::check_clause_watch(vec<atom>& cl, vec<int>& ant_ids) {
     }
   }
 
+//  for(int vi = 0; vi < var_is_queued.size(); vi++)
+//    assert(!var_is_queued[vi]);
   for(int cl_id : ant_ids) {
-    Clause* cl = find_clause(cl_id);
-    if(cl) {
-      // Find 'watches'
-      atom* w = cl->begin();
-      atom* end = cl->end();
+    Clause* cl_ptr = find_clause(cl_id);
+    if(cl_ptr) {
+      Clause& cl(*cl_ptr);
+      // Find the first indeterminate atom
+      atom* w = cl.begin();
+      atom* end = cl.end();
       // Find the first watch
       for(; w != end; ++w) {
         if(env.value(*w) == l_True)
@@ -338,34 +362,40 @@ bool FDres::check_clause_watch(vec<atom>& cl, vec<int>& ant_ids) {
         return true;
       }
       // Move first watch to cl[0]
-      std::swap((*cl)[0], *w);
+      atom fst = *w;
+      *w = cl[0];
+      cl[0] = fst;
      
       // Check that the clause is unit
       atom* at = w;
       for(++at; at != end; ++at) {
-        switch(env.value(*at)) {
-          case l_True:
-            goto clause_prep_done;
-          case l_False:
-            continue;
-          case l_Undef:
-            /* Not unit; set up watches. */
-            std::swap((*cl)[1], *at);
-            add_watch(this, *w, cl);
-            add_watch(this, *at, cl);
-            goto clause_prep_done;
+        if(env.value(*at) == l_True)
+          goto clause_prep_done;
+
+        if(env.value(*at) == l_Undef) {
+          /* Not unit; set up watches. */
+          atom snd = *at;
+          *at = cl[1];
+          cl[1] = snd;
+
+          add_watch(this, fst, cl_ptr);
+          add_watch(this, snd, cl_ptr);
+          goto clause_prep_done;
         }
       }
 
       // Clause is unit; first watch is true
+      if(!env.post(fst)) {
 #ifdef CHECK_VERBOSE
-      fprintf(stderr, "%s <- [%d]\n", atom_str((*cl)[0]).c_str(), cl->ident);
+        fprintf(stderr, "_|_ <- [%d]\n", cl.ident);
 #endif
-      if(!env.post((*cl)[0])) {
         cleanup(this);
         return true;
       }
-      enqueue_var(this, (*cl)[0].var);
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str(fst).c_str(), cl.ident);
+#endif
+      enqueue_var(this, fst.var);
     }
 
 clause_prep_done:
@@ -373,56 +403,67 @@ clause_prep_done:
   }
   
   while(var_queue.size() > 0) {
-    int var = var_queue.last(); var_queue.pop();
+    int var = dequeue_var(this);
+//    assert(!var_is_queued[var]);
     
-    watch* wj = watches[var].begin();
-    for(watch& wi : watches[var]) {
+    int wj = 0;
+    vec<watch>& ws(watches[var]);
+    for(watch w : ws) {
       // If the watch is still indeterminate, save it.
-      if(env.value(wi.at) == l_Undef) {
-        *wj = wi; ++wj;
+      if(env.value(w.at) == l_True)
+        continue;
+      if(env.value(w.at) == l_Undef) {
+        ws[wj++] = w;
         continue;
       }
       // Make sure the watch is cl[0].
-      Clause& cl(*(wi.cl));
-      if(cl[1] != wi.at) {
+      Clause& cl(*(w.cl));
+      if(cl[1] != w.at) {
+//        assert(w.at == cl[0]);
         cl[0] = cl[1];
-        cl[1] = wi.at;
+        cl[1] = w.at;
       }
-      if(env.value(cl[0]) == l_True) {
+//      assert(w.at == cl[1]);
+      atom fst = cl[0];
+      if(env.value(fst) == l_True) {
         // Clause is satisfied
         continue;
       }
       for(int ii = 2; ii < cl.size(); ii++) {
         atom at(cl[ii]);
-        switch(env.value(at)) {
-          case l_True:
-            goto clause_done;
-          case l_False:
-            continue;
-          case l_Undef:
-            // Watch found
-            // If the watch is on the current var,
-            // add_watch may invalidate the iterator.
-            if(at.var == var) {
-              *wj = { at, &cl }; ++wj;
-            } else {
-              add_watch(this, at, &cl);
-            }
-            cl[1] = at;
-            cl[ii] = wi.at;
-            goto clause_done;
+        if(env.value(at) == l_True)
+          goto clause_watch_done;
+        if(env.value(at) == l_Undef) {
+          // Watch found
+          // If the watch is on the current var,
+          // add_watch may invalidate the iterator.
+          if(at.var == var) {
+            ws[wj++] = { at, &cl };
+          } else {
+            add_watch(this, at, &cl);
+          }
+          cl[1] = at;
+          cl[ii] = w.at;
+          goto clause_watch_done;
         }
       }
       // If we reach here, clause is unit
-      if(!env.post(cl[0])) {
+      if(!env.post(fst)) {
+#ifdef CHECK_VERBOSE
+        fprintf(stderr, "_|_ <- [%d]\n", cl.ident);
+#endif
         cleanup(this);
         return true;
       }
-      enqueue_var(this, cl[0].var);
+#ifdef CHECK_VERBOSE
+      fprintf(stderr, "%s <- [%d]\n", atom_str(fst).c_str(), cl.ident);
+#endif
+      enqueue_var(this, fst.var);
         
-clause_done:
+clause_watch_done:
       continue;
     }
+    ws.dropTo(wj);
   }
 
   // Reached fixpoint without concluding unsat

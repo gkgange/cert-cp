@@ -22,7 +22,11 @@ struct atom {
     return atom { var, (AtKind) (kind^1), val };
   }
 
-  bool operator!=(const atom& o) {
+  bool operator==(const atom& o) const {
+    return var == o.var && kind == o.kind && val == o.val;
+  }
+
+  bool operator!=(const atom& o) const {
     return var != o.var || kind != o.kind || val != o.val;
   }
 };
@@ -39,12 +43,22 @@ static atom at_Undef = { INT_MAX, Le, INT_MIN };
 class domain {
 public: 
   domain(void)
-    : lb(INT_MIN), ub(INT_MAX)
+    : lb(INT_MIN), ub(INT_MAX), holes()
   { }
 
   domain(int _lb, int _ub, iset& _holes)
     : lb(_lb), ub(_ub), holes(_holes)
   { }
+
+  domain(const domain& o)
+    : lb(o.lb), ub(o.ub), holes(o.holes) { }
+
+  domain& operator=(const domain& o) {
+    lb = o.lb;
+    ub = o.ub;
+    holes = o.holes;
+    return *this;
+  }
 
   lbool value(unsigned int op, int k)
   {
@@ -198,21 +212,26 @@ public:
     : sz(0), maxsz(_maxsz), data((T*) malloc(sizeof(T)*maxsz))
   {
     assert(data);
+    assert(maxsz > 0);
   }
 
   vec(int _sz, T elt)
-    : sz(_sz), maxsz(_sz), data((T*) malloc(sizeof(T)*maxsz)) {
+    : sz(_sz), maxsz(std::max(2, sz)), data((T*) malloc(sizeof(T)*maxsz)) {
+    assert(maxsz > 0);
+
     for(int ii = 0; ii < sz; ii++)
-      new (&data[ii]) T(elt);
+      new (&(data[ii])) T(elt);
   }
 
   template<class V>
   vec(V& elts)
     : sz(elts.size()), maxsz(std::max(2, sz)), data((T*) malloc(sizeof(T)*maxsz))
   {
+    assert(maxsz > 0);
     int ii = 0;  
     for(T& e : elts)
-      data[ii++] = e;
+      new (&(data[ii++])) T(e);
+//      data[ii++] = e;
   }
 
   T* begin(void) { return data; }
@@ -251,6 +270,26 @@ public:
     }
     data = (T*) realloc(data, sizeof(T)*maxsz);
     assert(data);
+  }
+
+  void careful_growTo(int new_max) {
+    if(maxsz >= new_max) return;
+    assert(maxsz >= 1);
+    while(maxsz < new_max) {
+      maxsz *= 2;
+    }
+    
+    T* old = data;
+    
+    data = (T*) malloc(sizeof(T)*maxsz);
+    assert(data);
+    
+    T* q = data;
+    for(T* p = old; p != old + sz; ++p) {
+      new (q++) T(*p);
+      (*p).~T();
+    }
+    free(old);
   }
 
   void dropTo(int _sz)

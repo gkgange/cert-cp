@@ -72,6 +72,8 @@ bool verify_unsat(P& gen, int verbosity) {
 //        if(!res.check_clause_linear(gen.atoms, gen.ants))
 #ifdef VAR_WATCH
         if(!res.check_clause_watch(gen.atoms, gen.ants))
+        // if(!res.check_clause_watch(gen.atoms, gen.ants) && !res.check_clause(gen.atoms, gen.ants))
+//        if(!res.check_clause(gen.atoms, gen.ants))
 #else
         if(!res.check_clause(gen.atoms, gen.ants))
 #endif

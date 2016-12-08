@@ -14,8 +14,8 @@ struct fdres_env {
   }
 
   void growTo(int sz) {
-    dom.growTo(sz);     
-    dom_0.growTo(sz);
+    dom.careful_growTo(sz);     
+    dom_0.careful_growTo(sz);
     while(dom.size() < sz) {
       dom.push();
       dom_0.push();

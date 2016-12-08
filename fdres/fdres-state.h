@@ -8,7 +8,7 @@ typedef std::unordered_map<int, Clause*> ClauseTable;
 
 class FDres {
 public:
-  FDres(void) { }
+  FDres(void) : env(0) { }
 
   FDres(int sz)
     : env(sz)

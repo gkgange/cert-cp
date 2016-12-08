@@ -106,7 +106,8 @@ struct clause_info_t { int id ; int count; bool seen; bool used; };
 
 class clause_set {
 public:
-  clause_set(void) : count(0), next_id(1) { }
+  clause_set(void) : count(0), next_id(1),
+  active_hint("-"), last_hint("-") { }
 
   struct info_t { int id; int pos; int count; bool seen; bool emitted; };
   struct ref_t { int idx; int id; };

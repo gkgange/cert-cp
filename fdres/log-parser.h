@@ -12,7 +12,8 @@ enum StepT { S_Intro, S_Del, S_Infer, S_Comm };
 // contiguous range.
 class AtomTable {
 public:
-  AtomTable(void) { }
+  AtomTable(void)
+    : var_max(0) { }
 
   void set(int i, atom at) {
     assert(i > 0);
