@@ -211,6 +211,206 @@ Proof.
   destruct H2; [ apply domset_with_lit_iff | apply clause_unsatb_valid with (theta := theta) in H1]; tauto.
 Qed.
 
+Inductive prop_result :=
+| Unit : domset -> prop_result
+| Simp : clause -> prop_result
+| Conflict : prop_result.
+
+Fixpoint clause_unsat_simp ds cl :=
+  match cl with
+    | nil => None
+    | cons l cl' =>
+      if lit_unsatb ds l then
+        clause_unsat_simp ds cl'
+      else
+        Some (cons l cl')
+  end.
+
+Lemma clause_unsat_simp1 :
+  forall ds cl, clause_unsat_simp ds cl = None ->
+                forall theta, eval_domset ds theta -> ~ eval_clause cl theta.
+Proof.
+  intros ds cl.                             
+  unfold clause_unsat_simp; induction cl; fold clause_unsat_simp in *.
+  intros; unfold eval_clause; intuition.
+
+  eqelim (lit_unsatb ds a).
+  apply lit_unsatb_unsat in H0.
+  intros.
+  unfold eval_clause; fold eval_clause; intro.
+  destruct H2.
+  now apply H0 in H2.
+  now apply IHcl in H2.
+  congruence.
+Qed.  
+Lemma clause_unsat_simp2 :
+  forall ds cl cl', clause_unsat_simp ds cl = Some cl' ->
+                    forall theta, eval_domset ds theta -> eval_clause cl theta -> eval_clause cl' theta.
+Proof.
+  intros ds cl.  
+  induction cl.
+  unfold clause_unsat_simp; unfold eval_clause; intuition.
+
+  unfold clause_unsat_simp, eval_clause; fold clause_unsat_simp; fold eval_clause.
+  intro cl'.
+  eqelim (lit_unsatb ds a).
+  + apply lit_unsatb_unsat in H0.
+    intros.
+    destruct H2.
+      now apply H0 in H2.
+      apply (IHcl cl'); try assumption.
+  + intros. inversion H. rewrite <- H4 in *.
+    unfold eval_clause; fold eval_clause.
+    destruct H2; intuition.
+Qed.
+    
+Fixpoint prop_clause_simp (ds : domset) (cl : clause) : prop_result :=
+  match cl with
+  | nil => Conflict
+  | cons l cl' =>
+    if lit_unsatb ds l then
+      prop_clause_simp ds cl'
+    else
+      match clause_unsat_simp ds cl' with
+          | None => Unit (domset_with_lit ds l)
+          | Some cl'' => Simp (cons l cl'')
+      end
+  end.
+Lemma prop_clause_Confl :
+  forall ds cl, prop_clause_simp ds cl = Conflict ->
+                forall theta, eval_domset ds theta -> ~ eval_clause cl theta.
+Proof.
+  intros ds; induction cl; unfold prop_clause_simp; fold prop_clause_simp.
+  + unfold eval_clause; intuition.
+  + eqelim (lit_unsatb ds a); intuition.
+    apply H1 with (theta := theta); try assumption.
+    unfold eval_clause in H3; fold eval_clause in H3; intuition.
+    apply lit_unsatb_unsat in H0; now apply H0 in H4.
+    eqelim (clause_unsat_simp ds cl); congruence.
+Qed.
+
+Lemma prop_clause_Unit :
+  forall ds cl ds', prop_clause_simp ds cl = Unit ds' ->
+                    forall theta, eval_domset ds theta -> eval_clause cl theta -> eval_domset ds' theta.
+Proof.
+  intros ds cl; induction cl; unfold prop_clause_simp; fold prop_clause_simp.
+  + congruence.
+  + eqelim (lit_unsatb ds a); try apply lit_unsatb_unsat in H0.
+    - intros ds' Hp theta He; specialize (IHcl ds' Hp theta He).
+      unfold eval_clause; fold eval_clause.
+      intro H'; destruct H' as [H' | H'].
+      now apply H0 in H'.
+      intuition.
+    - intro ds'; eqelim (clause_unsat_simp ds cl).
+      congruence.
+      intros Hds' theta Heds.
+      inversion Hds'.
+      apply clause_unsat_simp1 with (theta := theta) in H1.
+      intro Hcl; unfold eval_clause in Hcl; fold eval_clause in Hcl.
+      rewrite domset_with_lit_iff.
+      split; [exact Heds | trivial].
+      destruct Hcl; intuition.
+      assumption.
+Qed.
+
+Lemma prop_clause_Simp :
+  forall ds cl cl', prop_clause_simp ds cl = Simp cl' ->
+                    forall theta, eval_domset ds theta -> eval_clause cl theta -> eval_clause cl' theta.
+Proof.
+  intros ds cl; induction cl.
+  unfold eval_clause; intuition.
+
+  unfold prop_clause_simp; fold prop_clause_simp; eqelim (lit_unsatb ds a).
+  + intros cl' Hcl' theta Heds Hecl'; specialize (IHcl cl' Hcl' theta Heds).
+    unfold eval_clause in Hecl'; fold eval_clause in Hecl'.
+    destruct Hecl' as [H' | H'].
+    apply lit_unsatb_unsat in H0; now apply H0 in H'.
+    intuition.
+  + intros cl'; eqelim (clause_unsat_simp ds cl); try congruence.
+    intros Hs theta Heds Hec; inversion Hs.
+    unfold eval_clause; fold eval_clause.
+    unfold eval_clause in Hec; fold eval_clause in Hec.
+    destruct Hec; [now left | right].
+    apply clause_unsat_simp2 with (theta := theta) (ds := ds) (cl := cl); try intuition.
+Qed.
+
+Fixpoint unit_prop_simp_step ds cs :=
+  match cs with
+    | nil => Some (ds, nil)
+    | cons cl cs' =>
+      match prop_clause_simp ds cl with
+        | Conflict => None
+        | Unit ds' => unit_prop_simp_step ds' cs'
+        | Simp cl' =>
+          match unit_prop_simp_step ds cs' with
+            | None => None
+            | Some (ds', cs'') => Some (ds', cons cl' cs'')
+          end
+      end
+  end.
+Lemma unit_prop_simp_step1 :
+  forall ds cs, unit_prop_simp_step ds cs = None ->
+                forall theta, eval_domset ds theta -> ~ eval_clauses cs theta.
+Proof.
+  intros ds cs; generalize ds; clear ds; induction cs; intro ds.
+  unfold unit_prop_simp_step; fold unit_prop_simp_step; congruence.
+  unfold unit_prop_simp_step; fold unit_prop_simp_step.
+  eqelim (prop_clause_simp ds a).
+  + intros; unfold eval_clauses; fold eval_clauses; intro.
+    specialize (IHcs d H theta).
+    apply prop_clause_Unit with (theta := theta) in H0; try intuition.
+  + eqelim (unit_prop_simp_step ds cs).
+    intro; simpl.
+    destruct p in H; congruence.
+
+    intros _ theta Heds.
+    specialize (IHcs ds H1 theta Heds).
+    simpl; intuition.
+  + intros _ theta Heds; simpl.
+    apply prop_clause_Confl with (theta := theta) in H0; intuition.
+Qed.
+
+Lemma unit_prop_simp_step2a :
+  forall ds cs ds' cs', unit_prop_simp_step ds cs = Some (ds', cs') ->
+                        forall theta, eval_domset ds theta -> eval_clauses cs theta -> eval_domset ds' theta.
+Proof.
+  intros ds cs; generalize ds; clear ds; induction cs; intro ds.
+  unfold unit_prop_simp_step; congruence.
+
+  unfold unit_prop_simp_step; fold unit_prop_simp_step.
+  eqelim (prop_clause_simp ds a); simpl; intros ds' cs' Hup theta Heds Heacs.
+  + specialize (IHcs d ds' cs' Hup theta).
+    apply prop_clause_Unit with (theta := theta) in H0; intuition.
+  + eqelim (unit_prop_simp_step ds cs).
+    destruct p; inversion Hup; simpl in *.
+    apply prop_clause_Simp with (theta := theta) in H0; try tauto.
+    destruct Heacs as [Hea Hecs]; specialize (IHcs ds d l H1 theta Heds Hecs).
+    congruence.
+    congruence.
+  + congruence.
+Qed.
+
+ Lemma unit_prop_simp_step2b :
+  forall ds cs ds' cs', unit_prop_simp_step ds cs = Some (ds', cs') ->
+                        forall theta, eval_domset ds theta -> eval_clauses cs theta -> eval_clauses cs' theta.
+Proof.
+  intros ds cs; generalize ds; clear ds; induction cs; intro ds.
+  unfold unit_prop_simp_step; congruence.
+
+  unfold unit_prop_simp_step; fold unit_prop_simp_step.
+  eqelim (prop_clause_simp ds a); simpl; intros ds' cs' Hup theta Heds Heacs.
+  + specialize (IHcs d ds' cs' Hup theta).
+    apply prop_clause_Unit with (theta := theta) in H0; intuition.
+  + eqelim (unit_prop_simp_step ds cs).
+    destruct p; inversion Hup; simpl in *.
+    apply prop_clause_Simp with (theta := theta) in H0; try tauto.
+    destruct Heacs as [Hea Hecs]; specialize (IHcs ds d l H1 theta Heds Hecs).
+    intuition.
+    intuition.
+    congruence.
+ + congruence.
+Qed.
+ 
 Fixpoint unit_prop_step (ds : domset) (cs : list clause) :=
   match cs with
   | nil => ds
@@ -258,12 +458,47 @@ Proof.
     apply unit_prop_step_valid; try tauto.
 Qed.
 
+Fixpoint unit_prop_simp_rep (ds : domset) (k : nat) (cs : list clause) :=
+  match k with
+    | O => ds
+    | (S k') =>
+      match unit_prop_simp_step ds cs with
+        | None => None
+        | Some (ds', cs') => unit_prop_simp_rep ds' k' cs'
+      end
+  end.
+Lemma unit_prop_srep_1 : forall (cs : list clause) (ks : nat) (theta : valuation),
+  eval_clauses cs theta -> forall ds, eval_domset ds theta -> eval_domset (unit_prop_simp_rep ds ks cs) theta.
+Proof.
+  intros cs ks theta; generalize cs; clear cs; induction ks; intros cs Hecs ds Heds.
+
+  unfold unit_prop_simp_rep; intuition.
+
+  unfold unit_prop_simp_rep; fold unit_prop_simp_rep.
+  eqelim (unit_prop_simp_step ds cs).
+  destruct p.
+  + apply IHks.
+    apply unit_prop_simp_step2b with (theta := theta) in H0; intuition.
+    apply unit_prop_simp_step2a with (theta := theta) in H0; intuition.
+  + apply unit_prop_simp_step1 with (theta := theta) in H0; intuition.
+Qed.
+
+(*
 Definition unit_prop (ds : domset) (cs : list clause) := unit_prop_rep ds (List.length cs) cs.
 Lemma unit_prop_valid : forall (cs : list clause) (theta : valuation),
   eval_clauses cs theta -> forall ds, eval_domset ds theta ->
     eval_domset (unit_prop ds cs) theta.
 Proof.
   unfold unit_prop; intros; apply unit_prop_rep_1 with (theta := theta) (cs := cs) (ks := (List.length cs)) (ds := ds); assumption.
+Qed.
+*)
+
+Definition unit_prop (ds : domset) (cs : list clause) := unit_prop_simp_rep ds (List.length cs) cs.
+Lemma unit_prop_valid : forall (cs : list clause) (theta : valuation),
+  eval_clauses cs theta -> forall ds, eval_domset ds theta ->
+    eval_domset (unit_prop ds cs) theta.
+Proof.
+  unfold unit_prop; intros; apply unit_prop_srep_1 with (theta := theta) (cs := cs) (ks := (List.length cs)) (ds := ds); assumption.
 Qed.
 
 (*
