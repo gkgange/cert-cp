@@ -240,16 +240,24 @@ public:
 
   T& last(void) { return data[sz-1]; }
 
-  void push(void) {
+  void _push(void) {
     if(sz >= maxsz)
       growTo(sz+1);
+    ++sz;
+  }
+
+  void push(void) {
+    if(sz >= maxsz)
+      careful_growTo(sz+1);
+      // growTo(sz+1);
     new (&(data[sz++])) T();
   }
   void _push(const T& elt) { data[sz++] = elt; }
   void push(const T& elt) {
     if(sz >= maxsz)
-      growTo(sz+1); 
-    _push(elt);
+      careful_growTo(sz+1); 
+    // _push(elt);
+    new (&(data[sz++])) T(elt);
   }
   void pop(void) { data[--sz].~T(); }
 
