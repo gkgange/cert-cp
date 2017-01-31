@@ -698,3 +698,18 @@ Proof.
   unfold empty_state, state_csts in H1; simpl in *.
   contradiction.
 Qed.
+Definition certify_optimal_list m obj sol p_proof :=
+  certify_optimal m obj sol
+                  (Z.of_nat (List.length p_proof))
+                  _
+                  p_proof
+                  (fun p =>
+                     match p with
+                       | nil => None
+                       | cons s p' => Some (s, p')
+                     end).
+Corollary certify_optimal_list_valid : forall m obj sol p_proof,
+  certify_optimal_list m obj sol p_proof = true -> is_model_minimum m obj sol.
+Proof.
+  unfold certify_optimal_list; intros m obj sol p_proof; apply certify_optimal_valid.
+Qed.
