@@ -137,7 +137,7 @@ let write_coq_csts fmt csts =
       
 (* Bundle bounds with the corresponding index, remove missing bounds, then print. *)
 let write_bounds fmt bs =
-  let print_tuple = (fun fmt (i, l, u) -> Format.fprintf fmt "(%d, %d, %d)" i l u) in
+  let print_tuple = (fun fmt (i, l, u) -> Format.fprintf fmt "(%d, (%d, %d))" i l u) in
   let flatten (i, b) = match b with
     | None -> None
     | Some (l, u) -> Some (i, l, u)
@@ -161,9 +161,8 @@ let write_coq_proof fmt ident model p_step proof_toks =
 
 let write_prelude fmt =
   Format.fprintf fmt "Require Import prim.@." ;
-  Format.fprintf fmt "Require bounds.@." ;
-  Format.fprintf fmt "Require model.@." ;
-  Format.fprintf fmt "Require sol.@." ;
+  Format.fprintf fmt "Require Import lit.@." ;
+  Format.fprintf fmt "Require Import model.@." ;
   Format.fprintf fmt "Require log.@." ;
   Format.fprintf fmt "Require map.@." ;
   Format.fprintf fmt "Require Import List.@." ;
@@ -174,7 +173,7 @@ let write_prelude fmt =
 let write_unsat_theorem fmt model_id proof_id =
   Format.fprintf fmt "Theorem model_unsat : model.model_unsat %s.@." model_id;
   Format.fprintf fmt "Proof.@." ;
-  Format.fprintf fmt "  apply log.certify_unsat_list_valid with (ss := %s)." proof_id ;
+  Format.fprintf fmt "  apply log.certify_unsat_list_valid with (p_proof := %s)." proof_id ;
   Format.fprintf fmt "  now vm_compute.@." ;
   Format.fprintf fmt "Qed.@."
 
@@ -188,12 +187,12 @@ let write_sol_theorem fmt model_id sol_id =
 let write_opt_theorem fmt model_id obj sol_id proof_id =
   Format.fprintf fmt "Theorem model_opt : model.is_model_minimum %s %d %s.@." model_id obj sol_id;
   Format.fprintf fmt "Proof.@." ;
-  Format.fprintf fmt "  apply log.certify_optimal_list_valid with (ss := %s)." proof_id ;
+  Format.fprintf fmt "  apply log.certify_optimal_list_valid with (p_proof := %s)." proof_id ;
   Format.fprintf fmt "  now vm_compute.@." ;
   Format.fprintf fmt "Qed.@."
 
 let write_coq_sol fmt sol_id sol =
-  Format.fprintf fmt "Definition %s := sol.asg_of_alist " sol_id ;
+  Format.fprintf fmt "Definition %s := log.asg_of_alist " sol_id ;
   print_list (fun fmt (x, k) -> Format.fprintf fmt "(%d, (%d))" x k) fmt sol ;
   Format.fprintf fmt ".@."
 (*
