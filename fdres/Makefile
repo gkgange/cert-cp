@@ -1,4 +1,4 @@
-# CXX = clang++
+#CXX = clang++
 CXX = g++
 #CXXFLAGS = -O2 -g -I .
 #CXXFLAGS = -O0 -g -I .

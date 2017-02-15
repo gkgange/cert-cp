@@ -65,15 +65,11 @@ bool verify_unsat(P& gen, int verbosity) {
         break;
       
       case S_Infer:
-//        if(!res.check_clause(gen.atoms, gen.ants)) {
         if(verbosity > 2) 
           fprintf(stderr, "> clause %d\n", gen.id);
 
-//        if(!res.check_clause_linear(gen.atoms, gen.ants))
 #ifdef VAR_WATCH
         if(!res.check_clause_watch(gen.atoms, gen.ants))
-        // if(!res.check_clause_watch(gen.atoms, gen.ants) && !res.check_clause(gen.atoms, gen.ants))
-//        if(!res.check_clause(gen.atoms, gen.ants))
 #else
         if(!res.check_clause(gen.atoms, gen.ants))
 #endif
@@ -88,7 +84,6 @@ bool verify_unsat(P& gen, int verbosity) {
 
         if(!res.add_clause(gen.id, gen.atoms))
           return true;
-//        res.add_clause(gen.id, gen.atoms);
         break;
       default:
         assert (0 && "Unreachable.");
@@ -99,6 +94,61 @@ bool verify_unsat(P& gen, int verbosity) {
 
   return false;
 }
+
+template<class P>
+bool verify_unsat(P& gen, VarTable& vtbl, int verbosity) {
+  FDres res;
+
+  // StepT next;
+  // while((next = gen.next()) != S_None)
+  while(!gen.isEof()) {
+    switch(gen.next(vtbl)) {
+      case S_Comm:
+        // Ignore coments in resolution checking
+        break;
+      case S_Intro:
+        if(verbosity > 2)
+          fprintf(stderr, "intro|> %d\n", gen.id);
+        // Any unit clauses will be permanently added.
+        if(!res.add_clause(gen.id, gen.atoms))
+          return true;
+        break;
+
+      case S_Del:
+        res.remove_clause(gen.id);
+        break;
+      
+      case S_Infer:
+        if(verbosity > 2) 
+          fprintf(stderr, "> clause %d\n", gen.id);
+
+#ifdef VAR_WATCH
+        if(!res.check_clause_watch(gen.atoms, gen.ants))
+#else
+        if(!res.check_clause(gen.atoms, gen.ants))
+#endif
+        {
+          if(verbosity > 1)
+            fprintf(stderr, "Error: derivation of clause %d failed.\n", gen.id);
+          return false;
+        }
+        // Empty clause derived
+        if(gen.atoms.size() == 0)
+          return true;
+
+        if(!res.add_clause(gen.id, gen.atoms))
+          return true;
+        break;
+      default:
+        assert (0 && "Unreachable.");
+    }
+  }
+  if(verbosity > 0)
+    fprintf(stderr, "Error: proof terminated without empty clause.\n");
+
+  return false;
+}
+
 
 
 int main(int argc, char** argv)
@@ -118,7 +168,8 @@ int main(int argc, char** argv)
 
     // Read in the atom semantics
     AtomTable atable;
-    read_atoms(lit_stream, atable);
+    VarTable vtable;
+    read_atoms(lit_stream, atable, vtable);
 
     gzclose(lit_file);
 
@@ -146,9 +197,10 @@ int main(int argc, char** argv)
       fprintf(stderr, "Failed to open trace file: %s\n", argv[1]);
       return 2;
     }
+    VarTable vtbl;
     Parse::StreamBuffer proof_stream(proof_file);
     SemParser<Parse::StreamBuffer> parser(proof_stream);
-    if(verify_unsat(parser, o.verbosity)) {
+    if(verify_unsat(parser, vtbl, o.verbosity)) {
       if(o.verbosity > 0)
         printf("s VERIFIED\n");
       return 0;

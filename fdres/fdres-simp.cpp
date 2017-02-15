@@ -76,12 +76,22 @@ const char* op_str[] = { ">", "<=", "!=", "=" };
 void print_atom(atom at) {
   fprintf(stdout, " v%d %s %d", at.var, op_str[at.kind], at.val);
 }
+void print_atom(atom at, VarTable& vtbl) {
+  fprintf(stdout, " %s %s %d", vtbl[at.var].c_str(), op_str[at.kind], at.val);
+}
 void print_intro(int id, vec<atom>& lemma) {
   fprintf(stdout, "%d", id);
   for(atom at : lemma)
     print_atom(at);
   fprintf(stdout, " 0 0\n");
 }
+void print_intro(int id, vec<atom>& lemma, VarTable& vtbl) {
+  fprintf(stdout, "%d", id);
+  for(atom at : lemma)
+    print_atom(at, vtbl);
+  fprintf(stdout, " 0 0\n");
+}
+
 
 void print_del(int id) {
   fprintf(stdout, "d %d\n", id);
@@ -91,6 +101,17 @@ void print_infer(int id, vec<atom>& lemma, vec<int>& ants) {
   fprintf(stdout, "%d", id);
   for(atom at : lemma)
     print_atom(at);
+  fprintf(stdout, " 0");
+
+  for(int ant : ants)
+    fprintf(stdout, " %d", ant);
+  fprintf(stdout, " 0\n");
+}
+
+void print_infer(int id, vec<atom>& lemma, vec<int>& ants, VarTable& vtbl) {
+  fprintf(stdout, "%d", id);
+  for(atom at : lemma)
+    print_atom(at, vtbl);
   fprintf(stdout, " 0");
 
   for(int ant : ants)
@@ -183,6 +204,7 @@ public:
   bool is_stale(ref_t r) { return r.id != _info[r.idx].id; }
 
   void flush_deletions(void);
+  void flush_deletions(VarTable& vtbl);
 protected:
   void real_delete(int ci) {
     int rep = dense[--count];
@@ -247,6 +269,35 @@ void emit_clause(clause_set& cs, clause_set::ref_t cl) {
   fprintf(stdout, " 0\n");
 }
 
+void emit_clause(clause_set& cs, clause_set::ref_t cl, VarTable& vtbl) {
+  clause_set::info_t& cinfo(cs[cl]);
+  // If the clause has already been
+  // output, terminate
+  if(cinfo.emitted)
+    return;
+  // Assuming deletion handling is correct, there
+  // shouldn't be any stale references
+  assert(cinfo.id == cl.id);
+
+  cinfo.emitted = true;
+  vec<clause_set::ref_t>& ants(cs.ants(cl));
+  for(clause_set::ref_t ant : cs.ants(cl)) {
+    emit_clause(cs, ant, vtbl);
+  }
+  if(ants.size() == 0 && cs.last_hint != cs.hint(cl)) {
+    fprintf(stdout, "c %s\n", cs.hint(cl).c_str());
+    cs.last_hint = cs.hint(cl);
+  }
+  fprintf(stdout, "%d", cl.id);
+  for(atom at : cs.atoms(cl))
+    print_atom(at, vtbl);
+  fprintf(stdout, " 0");
+
+  for(clause_set::ref_t ant : ants)
+    fprintf(stdout, " %d", ant.id);
+  fprintf(stdout, " 0\n");
+}
+
 void clause_set::flush_deletions(void) {
   // For each deleted clause, check whether some
   // reference survives
@@ -258,6 +309,37 @@ void clause_set::flush_deletions(void) {
     for(ref_t use : _uses[ci]) {
       if(!is_stale(use) && _info[use.idx].count > 0) {
         emit_clause(*this, use);
+      }
+    }
+  }
+  // Now, emit deletion information for any clause
+  // that has been emitted,
+  // and clear expired data
+  for(int ci : pending_deletes) {
+    if(_info[ci].emitted) {
+      fprintf(stdout, "d %d\n", _info[ci].id);
+    }
+    real_delete(ci);
+    /*
+    _ants[ci].clear();
+    _uses[ci].clear();
+    _atoms[ci].clear();
+    */
+  }
+  pending_deletes.clear();
+}
+
+void clause_set::flush_deletions(VarTable& vtbl) {
+  // For each deleted clause, check whether some
+  // reference survives
+  for(int ci : pending_deletes) {
+    assert(_info[ci].pos < count);
+
+    // If so, the subtree rooted at that use
+    // must be emitted
+    for(ref_t use : _uses[ci]) {
+      if(!is_stale(use) && _info[use.idx].count > 0) {
+        emit_clause(*this, use, vtbl);
       }
     }
   }
@@ -306,7 +388,8 @@ int main(int argc, char** argv) {
 
   // Read in the atom semantics
   AtomTable atable;
-  read_atoms(lit_stream, atable);
+  VarTable vtable;
+  read_atoms(lit_stream, atable, vtable);
 
   gzclose(lit_file);
 
@@ -335,7 +418,7 @@ int main(int argc, char** argv) {
         break;
       case S_Intro:
         // Dump tautologies
-        clause_info.flush_deletions();
+        clause_info.flush_deletions(vtable);
         if(!is_tauto(env, parser.atoms)) {
           simplify(env, parser.atoms);
           // int id = clause_info.size();
@@ -370,7 +453,7 @@ int main(int argc, char** argv) {
         break;
       case S_Infer:
         {
-          clause_info.flush_deletions();
+          clause_info.flush_deletions(vtable);
           
           // Resolve non-tautology antecedents to the
           // corresponding references
@@ -403,7 +486,7 @@ int main(int argc, char** argv) {
               live_clauses.insert(std::make_pair(parser.id, ref));
 
               if(parser.atoms.size() == 0) {
-                emit_clause(clause_info, ref);
+                emit_clause(clause_info, ref, vtable);
               }
             }
           } else {

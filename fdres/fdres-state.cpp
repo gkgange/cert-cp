@@ -507,7 +507,8 @@ Clause* FDres::pop_clause(int cl_id)
     table.erase(it);
     return cl;
   }
-  assert(0 && "Clause not found.\n");
+//  fprintf(stderr, "Clause not found: %d\n", cl_id);
+//  assert(0);
   return NULL;
 }
 
