@@ -526,8 +526,8 @@ void FDres::grow_to(int nvars)
 
 void FDres::grow_to(vec<atom>& cl)
 {
-  int v = 0;
+  int v = -1;
   for(atom l : cl)
     v = std::max(v, l.var);
-  grow_to(v);
+  grow_to(v+1);
 }
