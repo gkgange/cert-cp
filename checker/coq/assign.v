@@ -10,9 +10,19 @@ Require Psatz.
 Open Scope Z_scope.
 Definition ivar := Z.
 Definition val := Z.
+
+Inductive iterm :=
+  | Ivar : ivar -> iterm
+  | Ilit : Z -> iterm.
+                
 Definition valuation := (Z -> val).
 
 Definition eval_ivar (x : ivar) (theta : valuation) := theta x.
+Definition eval_iterm (t : iterm) (theta : valuation) :=
+  match t with
+    | Ivar v => eval_ivar v theta
+    | Ilit k => k
+  end.
 
 Definition ivar_eqb x y := Z.eqb x y.
 

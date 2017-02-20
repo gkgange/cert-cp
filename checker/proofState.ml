@@ -96,6 +96,24 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
+let parse_cst model toks =
+  match Stream.next toks with
+  | GL.Ident id -> 
+    begin
+    try
+      let pcst = (get_cst_parser id) in
+      (* Drop opening paren *)
+      chomp toks (GL.Kwd "(") ;
+      (* Indirection is to support (eventually) providing
+       * multiple checkers for a constraint. *)
+      let cst = pcst model toks in
+      (* Drop closing paren. *)
+      chomp toks (GL.Kwd ")") ;
+      cst
+    with Not_found -> failwith (Format.sprintf "In: parse_cst. constraint not found: %s" id)
+    end
+  | _ -> failwith "In: parse_cst. Expected identifier as next token."
+
 (* Determining the value of an identifier. *)
 let term_defn model id =
   let aux key =

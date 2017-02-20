@@ -117,17 +117,24 @@ let write_clause fmt cl =
 let write_arith fmt arith =
   Format.fprintf fmt "model.Arith <fix>"
 
+let rec write_cst_body fmt cst =
+  match cst with
+  | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
+  | C_impl.Elem obj -> let (x, y, ks) = Obj.magic obj in write_elem fmt x y ks
+  | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
+  | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
+  | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
+  | C_impl.Conj (x, y) -> write_meta fmt "model.Conj" [x; y]
+  | C_impl.Disj (x, y) -> write_meta fmt "model.Disj" [x; y]
+  | C_impl.Tauto -> ()
+and write_meta fmt ident args =
+  Format.fprintf fmt "%s(@[<hov 1>" ident ;
+  Utils.print_list ~sep:";@," write_cst_body fmt args ;
+  Format.fprintf fmt ")@]"
+
 let write_coq_cst fmt id cst =
   Format.fprintf fmt "@[(%d, " id ;
-  begin
-    match cst with
-    | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
-    | C_impl.Elem obj -> let (x, y, ks) = Obj.magic obj in write_elem fmt x y ks
-    | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
-    | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
-    | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
-    | C_impl.Tauto -> ()
-  end ;
+  write_cst_body fmt cst ;
   Format.fprintf fmt ")@]"
     
 (* Bundle each cst with its index, then print *)

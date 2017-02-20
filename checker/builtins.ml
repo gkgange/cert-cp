@@ -87,7 +87,28 @@ let parse_cumul model tokens =
   C_impl.make_cumul (make_cumul xs durations resources lim)
 ;;
 
+let chomp tok toks =
+  match Stream.next toks with
+  | t' when tok = t' -> ()
+  | _ -> failwith "Token match failed."
+
+let parse_conj model tokens =
+  let x = Pr.parse_cst model tokens in
+  chomp (GL.Kwd ",") tokens ;
+  let y = Pr.parse_cst model tokens in
+  C_impl.Conj (x, y)
+
+let parse_disj model tokens =
+  let x = Pr.parse_cst model tokens in
+  chomp (GL.Kwd ",") tokens ;
+  let y = Pr.parse_cst model tokens in
+  C_impl.Disj (x, y)
+
 let register () =
   Pr.add_cst_parser "linear_le" minfo_parse_linear_le ;
   Pr.add_cst_parser "element" parse_element ;
   Pr.add_cst_parser "cumulative" parse_cumul ;
+  Pr.add_cst_parser "clause" minfo_parse_clause ;
+  Pr.add_cst_parser "and" parse_conj ;
+  Pr.add_cst_parser "or" parse_disj
+

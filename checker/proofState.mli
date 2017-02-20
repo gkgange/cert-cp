@@ -17,6 +17,7 @@ val parse_model_info : Genlex.token Stream.t -> model_info
 val model_of_model_info : model_info -> Checker_impl.model
 
 val add_cst_parser : ident -> (model_info -> Genlex.token Stream.t -> Checker_impl.cst) -> unit
+val parse_cst : model_info -> Genlex.token Stream.t -> Checker_impl.cst
 
 val get_ivar : model_info -> ident -> int
 

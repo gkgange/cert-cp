@@ -1,6 +1,6 @@
 (* Various helper functions *)
 
-let print_list ?sep:(sep=";") f fmt xs =
+let print_list ?sep:(sep=(";@," : (unit, Format.formatter, unit) format)) f fmt xs =
   Format.fprintf fmt "[@[" ;
   begin
     match xs with
@@ -9,7 +9,7 @@ let print_list ?sep:(sep=";") f fmt xs =
       begin
         f fmt h ;
         List.iter (fun x ->
-          Format.fprintf fmt "%s@ " sep ;
+          Format.fprintf fmt sep ;
           f fmt x
         ) tl
       end

@@ -72,6 +72,12 @@ Definition var_dom ds x :=
     end
   end.
 
+Definition term_dom ds x :=
+  match x with
+  | Ilit k => dom_const k
+  | Ivar v => var_dom ds v
+  end.
+
 Definition db_from_dom x ds := fst (var_dom ds x).
 
 Definition eval_domset_alt ds theta := forall (x : ivar), eval_dom (x, var_dom ds x) theta.
