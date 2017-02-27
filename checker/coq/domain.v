@@ -110,7 +110,6 @@ Lemma eval_domset_vardom : forall ds x theta, eval_domset ds theta -> eval_dom (
 Proof.
   intros ds x theta H; apply eval_domset_equiv in H; unfold eval_domset_alt in H; now apply H.
 Qed.
-
 Lemma db_from_dom_valid : forall ds x theta, eval_domset ds theta -> sat_dbound (db_from_dom x ds) (theta x).
 Proof.
   intros; apply eval_domset_vardom with (x := x) (theta := theta) in H; now unfold eval_dom, sat_dom in H.
@@ -387,6 +386,19 @@ Qed.
 
 Lemma eval_dom_sat_equiv : forall x d t, eval_dom (x, d) t <-> sat_dom d (t x).
 Proof. now unfold eval_dom. Qed.
+
+Lemma term_dom_valid :
+  forall ds theta,
+    eval_domset ds theta -> forall t, sat_dom (term_dom ds t) (eval_iterm t theta).
+Proof.
+  intros. unfold term_dom, eval_iterm; destruct t.
+  + apply eval_domset_vardom with (x := i) in H.
+    unfold eval_dom in H; simpl in H.
+    assumption.
+  + unfold sat_dom, dom_const, sat_dbound, sat_lb, sat_ub; simpl.
+    split; [omega | apply zset.notmem_empty ].
+Qed.
+
 Ltac dom_spec :=
     repeat (
       match goal with

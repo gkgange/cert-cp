@@ -264,6 +264,7 @@ Definition sat_bound (b : model_bound) (x : ivar) (k : Z) :=
   end.
 *)
     
+
        
 (*
 Fixpoint tighten_model_ub (bs : list model_bound) (x : ivar) (k : Z) :=
@@ -341,3 +342,35 @@ Definition BoundedChecker (C : Constraint) (Ch : Checker C)  : Checker (BoundedC
   mkChecker (BoundedConstraint C) (bounded_check C Ch) (bounded_check_valid C Ch).
 
 *)
+
+Definition db_max x y := (bound_may2 Z.max (fst x) (fst y), bound_must2 Z.max (snd x) (snd y)).
+Definition db_min x y := (bound_must2 Zmin (fst x) (fst y), bound_may2 Zmin (snd x) (snd y)).
+
+Ltac max_tac :=
+  (match goal with
+    | [ H : Z.le ?X ?Y |- Z.le ?X (Z.max ?Y ?Z) ] =>
+      let H := fresh in assert (H := Z.le_max_l Y Z)
+    | [ H : Z.le ?X ?Z |- Z.le ?X (Z.max ?Y ?Z) ] =>
+      let H := fresh in assert (H := Z.le_max_r Y Z)
+    | [ H : Z.le ?Y ?X |- Z.le (Z.min ?Y ?Z) ?X ] =>
+      let H := fresh in assert (H := Z.le_min_l Y Z)
+    | [ H : Z.le ?Z ?X |- Z.le (Z.min ?Y ?Z) ?X ] =>
+      let H := fresh in assert (H := Z.le_min_r Y Z)
+  end); try omega.
+
+Lemma db_max_spec : forall x x' k k', sat_dbound x k -> sat_dbound x' k' -> sat_dbound (db_max x x') (Z.max k k').
+Proof.
+  intros x x' k k'.
+  unfold db_max, bound_may2, bound_must2; simpl.
+  unfold sat_dbound, sat_lb, sat_ub; destruct x, x'; simpl.
+  destruct b, b0, b1, b2; intuition; try max_tac;
+    try (apply Z.max_le_compat; omega).
+Qed.
+Lemma db_min_spec : forall x x' k k', sat_dbound x k -> sat_dbound x' k' -> sat_dbound (db_min x x') (Z.min k k').
+Proof.
+  intros x x' k k'.
+  unfold db_min, bound_may2, bound_must2; simpl.
+  unfold sat_dbound, sat_lb, sat_ub; destruct x, x'; simpl.
+  destruct b, b0, b1, b2; intuition; try max_tac;
+    try (apply Z.min_le_compat; omega).
+Qed.
