@@ -149,12 +149,25 @@ let init_printers () =
   let handlers =
     [ "int_lin_le", (fun fmt pr args -> print_linear "le" args fmt) ;
       "int_lin_eq", (fun fmt pr args -> print_linear_eq args fmt) ;
+      "int_lin_ne", (fun fmt pr args -> print_linear "ne" args fmt) ;
       "int_lin_le_reif",
         (fun fmt pr args ->
           let r = get_atom args.(3) in
           print_conj
             [print_half r (print_linear "le" [|args.(0); args.(1); args.(2)|]) ;
             (print_half (negate r) (print_linear_ge [|args.(0); args.(1); Pr.Ilit ((Pr.get_int args.(2)) + 1)|]))] fmt) ;
+      "int_lin_eq_reif",
+        (fun fmt pr args ->
+          let r = get_atom args.(3) in
+          print_conj
+            [print_half r (print_linear_eq [|args.(0); args.(1); args.(2)|]) ;
+            (print_half (negate r) (print_linear "ne" [|args.(0); args.(1); args.(2)|]))] fmt) ;
+      "int_lin_ne_reif",
+        (fun fmt pr args ->
+          let r = get_atom args.(3) in
+          print_conj
+            [print_half r (print_linear "ne" [|args.(0); args.(1); args.(2)|]) ;
+            (print_half (negate r) (print_linear_eq [|args.(0); args.(1); args.(2)|]))] fmt) ;
       "array_int_element", (fun fmt pr args -> print_element args fmt) ;
       "array_var_int_element", (fun fmt pr args -> print_element args fmt) ;
       "chuffed_cumulative", (fun fmt pr args -> print_cumulative args fmt) ;
