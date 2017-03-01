@@ -49,6 +49,8 @@ let minfo_parse_vprop minfo =
     | [< 'GL.Kwd ">=" ; k = S.intconst >] -> C_impl.Neg (C_impl.ILeq (x, (k-1)))
   in
   parser
+    | [< 'GL.Ident "true" >] -> C_impl.Pos C_impl.CTrue
+    | [< 'GL.Ident "false" >] -> C_impl.Neg C_impl.CTrue
     | [< 'GL.Ident x ; vp = aux (Pr.get_ivar minfo x) >] -> vp
 
 let neglit = function
