@@ -17,6 +17,7 @@ Definition model_bound := (ivar * (val * val))%type.
 Inductive cst :=
   | Tauto
   | Lin : linear.LinearCon.(T) -> cst
+  | LinNE : linear.LinearNE.(T) -> cst
   | Elem : element.ElemConstraint.(T) -> cst  
   | Cumul : cumulative.CumulConstraint.(T) -> cst  
   | Clause : clause_domain.ClauseCst.(T) -> cst
@@ -27,6 +28,7 @@ Inductive cst :=
   | Half : lit.lit -> cst -> cst.
 
 Definition make_linear xs k := Lin (xs, k).
+Definition make_lin_ne xs k := LinNE (xs, k).
 Definition make_element x y ks := Elem (element.Element x y ks).
 Definition make_cumul (c : cumulative.cumul) := Cumul c.                                  
 Definition make_clause (cl : lit.clause) := Clause cl.
@@ -42,6 +44,7 @@ Definition csts := list (cst_id * cst).
 Fixpoint eval_cst c (theta : valuation) := match c with
   | Tauto => True
   | Lin x => linear.LinearCon.(eval) x theta
+  | LinNE x => linear.LinearNE.(eval) x theta
   | Elem x => element.ElemConstraint.(eval) x theta
   | Cumul x => cumulative.CumulConstraint.(eval) x theta
   | Clause x => clause_domain.ClauseCst.(eval) x theta
@@ -59,6 +62,7 @@ Fixpoint check_cst_unsat c (ds : domset) := match c with
       | _ => false
     end
   | Lin x => check_unsat linear.LinearCon linear.CheckLinearUnsat x ds
+  | LinNE x => check_unsat linear.LinearNE linear.CheckLinearNeqUnsat x ds
   | Elem x => check_unsat element.ElemConstraint element.ElemCheckUnsat x ds
   | Cumul x => check_unsat cumulative.CumulConstraint cumulative.CumulCheck x ds
   | Clause x => check_unsat clause_domain.ClauseCst clause_domain.ClauseCheckUnsat x ds
@@ -94,6 +98,7 @@ Fixpoint eval_csts (cs : csts) (theta : valuation) :=
 Fixpoint check_cst_sol c (sol : valuation) := match c with
   | Tauto => true
   | Lin x => check_sol linear.LinearCon linear.LinearSolCheck x sol
+  | LinNE x => check_sol linear.LinearNE linear.LinearNESolCheck x sol
   | Elem x => check_sol element.ElemConstraint element.ElementSolCheck x sol
   | Cumul x => check_sol cumulative.CumulConstraint cumulative.CumulSolCheck x sol
   | Clause x => check_sol clause_domain.ClauseCst clause_domain.ClauseSolCheck x sol

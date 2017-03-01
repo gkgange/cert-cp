@@ -9,6 +9,7 @@ Definition linterm : Type := (Z * iterm)%type.
 
 (* c_1 x_1 + ... + c_n x_n <= k *)
 Definition lin_leq : Type := ((list linterm) * Z)%type.
+Definition lin_neq : Type := ((list linterm) * Z)%type.
 
 Definition eval_linterm (term : linterm) (theta : valuation) := (fst term)*(eval_iterm (snd term) theta).
 
@@ -61,10 +62,20 @@ Qed.
 Definition eval_lincon lincon (theta : valuation) :=
   (eval_linsum (fst lincon) theta) <= (snd lincon).
 
+Definition eval_lin_neq diseq theta :=
+  (eval_linsum (fst diseq) theta) <> (snd diseq).
+
 Definition check_lincon_unsat (lincon : lin_leq) (ds : domset) : bool :=
   negb (satb_lb (fst (linsum_db_from_dom (fst lincon) ds)) (snd lincon)).
 
+Definition check_lin_neq_unsat diseq ds :=
+  match db_constant_value (linsum_db_from_dom (fst diseq) ds) with
+    | None => false
+    | Some k => Z.eqb k (snd diseq)
+  end.
+                                    
 Definition LinearCon := mkConstraint lin_leq eval_lincon.
+Definition LinearNE := mkConstraint lin_neq eval_lin_neq.
 
 Theorem check_lincon_unsat_valid : forall (lincon : lin_leq) (ds : domset),
   check_lincon_unsat lincon ds = true -> cst_is_unsat LinearCon lincon ds.
@@ -79,12 +90,30 @@ Proof.
     try (tauto || omega).
 Qed.  
 
+Theorem check_lin_neq_unsat_valid : forall (lincon : lin_neq) (ds : domset),
+  check_lin_neq_unsat lincon ds = true -> cst_is_unsat LinearNE lincon ds.
+Proof.
+  unfold check_lin_neq_unsat, cst_is_unsat, eval; simpl; unfold eval_lin_neq.
+  intros cst ds; eqelim (db_constant_value (linsum_db_from_dom (fst cst) ds)); destruct cst as (ls, c).
+  assert (Hc := db_constant_value_2 (linsum_db_from_dom (fst (ls, c)) ds) z H0).
+  intros Hz theta Hds Hls.
+  simpl in *.
+  assert (Hsum := linsum_db_valid ls ds theta Hds).
+  apply Z.eqb_eq in Hz.
+  specialize (Hc _ Hsum).
+  congruence.
+  intros; congruence.
+Qed.
+
 Definition CheckLinearUnsat := mkUnsatChecker LinearCon check_lincon_unsat check_lincon_unsat_valid.
+Definition CheckLinearNeqUnsat := mkUnsatChecker LinearNE check_lin_neq_unsat check_lin_neq_unsat_valid.
 
 (* Computing solutions. *)
 Definition check_lincon_sol lincon theta :=
   Z.leb (eval_linsum (fst lincon) theta) (snd lincon).
 
+Definition check_lin_neq_sol lincon theta :=
+  negb (Z.eqb (eval_linsum (fst lincon) theta) (snd lincon)).
 Theorem check_lincon_sol_valid :
     forall lincon theta,
       (check_lincon_sol lincon theta = true) -> eval_lincon lincon theta.
@@ -95,4 +124,16 @@ Proof.
   intros; now apply Z.leb_le.
 Qed.
 
+Theorem check_lin_neq_sol_valid :
+    forall lincon theta,
+      (check_lin_neq_sol lincon theta = true) -> eval_lin_neq lincon theta.
+Proof.
+  intros lincon zs; destruct lincon.
+  unfold check_lin_neq_sol;  simpl.
+  unfold eval_lin_neq; simpl.
+  rewrite Bool.negb_true_iff; intros.
+  intro H'; apply Z.eqb_eq in H'; congruence.
+Qed.
+
 Definition LinearSolCheck := mkSolChecker LinearCon check_lincon_sol check_lincon_sol_valid.
+Definition LinearNESolCheck := mkSolChecker LinearNE check_lin_neq_sol check_lin_neq_sol_valid.

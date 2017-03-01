@@ -38,6 +38,11 @@ let minfo_parse_linear_le minfo tokens =
    let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
    C_impl.make_linear linterms k
 
+let minfo_parse_linear_ne minfo tokens =
+   let (coeffs, (vars, k)) = linear_args (parse_iterm minfo) tokens in
+   let linterms = List.map2 (fun c v -> (c, v)) coeffs vars in
+   C_impl.make_lin_ne linterms k
+
 
 (* FIXME: Add clause parser *)
 let minfo_parse_vprop minfo = 
@@ -161,6 +166,7 @@ let parse_arith_ne model tokens =
 
 let register () =
   Pr.add_cst_parser "linear_le" minfo_parse_linear_le ;
+  Pr.add_cst_parser "linear_ne" minfo_parse_linear_ne ;
   Pr.add_cst_parser "element" parse_element ;
   Pr.add_cst_parser "cumulative" parse_cumul ;
   Pr.add_cst_parser "clause" minfo_parse_clause ;

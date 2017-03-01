@@ -1,6 +1,6 @@
 (* Most of these than probably go. *)
 Require Import Bool.
-Require Import Arith.
+(* Require Import Arith. *)
 Require Import ZArith.
 Require Import Compare_dec.
 (* Require Import Omega. *)
@@ -68,6 +68,38 @@ Definition satb_dbound (db : dbound) (k : Z) :=
 
 Definition unsat_db (db : dbound) :=
   forall (k : Z), ~ sat_dbound db k.
+
+Definition db_constant_value db :=
+  match db with
+    | (Bounded k, Bounded k') =>
+      if Z.eqb k k' then
+        Some k
+      else None
+    | _ => None
+  end.
+        
+Lemma db_constant_value_1 :
+  forall db k, db_constant_value db = Some k -> sat_dbound db k.
+Proof.
+  intros db k; unfold db_constant_value, sat_dbound, sat_lb, sat_ub; destruct db; destruct b, b0;
+  simpl; intuition; try (congruence || omega).
+  eqelim (Z.eqb z z0).
+    + inversion H; omega.
+    + congruence.
+    + eqelim (Z.eqb z z0).
+      apply Z.eqb_eq in H1.
+      inversion H; omega.
+      congruence.
+Qed.
+
+Lemma db_constant_value_2 :
+  forall db k, db_constant_value db = Some k -> forall k', sat_dbound db k' -> k = k'.
+Proof.
+  intros db k; unfold db_constant_value, sat_dbound, sat_ub, sat_lb; destruct db; destruct b, b0;
+    simpl; intros H k'; try congruence.
+  intros; eqelim (Z.eqb z z0); try congruence; try (inversion H; clear H).
+  apply Z.eqb_eq in H2; omega.
+Qed.
 
 Definition unsatb_db (db : dbound) :=
   match (fst db) with

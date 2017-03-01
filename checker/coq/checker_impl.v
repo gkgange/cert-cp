@@ -15,6 +15,7 @@ Set Extraction Optimize.
 Extraction "checker_impl.ml"
   model.cst
   model.make_linear
+  model.make_lin_ne
   model.make_cumul
   model.make_element
   model.make_clause
