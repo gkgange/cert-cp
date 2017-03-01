@@ -4,6 +4,7 @@ Require Import Psatz.
 Require Import range.
 Require Import range_properties.
 Require Import domain.
+Require Import assign.
 
 Ltac unfold_satdb := unfold sat_dbound, sat_lb, sat_ub in *; simpl.
 
@@ -183,12 +184,17 @@ Proof.
 Qed.
 
 Definition db_mul_pos (x y : dbound) :=
-  match x with
-  | (lx, ux) =>
-    match y with
-    | (ly, uy) => (mul_bound lx ly, mul_bound ux uy)
-    end
-  end.
+  if unsatb_db x then
+    x
+  else if unsatb_db y then
+    y
+  else
+    match x with
+    | (lx, ux) =>
+        match y with
+        | (ly, uy) => (mul_bound lx ly, mul_bound ux uy)
+        end
+    end.
 
 Lemma nonneg_mul_monotone_r : forall k k' x x',
   0 <= k -> 0 <= k' -> k <= x -> k' <= x' -> k * k' <= x * x'.
@@ -248,12 +254,16 @@ Proof.
   intros Hkx Hk'y.
   assert (Hpk := Hkx); apply Hk in Hpk.
   assert (Hpk' := Hk'y); apply Hk' in Hpk'.
+  unfold db_mul_pos;
+    eqelim (unsatb_db x).
+    rewrite unsatb_db_true_iff in H0; specialize (H0 k); contradiction.
+    eqelim (unsatb_db y).
+    rewrite unsatb_db_true_iff in H1; specialize (H1 k'); contradiction.
   unfold db_is_nonneg in *; unfold db_mul_pos, mul_bound; destruct x, y; destruct b, b0, b1, b2; simpl in *;
     unfold_satdb; simpl in *; split; try trivial; destruct Hkx, Hk'y;
     apply nonneg_mul_monotone_r; try lia; try apply (Hnx z); try apply (Hny z0);
     try apply (Hny z1); lia.
 Qed.
-  
   
 Definition db_mul (x y : dbound) :=
   let (xn, xp) := db_split_at x (-1) in

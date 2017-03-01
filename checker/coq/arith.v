@@ -12,24 +12,6 @@ Require arith_ops.
 (* Propagation for multiplication.
  * We're not doing full factorization, just bounds. *)
 
-(*
-Inductive int_term :=
-  | Const : Z -> int_term
-  | Var : ivar -> int_term.
-
-Definition eval_int_term term theta :=
-  match term with
-  | Const c => c
-  | Var v => eval_ivar v theta
-  end.
-
-Definition domset_term_dbound term ds :=
-  match term with
-  | Const c => (Bounded c, Bounded c)
-  | Var x => (fst (var_dom ds x))
-  end.
-*)
-
 Inductive binop := Plus | Times | Sub | Div | Min | Max.
 
 Definition rel_of f : Z -> Z -> Z -> Prop := fun z x y => Z.eq z (f x y).
@@ -83,6 +65,7 @@ Fixpoint eval_aexpr exp theta v :=
 
 Definition arith_eq := (iterm * aexpr)%type.
 Definition eval_arith_eq aeq theta := eval_aexpr (snd aeq) theta (eval_iterm (fst aeq) theta).
+Definition eval_arith_neq ane theta := exists v, eval_aexpr (snd ane) theta v /\ v <> (eval_iterm (fst ane) theta).
 
 Definition db_of_binop op : dbound -> dbound -> dbound :=
    match op with
@@ -138,19 +121,12 @@ Definition eval_int_arith arith theta :=
 *)
 
 Definition ArithConstraint := mkConstraint arith_eq eval_arith_eq.
+Definition ArithNE := mkConstraint (iterm * aexpr)%type eval_arith_neq.
 
 (* What are the semantics of Div?
    - Round towards zero/round towards -infty?
    - x/0 fails? or x/0 = 0?
    Most sense to have round-towards-zero, x/0 fails. *)
-(*
-Definition check_int_arith_sol arith theta :=
-  match arith with
-  | Mul x y z => Z.eqb (eval_ivar x theta) ((eval_ivar y theta)*(eval_ivar z theta))
-  | Div x y z =>
-    andb (negb (Z.eqb (eval_ivar z theta) 0)) (Z.eqb (eval_ivar x theta) (Z.quot (eval_ivar y theta) (eval_ivar z theta)))
-  end.
-*)
 
 Fixpoint eval_aexpr_part expr theta :=
   match expr with
@@ -187,6 +163,23 @@ Proof.
   intros; congruence.
 Qed.
 
+Definition check_aneq_sol aneq theta :=
+  match eval_aexpr_part (snd aneq) theta with
+    | None => false
+    | Some r => negb (Z.eqb r (eval_iterm (fst aneq) theta))
+  end.
+Lemma check_aneq_sol_valid : forall arith theta, check_aneq_sol arith theta = true -> eval_arith_neq arith theta.
+Proof.
+  intros arith theta.
+  unfold check_aneq_sol, eval_arith_neq.
+  eqelim (eval_aexpr_part (snd arith) theta).
+  intro Hv; rewrite Bool.negb_true_iff in Hv.
+  rewrite Z.eqb_neq in Hv.
+  exists v.
+  split; [apply eval_aexpr_part_sound; assumption | assumption].
+  intros; discriminate.
+Qed.
+
 Definition check_int_arith arith ds :=
   unsatb_db (db_meet (range_of_dom (term_dom ds (fst arith))) (db_of_aexpr (snd arith) ds)).
 Lemma check_int_arith_valid : forall arith ds, check_int_arith arith ds = true -> cst_is_unsat ArithConstraint arith ds.
@@ -202,116 +195,58 @@ Proof.
   specialize (Hu (eval_iterm i theta)); contradiction.
 Qed.
 
+Definition check_aneq arith ds :=
+  let x := term_dom ds (fst arith) in
+  let y := db_of_aexpr (snd arith) ds in
+  if orb (dom_unsatb x) (unsatb_db y) then
+    true
+  else
+    match (range_of_dom x), y with
+      | (Bounded k, Bounded k'), (Bounded k'', Bounded k''')  =>
+          andb (Z.eqb k k') (andb (Z.eqb k k'') (Z.eqb k k'''))
+      | _, _ => false
+    end.
+Lemma check_aneq_valid : forall arith ds, check_aneq arith ds = true -> cst_is_unsat ArithNE arith ds.
+Proof.
+  intros arith ds.
+  unfold check_aneq.
+  unfold cst_is_unsat, eval; simpl; unfold eval_arith_neq.
+  eqelim (dom_unsatb (term_dom ds (fst arith))); eqelim (unsatb_db (db_of_aexpr (snd arith) ds));
+    simpl; intros H theta Hds;
+    intro Hv; elim Hv; clear Hv; intros v Hv; destruct Hv as [He Hv].
+  + assert (Hc := db_of_aexpr_spec (snd arith) ds theta v).
+    specialize (Hc Hds He).
+    apply unsatb_db_true_iff in H1.
+    specialize (H1 v); contradiction.
+  + assert (Ht := term_dom_valid ds theta Hds (fst arith)).
+    apply dom_unsatb_unsat in H0; specialize (H0 (eval_iterm (fst arith) theta)); contradiction.
+  + assert (Hc := db_of_aexpr_spec (snd arith) ds theta v Hds He).
+    apply unsatb_db_true_iff in H1; specialize (H1 v); contradiction.
+  + eqelim (range_of_dom (term_dom ds (fst arith)));
+    eqelim (db_of_aexpr (snd arith) ds); simpl in *; destruct b, b0, b1, b2; try congruence.
+    repeat (apply Bool.andb_true_iff in H;
+            let H' := fresh in destruct H as [H' H];
+            apply Z.eqb_eq in H'); apply Z.eqb_eq in H.
+    rewrite <- H2, <- H5, <- H in *.
+    assert (Hse := db_of_aexpr_spec (snd arith) ds theta v Hds He).
+    assert (Ht := term_dom_valid ds theta Hds (fst arith)).
+    unfold sat_dom in Ht; destruct Ht as [Ht _]; unfold range_of_dom in H3; simpl in *.
+    assert (fst (term_dom ds (fst arith)) = (Bounded z, Bounded z)).
+      eqelim (term_dom ds (fst arith)).
+      rewrite H3; trivial.
+    rewrite H6 in *.
+    rewrite H4 in Hse.
+    unfold sat_dbound in Hse, Ht; simpl in *.
+    assert (z = v). omega.
+    assert (eval_iterm (fst arith) theta = z). 
+    apply Z.le_antisymm; intuition.
+    congruence.
+Qed.
+
 Definition ArithCheck :=
   mkUnsatChecker ArithConstraint (check_int_arith) (check_int_arith_valid).
-
-(*
-Definition ArithDbnd := DomboundedConstraint ArithConstraint.
-Definition ArithDbndCheck := DomboundedDBCheck ArithConstraint ArithDSet.
-*)
-
-(*
-Definition check_int_arith arith (ds : domset) :=
-  match arith with
-  | Mul x y z =>
-    unsatb_db
-      (db_meet
-         (db_from_dom x ds)
-         (arith_ops.db_mul (db_from_dom y ds) (db_from_dom z ds)))
-  | Div x y z => negb (arith_ops.db_div_check (db_from_dom x ds) (db_from_dom y ds) (db_from_dom z ds))
-  end.
-*)
-
-(*
-Theorem check_int_arith_valid :
-  forall (arith : int_arith) (ds : domset),
-    check_int_arith arith ds = true -> cst_is_unsat ArithConstraint arith ds.
-Proof.
-  unfold ArithConstraint, cst_is_unsat.
-  unfold eval_int_arith, check_int_arith; destruct arith; simpl in *;
-    intros; try discriminate.
-  rewrite unsatb_db_true_iff in H.
-(*   apply evalclause_contra; intros. *)
-
-  assert (Hx := H0); apply db_from_dom_valid with (x := i) in Hx.
-  assert (Hy := H0); apply db_from_dom_valid with (x := i0) in Hy.
-  assert (Hz := H0); apply db_from_dom_valid with (x := i1) in Hz.
-  remember (db_from_dom i ds) as ix.
-  remember (db_from_dom i0 ds) as iy.
-  remember (db_from_dom i1 ds) as iz.
-  assert (Hyz := arith_ops.db_mul_sound iy iz (eval_ivar i0 theta) (eval_ivar i1 theta)).
-  assert (Hmeet := db_sat_impl_meet ix (arith_ops.db_mul iy iz) (eval_ivar i theta)).
-  assert (sat_dbound (db_meet ix (arith_ops.db_mul iy iz)) (eval_ivar i theta)).
-  apply Hmeet; split; try assumption.
-    rewrite H1. apply arith_ops.db_mul_sound; try assumption.
-  unfold unsat_db in H. now apply H in H2.
-
-  remember (eval_ivar i0 theta) as k; remember (eval_ivar i1 theta) as k'.
-  assert (Hsk := H0); apply db_from_dom_valid with (x := i) in Hsk.
-  assert (Hsk' := H0); apply db_from_dom_valid with (x := i0) in Hsk'.
-  assert (Hskk' := H0); apply db_from_dom_valid with (x := i1) in Hskk'.
-  remember (db_from_dom i ds) as x; remember (db_from_dom i0 ds) as y;
-    remember (db_from_dom i1 ds) as z.
-  destruct H1 as [Hz Hq].
-  assert (Hf := arith_ops.db_div_check_sound x y z k k').
-  apply negb_true_iff in H.
-  assert (arith_ops.db_div_check x y z = true).
-  apply Hf; [assumption | rewrite Heqk | rewrite Heqk' | rewrite <- Hq]; assumption.
-  congruence.
-Qed.
-
-Definition ArithCheck := mkUnsatChecker ArithConstraint (check_int_arith) (check_int_arith_valid).
-*)
-
-(*
-Definition check_int_arith_dbfun arith (f : dbfun) :=
-  match arith with
-  | Mul x y z =>
-    unsatb_db
-      (db_meet (f x)
-         (arith_ops.db_mul (f y) (f z)))
-  | Div x y z => negb (arith_ops.db_div_check (f x) (f y) (f z))
-  end.
-
-Theorem check_int_arith_dbfun_valid : forall (c : int_arith) (f : dbfun) (cl : clause),
-  is_domset_dbfun f cl /\ check_int_arith_dbfun c f = true ->
-    implies (eval_int_arith c) (eval_clause cl).
-Proof.
-  unfold check_int_arith; unfold is_domset_dbfun in *.
-  intros; apply check_int_arith_valid; destruct H.
-  unfold check_int_arith_dbfun in H0; unfold check_int_arith.
-  destruct c; try tauto; try contradiction.
-
-  now rewrite <- (H i), <- (H i0), <- (H i1); congruence. 
-  now rewrite <- (H i), <- (H i0), <- (H i1); congruence. 
-Qed.
- 
-Definition ArithDSet :=
-  mkDomDBCheck ArithConstraint (check_int_arith_dbfun) (check_int_arith_dbfun_valid).
-Definition ArithDbnd := DomboundedConstraint ArithConstraint.
-Definition ArithDbndCheck := DomboundedDBCheck ArithConstraint ArithDSet.
-
-Definition ArithDomCheck :=
-  CheckOfDomDBCheck ArithDbnd (ArithDbndCheck).
-
-Definition check_arith_dbnd (a : int_arith) (ds : domset) (cl : clause) :=
-  (check ArithDbnd ArithDomCheck) (ds, a) cl.
-
-Definition check_reif_arith_dbnd (r : lit) (a : int_arith) (ds : domset) (cl : clause) :=
-  (check (reif.ReifiedConstraint ArithDbnd) (reif.ReifiedCheck ArithDbnd ArithDomCheck)) (r, (ds, a)) cl.
-*)
-
-(*
-Theorem eval_int_arith_sol_valid :
-    forall arith theta,
-      (check_int_arith_sol arith theta = true) -> eval_int_arith arith theta.
-Proof.
-  intros arith theta; unfold check_int_arith_sol, eval_int_arith; destruct arith;
-    [now rewrite Z.eqb_eq |
-     rewrite andb_true_iff; rewrite negb_true_iff; rewrite Z.eqb_eq].
-  intro H; destruct H as [H0 Hquot].
-  split; [intro Heq ; rewrite <- Z.eqb_eq in Heq; now rewrite Heq in H0 | assumption].
-Qed.
-*)
+Definition ArithNECheck :=
+  mkUnsatChecker ArithNE (check_aneq) (check_aneq_valid).
 
 Definition ArithSolCheck := mkSolChecker ArithConstraint check_arith_sol check_arith_sol_valid.
+Definition ArithNESolCheck := mkSolChecker ArithNE check_aneq_sol check_aneq_sol_valid.

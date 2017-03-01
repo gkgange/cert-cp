@@ -36,18 +36,23 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
-(* let check_inferences model_info lmap toks = *)
 let check_inferences model_info p_step toks =
   let model = Pr.model_of_model_info model_info in
   let hint = ref (-1) in
+  let count = ref 0 in
   while Stream.peek toks <> None
   do
+    incr count ;
     (* match Pr.parse_step model_info lmap toks *)
     match p_step toks
     with
     | C_impl.Intro (id, cl) ->
         if not (C_impl.check_inference_model model !hint cl) then
-          Format.fprintf fmt "Inference failed.@."
+          begin
+            Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
+            Pr.print_clause fmt cl ;
+            Format.fprintf fmt "@."
+          end
     | C_impl.Hint h -> hint := h
     | C_impl.Resolve _ -> ()
     | C_impl.Del _ -> ()
@@ -188,18 +193,22 @@ let main () =
       let tchannel = open_in tfile in
       (* let ttoks = Spec.lexer (Stream.of_channel tchannel) in *)
       let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in
-      (* check_inferences model_info p_step ttoks *)
-      (* check_resolution model_info p_step ttoks *)
-      (* *)
-      let step0 = Pr.create model_info p_step ttoks in
-      let next_step = Pr.next in
-      (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
-      let okay = C_impl.certify_unsat model max_int step0 next_step in
-      if okay then
-        Format.fprintf fmt "OKAY@."
+      if !COption.debug then
+        begin
+          check_inferences model_info p_step ttoks ;
+          check_resolution model_info p_step ttoks 
+        end
       else
-        Format.fprintf fmt "FAILED@."
-      (* *)
+        begin
+          let step0 = Pr.create model_info p_step ttoks in
+          let next_step = Pr.next in
+          (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
+          let okay = C_impl.certify_unsat model max_int step0 next_step in
+          if okay then
+            Format.fprintf fmt "OKAY@."
+          else
+            Format.fprintf fmt "FAILED@."
+        end
     end
   | _ -> Format.fprintf fmt "ERROR: No solution or trace specified.@."
 

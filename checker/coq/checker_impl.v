@@ -18,6 +18,8 @@ Extraction "checker_impl.ml"
   model.make_cumul
   model.make_element
   model.make_clause
+  model.make_arith_eq
+  model.make_arith_ne
   model.domset_of_bounds
 
   resolution.resolvable

@@ -21,8 +21,10 @@ Inductive cst :=
   | Cumul : cumulative.CumulConstraint.(T) -> cst  
   | Clause : clause_domain.ClauseCst.(T) -> cst
   | Arith : arith.ArithConstraint.(T) -> cst
+  | ArithNE : arith.ArithNE.(T) -> cst
   | Conj : cst -> cst -> cst
-  | Disj : cst -> cst -> cst.
+  | Disj : cst -> cst -> cst
+  | Half : lit.lit -> cst -> cst.
 
 Definition make_linear xs k := Lin (xs, k).
 Definition make_element x y ks := Elem (element.Element x y ks).
@@ -30,6 +32,9 @@ Definition make_cumul (c : cumulative.cumul) := Cumul c.
 Definition make_clause (cl : lit.clause) := Clause cl.
 Definition make_conj x y := Conj x y.
 Definition make_disj x y := Disj x y.
+Definition make_arith_eq id expr := Arith (id, expr).
+Definition make_arith_ne id expr := ArithNE (id, expr).
+Definition make_half r cons := Half r cons.
 
 Definition cst_id := Z.
 Definition csts := list (cst_id * cst).
@@ -41,8 +46,10 @@ Fixpoint eval_cst c (theta : valuation) := match c with
   | Cumul x => cumulative.CumulConstraint.(eval) x theta
   | Clause x => clause_domain.ClauseCst.(eval) x theta
   | Arith x => arith.ArithConstraint.(eval) x theta
+  | ArithNE x => arith.ArithNE.(eval) x theta
   | Conj x y => (eval_cst x theta) /\ (eval_cst y theta)
   | Disj x y => (eval_cst x theta) \/ (eval_cst y theta)
+  | Half r c => (lit.eval_lit r theta) -> (eval_cst c theta)
   end.
 
 Fixpoint check_cst_unsat c (ds : domset) := match c with
@@ -56,8 +63,10 @@ Fixpoint check_cst_unsat c (ds : domset) := match c with
   | Cumul x => check_unsat cumulative.CumulConstraint cumulative.CumulCheck x ds
   | Clause x => check_unsat clause_domain.ClauseCst clause_domain.ClauseCheckUnsat x ds
   | Arith x => check_unsat arith.ArithConstraint arith.ArithCheck x ds
+  | ArithNE x => check_unsat arith.ArithNE arith.ArithNECheck x ds
   | Conj x y => orb (check_cst_unsat x ds) (check_cst_unsat y ds)
   | Disj x y => andb (check_cst_unsat x ds) (check_cst_unsat y ds)
+  | Half r c => andb (lit.lit_unsatb ds (lit.neglit r)) (check_cst_unsat c ds)
   end.
 
 Lemma check_cst_unsat_valid : forall c ds,
@@ -66,8 +75,14 @@ Proof.
   unfold check_cst_unsat, eval_cst; intros; induction c;
   try (destruct ds; tsimpl);
   try (apply check_unsat_valid in H; unfold cst_is_unsat in H; specialize (H theta); tauto).
-  (* Remaining case is conj *)
+  (* Remaining cases: conj, half *)
   apply Bool.orb_true_iff in H ; destruct H as [H | H]; [apply IHc1 | apply IHc2]; intuition.
+  (* Now, half *)
+  apply lit.lit_unsatb_unsat in H.
+  apply lit.lit_valid_neglit in H.
+  unfold lit.lit_valid in H; specialize (H theta H0).
+  specialize (H1 H).
+  now specialize (IHc H2 H1).
 Qed.
 
 Fixpoint eval_csts (cs : csts) (theta : valuation) := 
@@ -83,8 +98,10 @@ Fixpoint check_cst_sol c (sol : valuation) := match c with
   | Cumul x => check_sol cumulative.CumulConstraint cumulative.CumulSolCheck x sol
   | Clause x => check_sol clause_domain.ClauseCst clause_domain.ClauseSolCheck x sol
   | Arith x => check_sol arith.ArithConstraint arith.ArithSolCheck x sol
+  | ArithNE x => check_sol arith.ArithNE arith.ArithNESolCheck x sol
   | Conj x y => andb (check_cst_sol x sol) (check_cst_sol y sol)
   | Disj x y => orb (check_cst_sol x sol) (check_cst_sol y sol)
+  | Half r c => orb (negb (lit.evalb_lit r sol)) (check_cst_sol c sol)
   end.
 
 Lemma check_cst_sol_valid : forall c sol, check_cst_sol c sol = true -> eval_cst c sol.
@@ -92,6 +109,9 @@ Proof.
   intros c sol; unfold check_cst_sol, eval_cst; induction c; try (trivial || apply check_sol_valid). 
   + rewrite Bool.andb_true_iff; intuition.
   + rewrite Bool.orb_true_iff; intuition.
+  + rewrite Bool.orb_true_iff; intuition.
+    rewrite Bool.negb_true_iff in H1.
+    rewrite <- lit.evalb_lit_iff in H0; congruence.
 Qed.
 
 Fixpoint check_csts_sol (cs : csts) sol := match cs with

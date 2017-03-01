@@ -10,6 +10,7 @@ let verbosity = ref 0
 
 let stream = ref false
 let no_resolve = ref false
+let debug = ref false
 
 type trace_kind =
   | IDrup (* DRUP with axiom introduction. *)
@@ -43,6 +44,9 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
       Arg.String(fun f -> tracefile := Some f),
       " resolution proof trace to attempt to justify."
      );
+     ("-debug",
+      Arg.Unit (fun () -> debug := true),
+      " try to identify a failed inference/resolution step.");
      ("-format",
        Arg.Symbol([ "idrup" ; "dres" ], fun m ->
          match m with

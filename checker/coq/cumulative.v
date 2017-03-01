@@ -18,9 +18,9 @@ Record task : Type := mkTask {
 }.
 
 Record vartask : Type := mkVarTask {
-  vt_dur: ivar ;
-  vt_res : ivar ;
-  vt_svar : ivar
+  vt_dur: iterm ;
+  vt_res : iterm ;
+  vt_svar : iterm
 }.
 
 Record cumul : Type := mkCumul {

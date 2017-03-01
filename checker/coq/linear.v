@@ -5,12 +5,12 @@ Require Import range.
 Require Import range_properties.
 Require Import constraint.
 
-Definition linterm : Type := (Z * ivar)%type.
+Definition linterm : Type := (Z * iterm)%type.
 
 (* c_1 x_1 + ... + c_n x_n <= k *)
 Definition lin_leq : Type := ((list linterm) * Z)%type.
 
-Definition eval_linterm (term : linterm) (theta : valuation) := (fst term)*(theta (snd term)).
+Definition eval_linterm (term : linterm) (theta : valuation) := (fst term)*(eval_iterm (snd term) theta).
 
 Fixpoint eval_linsum ts theta :=
   match ts with
@@ -19,7 +19,7 @@ Fixpoint eval_linsum ts theta :=
   end.
 
 Definition linterm_db_from_dom (t : linterm) (ds : domset) :=
-  mul_z_dbound (fst t) (fst (var_dom ds (snd t))).
+  mul_z_dbound (fst t) (fst (term_dom ds (snd t))).
 
 Theorem linterm_db_from_dom_valid :
   forall (t : linterm) (ds : domset) (theta : valuation),
@@ -27,7 +27,8 @@ Theorem linterm_db_from_dom_valid :
       sat_dbound (linterm_db_from_dom t ds) (eval_linterm t theta).
 Proof.
   intros. destruct t. unfold linterm_db_from_dom.
-  apply (eval_domset_vardom ds i) in H.
+  assert (Ht := term_dom_valid ds theta H i).
+  unfold sat_dom in Ht; destruct Ht as [Ht _].
   apply mul_z_dbound_valid. unfold eval_dom, sat_dom in H; tauto.
 Qed.
 

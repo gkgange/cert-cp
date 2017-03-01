@@ -11,7 +11,7 @@ Require Import constraint.
  * 
  * We're assuming the elements are *)
 Inductive element : Type :=
-  | Element : ivar -> ivar -> list Z -> element.
+  | Element : iterm -> iterm -> list iterm -> element.
 
 (*
 Definition eval_element_alt con theta :=
@@ -22,11 +22,11 @@ Definition eval_element_alt con theta :=
 *)
 
 (* This is kind of an awkward definition. *)
-Fixpoint eval_element_rec (x : ivar) (i : ivar) (ys : list (Z * Z)) theta :=
+Fixpoint eval_element_rec (x : iterm) (i : iterm) (ys : list (Z * iterm)) theta :=
   match ys with
   | nil => False
   | cons (k, y) ys' =>
-    (theta i = k /\ theta x = y)
+    ((eval_iterm i theta) = k /\ (eval_iterm x theta)  = (eval_iterm y theta))
       \/ eval_element_rec x i ys' theta
   end.
 
@@ -36,11 +36,11 @@ Fixpoint augment_rec (A : Type) (xs : list A) (k : Z) :=
   | (cons x xs') => cons (k, x) (augment_rec A xs' (k+1))
   end.
 Definition augment (A : Type) (xs : list A) :=
-  augment_rec A xs 0.
+  augment_rec A xs 1.
 
 Definition eval_element (con : element) (theta : valuation) :=
   match con with
-  | Element x i ys => eval_element_rec x i (augment Z ys) theta
+  | Element x i ys => eval_element_rec x i (augment _ ys) theta
   end.
 
 (*
@@ -65,9 +65,13 @@ Fixpoint check_element_rec x i ys ds :=
   match ys with
   | nil => true
   | cons (k, y) ys' =>
+    (*
     negb
       ((satb_dom (var_dom ds i) k)
         && (satb_dom (var_dom ds x) y))
+     *)
+    ((negb (satb_dom (term_dom ds i) k))
+         || (dom_unsatb (dom_meet (term_dom ds x) (term_dom ds y))))
       (*
       ((satb_dbound (db_from_negclause i cl) k)
         && (satb_dbound (db_from_negclause x cl) y))
@@ -80,7 +84,7 @@ Definition ElemConstraint : Constraint :=
 
 Definition check_element_unsat elem ds :=
   match elem with
-  | Element x i ys => check_element_rec x i (augment Z ys) ds
+  | Element x i ys => check_element_rec x i (augment _ ys) ds
   end.
 
 Theorem check_element_unsat_valid : forall (elem : element) (ds : domset),
@@ -88,41 +92,44 @@ Theorem check_element_unsat_valid : forall (elem : element) (ds : domset),
 Proof.
   unfold cst_is_unsat, eval.
   unfold ElemConstraint, eval_element, check_element_unsat; destruct elem.
-  generalize (augment Z l); intros l0 ds; induction l0.
+  generalize (augment _ l); intros l0 ds; induction l0.
 
   intros; unfold eval_element_rec in H1; contradiction.
 
   unfold check_element_rec, eval_element_rec, augment, augment_rec in *;
     fold augment_rec in *; fold check_element_rec in *; fold eval_element_rec in *.
-  destruct a; simpl.
-  rewrite andb_true_iff, negb_true_iff, andb_false_iff in *.
+  destruct a.
+  rewrite andb_true_iff; rewrite orb_true_iff; rewrite negb_true_iff.
   intros.
-  destruct H.
+  destruct H as [Hc Hr].
 
-  destruct H1; [destruct H1 as [Hi0 Hi] | apply IHl0 with (theta := theta) in H2].
-
-    destruct H; [apply (eval_domset_vardom ds i0) in H0 | apply (eval_domset_vardom ds i) in H0];
-      unfold eval_dom in H0; simpl in H0; [rewrite Hi0 in H0 | rewrite Hi in H0];
-      apply satb_dom_iff in H0; congruence.
-
-    contradiction.
-    assumption.
-    assumption.
+  destruct H1 as [Hz | Ht]; [destruct Hz as [Hz Hi] | apply IHl0 with (theta := theta) in Ht];
+    try congruence.                                                                                        
+  destruct Hc.
+  + assert (Hd := term_dom_valid ds theta H0 i0).
+    rewrite Hz in Hd.
+    apply satb_dom_iff in Hd; congruence.
+  + rewrite dom_unsatb_unsat in H.
+    assert (sat_dom (dom_meet (term_dom ds i) (term_dom ds i1)) (eval_iterm i theta)).
+    apply dom_meet_iff; split.
+      apply (term_dom_valid ds theta H0 i).
+      rewrite Hi; apply (term_dom_valid ds theta H0 i1).
+    specialize (H (eval_iterm i theta)); contradiction.
 Qed.
 
 Definition ElemCheckUnsat := mkUnsatChecker ElemConstraint (check_element_unsat) (check_element_unsat_valid).
 
-Fixpoint eval_element_sol_rec (x : ivar) (i : ivar) ys (theta : valuation) :=
+Fixpoint eval_element_sol_rec (x : iterm) (i : iterm) ys (theta : valuation) :=
   match ys with
   | nil => false
   | cons (k, y) ys' =>
-    (Z.eqb (theta i)  k) && (Z.eqb (theta x) y)
+    (Z.eqb (eval_iterm i theta)  k) && (Z.eqb (eval_iterm x theta) (eval_iterm y theta))
       || eval_element_sol_rec x i ys' theta
   end.
 
 Definition eval_element_sol (con : element) (theta : valuation) :=
   match con with
-  | Element x i ys => eval_element_sol_rec x i (augment Z ys) theta
+  | Element x i ys => eval_element_sol_rec x i (augment _ ys) theta
   end.
 
 Theorem eval_element_sol_rec_iff :

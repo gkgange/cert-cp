@@ -8,6 +8,7 @@ val modules : string list ref
 val verbosity : int ref
 val stream : bool ref
 val no_resolve : bool ref
+val debug : bool ref
 
 type trace_kind =
   | IDrup (* DRUP with axiom introduction. *)

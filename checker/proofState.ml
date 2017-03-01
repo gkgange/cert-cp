@@ -44,6 +44,7 @@ let create_model_info () = {
 
  
 let add_ivar m id opt_b =
+  (* Format.fprintf Format.err_formatter "%s@." id ; *)
   let idx = A.length m.bounds in
   begin
     H.add m.ivars id idx ;
