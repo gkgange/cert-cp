@@ -1,6 +1,8 @@
 (* Module for integer sets. *)
 Require Import Bool.
 Require Import ZArith.
+Require Import ZArith.Zwf.
+Require Import Recdef.
 Require MSets.
 
 Require Import Orders.
@@ -116,9 +118,91 @@ Proof.
     apply IHsz.
     intros; apply H. clear IHsz; omega.
 Qed.
+
+Function zset_covers_Z (xs : zset) (k : Z) (sz : Z) { wf (Zwf 0) sz} :=
+  if Z.leb sz 0 then
+    true
+  else
+    let sz' := Z.pred sz in
+    memb xs (k + sz') && zset_covers_Z xs k sz'.
+  intros _ _ sz Hsz.
+  apply Z.leb_nle, Z.nle_gt in Hsz; unfold Zwf; omega.
+  apply Zwf_well_founded.
+Defined.
+
+Lemma z_ind :
+  forall x0 P x,
+    Z.lt x0 x ->
+    ((P x /\ (forall k, Z.le x0 k /\ Z.le k (Z.pred x) -> P k)) <-> (forall k, Z.le x0 k /\ Z.le k x -> P k)).
+Proof.
+  intros x0 P x Hlt.
+  split; intros.
+  + destruct H as [Hx Hys].
+    assert (Hd := Z_le_dec k (Z.pred x)); destruct Hd.
+    specialize (Hys k); intuition.
+    apply Z.nle_gt in n.
+    assert (x = k). omega.
+    rewrite <- H; exact Hx.
+  + split.
+    apply (H x); omega.
+    intro k; specialize (H k).
+    intro Hp; apply H; omega.
+Qed.
+
+Definition covers_range xs k sz := forall sz', Z.le 0 sz' -> Z.lt sz' sz -> mem xs (k + sz').
+Lemma covers_range_1 : forall xs k sz, Z.lt 0 sz -> (covers_range xs k sz <-> mem xs (k + (Z.pred sz)) /\ covers_range xs k (Z.pred sz)).
+Proof.
+  intros xs k sz Hlt.
+  split.
+  + intro Hc.
+    unfold covers_range in Hc; split.
+    apply (Hc (Z.pred sz)); omega.
+    unfold covers_range.
+    intros; apply Hc; try omega.
+  + intro H; destruct H as [Hp Hks].
+    unfold covers_range; intros sz' Hlt' Hsz'.
+    assert (Hd := Z_lt_dec sz' (Z.pred sz)); destruct Hd as [Hd | Hd].
+    apply Hks; omega.
+    assert (sz' = Z.pred sz). omega.
+    rewrite H; apply Hp.
+Qed.
+
+Require ZArith.Wf_Z.
+Lemma zset_covers_Z_1 :
+  forall xs k sz, zset_covers_Z xs k sz = true <-> covers_range xs k sz.
+Proof.
+  intros xs k.
+  intro sz.
+  destruct (Z_le_dec 0 sz) as [Hge | Hlt].
+  + generalize sz Hge.
+    apply natlike_ind.
+    unfold covers_range; rewrite zset_covers_Z_equation.
+    simpl; split; intros; try omega.
+    trivial.
+
+    intros.
+    rewrite zset_covers_Z_equation, covers_range_1.
+    assert (x = Z.pred (Z.succ x)). omega.
+    rewrite <- H1.
+    assert (Z.leb (Z.succ x) 0 = false).
+      apply Z.leb_gt.
+      omega.
+      rewrite H2.
+      rewrite Bool.andb_true_iff.
+      rewrite memb_iff_mem; rewrite H0.
+      intuition.
+      omega.
+  + unfold covers_range; rewrite zset_covers_Z_equation.
+    rewrite Z.nle_gt in Hlt.
+    assert (Z.leb sz 0 = true).
+      apply Z.leb_le; omega.
+      rewrite H.
+      split; intuition; omega.
+Qed.
+
 Definition zset_covers (xs : zset) (lb ub : Z) :=
   if Z.leb lb ub then
-    zset_covers_nat xs lb (Zabs_nat (ub - lb + 1))
+    zset_covers_Z xs lb (ub - lb + 1)
   else
     true.
 Theorem zset_covers_spec : forall (xs : zset) (lb ub : Z),
@@ -134,40 +218,33 @@ Proof.
 
     split.
       intros.
-      assert (k = (lb + (Z_of_nat (Zabs_nat (k - lb))))).
-      rewrite inj_Zabs_nat.
+      (* assert (k = (lb + (Z_of_nat (Zabs_nat (k - lb))))). *)
+      assert (k = (lb + (k - lb))). omega.
+      (* rewrite inj_Zabs_nat. *)
       assert (k - lb >= 0).
         omega.
+      (*
       rewrite Zabs_eq.
         clear H. omega. omega.
-      rewrite zset_covers_nat_iff_covers in H.
+       *)
+      (* rewrite zset_covers_nat_iff_covers in H. *)
+      rewrite zset_covers_Z_1 in H.
       rewrite H1.
       apply H.
-      apply Zabs_nat_lt. omega.
+      omega.
+      omega.
 
-      intros. rewrite zset_covers_nat_iff_covers.
-      intros. apply H.
-      split. omega.
-      assert (ub = lb + Z_of_nat (Zabs_nat (ub - lb))).
-        rewrite inj_Zabs_nat. rewrite Zabs_eq.
-        omega.
-        omega.
-      rewrite H1. apply Zplus_le_compat.
-      omega. 
-      apply inj_le.
-      apply lt_n_Sm_le.
-      rewrite <- Zabs_nat_Zsucc.
-      assumption. omega.
+      intros. rewrite zset_covers_Z_1.
+      unfold covers_range; intros; apply H.
+      omega.
 
-  assert (lb <= ub \/ ub < lb).
-    clear H; omega.
-  destruct H0.
-    apply H in H0; discriminate.
-  clear H.
-  split.
-    intros.
-      assert False. omega. tauto.
-    intros; trivial.
+      assert (Z.lt ub lb).
+      apply Z.lt_nge; intro; intuition.
+      split; intros; try (intuition || omega).
+
+      assert (false = true).
+        apply H5; omega.
+        discriminate.
 Qed.
 
 Definition zset_min_lb (xs : zset) (k : Z) :=
