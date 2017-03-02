@@ -218,6 +218,16 @@ let init_printers () =
       "bool2int" ,
         (fun fmt pr args -> print_equal (get_arith args.(0)) (get_arith args.(1)) fmt) ;
       "bool_clause", (fun fmt pr args -> print_clause args fmt) ;
+      "bool_eq_reif", (fun fmt pr args ->
+        let r = get_atom args.(2) in
+        print_conj
+          [print_half r (print_equal (get_arith args.(0)) (get_arith args.(1))) ;
+           print_half (negate r) (print_neq (get_arith args.(0)) (get_arith args.(1)))] fmt) ;
+      "bool_xor", (fun fmt pr args ->
+        let r = get_atom args.(2) in
+        print_conj
+          [print_half r (print_neq (get_arith args.(0)) (get_arith args.(1))) ;
+           print_half (negate r) (print_equal (get_arith args.(0)) (get_arith args.(1)))] fmt) ;
       (* "bool_sum_le", (fun fmt pr args -> print_linear "le" args fmt) ; *)
       ]
   in
