@@ -174,7 +174,15 @@ let get_model_bounds minfo =
       end
   in aux 0 [] (A.to_list minfo.bounds)
 
-let get_csts minfo = List.mapi (fun i cst -> (i, cst)) (A.to_list minfo.csts)
+(* let get_csts minfo = List.mapi (fun i cst -> (i, cst)) (A.to_list minfo.csts) *)
+let mapi f xs =
+  let rec aux k acc xs =
+    match xs with
+    | [] -> List.rev acc
+    | x :: xs' -> aux (k+1) ((f k x) :: acc) xs'
+  in aux 0 [] xs
+
+let get_csts minfo = mapi (fun i cst -> (i, cst)) (A.to_list minfo.csts)
 
 let model_of_model_info minfo = (get_model_bounds minfo, get_csts minfo)
   
