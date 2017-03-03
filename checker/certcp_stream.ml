@@ -1,5 +1,5 @@
 (* Top-level checker code. *)
-module List = ExtLib.List
+(* module List = ExtLib.List *)
 module A = DynArray
 module L = List
 module H = Hashtbl

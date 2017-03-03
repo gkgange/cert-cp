@@ -1,5 +1,5 @@
 (* Top-level checker code. *)
-module List = ExtLib.List
+(* module List = ExtLib.List *)
 module A = DynArray
 module L = List
 module H = Hashtbl
@@ -120,17 +120,25 @@ let write_arith fmt arith =
 let rec write_cst_body fmt cst =
   match cst with
   | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
+  | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
   | C_impl.Elem obj -> let (x, y, ks) = Obj.magic obj in write_elem fmt x y ks
   | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
   | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
   | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
   | C_impl.Conj (x, y) -> write_meta fmt "model.Conj" [x; y]
   | C_impl.Disj (x, y) -> write_meta fmt "model.Disj" [x; y]
+  | C_impl.Half (r, c) -> write_half fmt r c
   | C_impl.Tauto -> ()
 and write_meta fmt ident args =
   Format.fprintf fmt "%s(@[<hov 1>" ident ;
   Utils.print_list ~sep:";@," write_cst_body fmt args ;
   Format.fprintf fmt ")@]"
+and write_half fmt lit cst =
+  Format.fprintf fmt "half@[<hov 1(" ; 
+  Pr.print_lit fmt lit ;
+  Format.fprintf fmt ",@," ;
+  write_cst_body fmt cst ;
+  Format.fprintf fmt ")@]" 
 
 let write_coq_cst fmt id cst =
   Format.fprintf fmt "@[(%d, " id ;
@@ -139,18 +147,37 @@ let write_coq_cst fmt id cst =
     
 (* Bundle each cst with its index, then print *)
 let write_coq_csts fmt csts =
+  A.to_list csts |> List.mapi (fun i b -> (i, b)) |> 
+    Utils.print_list (fun fmt (i, c) -> write_coq_cst fmt i c) fmt
+  (*
   Utils.print_enum (fun fmt (i, c) -> write_coq_cst fmt i c) fmt
     @@ Enum.mapi (fun i b -> (i, b)) @@ A.enum csts
+    *)
       
 (* Bundle bounds with the corresponding index, remove missing bounds, then print. *)
+let filter_map f xs =
+  let rec aux xs acc =
+    match xs with
+    | [] -> List.rev acc
+    | x :: xs' ->
+    begin
+      match f x with
+      | None -> aux xs' acc
+      | Some y -> aux xs' (y :: acc)
+    end
+  in
+  aux xs []
+
 let write_bounds fmt bs =
   let print_tuple = (fun fmt (i, l, u) -> Format.fprintf fmt "(%d, (%d, %d))" i l u) in
   let flatten (i, b) = match b with
     | None -> None
     | Some (l, u) -> Some (i, l, u)
   in
-  (* Utils.print_enum print_tuple fmt @@ Enum.filter_map flatten @@ Enum.mapi (fun i b -> (i, b)) @@ A.enum bs *)
+  (*
   A.enum bs |> Enum.mapi (fun i b -> (i, b)) |> Enum.filter_map flatten |> Utils.print_enum print_tuple fmt
+  *)
+  A.to_list bs |> List.mapi (fun i b -> (i, b)) |> filter_map flatten |> Utils.print_list print_tuple fmt
   
 let write_coq_model fmt ident model =
   Format.fprintf fmt "@[Definition %s_bounds@ :=@ @[" ident ;

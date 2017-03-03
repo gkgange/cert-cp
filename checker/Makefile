@@ -96,8 +96,7 @@ CAMLP4EXTEND:=pa_extend.cmo pa_macro.cmo q_MLast.cmo
 CAMLP4OPTIONS:=
 PP:=-pp "$(CAMLP4BIN)$(CAMLP4)o -I $(CAMLLIB) -I . $(COQSRCLIBS) $(CAMLP4EXTEND) $(GRAMMARS) $(CAMLP4OPTIONS) -impl"
 
-REQ_PKG:="dynlink extlib"
-#REQ_PKG:="dynlink"
+REQ_PKG:="dynlink"
 PKG_FLAGS:=-package $(REQ_PKG)
 LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 
@@ -116,6 +115,7 @@ LINKPKG_FLAGS:=-package $(REQ_PKG) -linkpkg
 #HTMLFILES:=$(VFILES:.v=.html)
 #GHTMLFILES:=$(VFILES:.v=.g.html)
 BASE_MLFILES:=\
+  dynArray.ml\
   cOption.ml\
   utils.ml\
   mTypes.ml\
