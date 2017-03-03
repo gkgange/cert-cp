@@ -66,6 +66,37 @@ Proof.
     apply IHcs in Hcs; unfold eval_cstmap in Hcs; now apply Hcs with (id := id).
 Qed.
 
+Fixpoint cst_map_of_csts_acc (m : zmap cst) cs :=
+  match cs with
+  | nil => m
+  | cons (k, c) cs' =>
+      cst_map_of_csts_acc (ZMaps.add k c m) cs'
+  end.
+
+Lemma cst_map_of_csts_eq : forall xs, cst_map_of_csts xs = cst_map_of_csts_acc (ZMaps.empty _) (List.rev xs).
+Proof.
+  intros.
+  assert (cst_map_of_csts xs = List.fold_right (fun t m => ZMaps.add (fst t) (snd t) m) (ZMaps.empty _) xs).
+    induction xs.
+    trivial.
+    destruct a.
+    unfold cst_map_of_csts, List.fold_right; simpl; fold cst_map_of_csts; fold List.fold_right.
+    rewrite IHxs.
+    trivial.
+  assert (forall m ys, cst_map_of_csts_acc m ys = List.fold_left (fun m t => (fun t m => ZMaps.add (fst t) (snd t) m) t m) ys m).
+    intros m ys.
+    generalize m; clear m; induction ys; intro m.
+    trivial.
+    destruct a.
+    unfold cst_map_of_csts_acc at 1; simpl; fold cst_map_of_csts_acc.
+    rewrite IHys.
+    trivial.
+    rewrite H0.
+    rewrite H.
+    rewrite <- List.fold_left_rev_right.
+    now rewrite List.rev_involutive.
+Qed.
+
 Definition state_csts (s : state) :=
   match s with
   | (cs, clauses, hint) => cs
@@ -123,7 +154,7 @@ Definition state_valid_bnd (bs : domset) (s : state) :=
   
 Definition empty_state (m : model) :=
   match m with
-  | (bs, cs) => (cst_map_of_csts cs, ZMaps.empty clause, (-1))
+  | (bs, cs) => (cst_map_of_csts_acc (ZMaps.empty _) (List.rev cs), ZMaps.empty clause, (-1))
   end.
 
 Lemma empty_state_valid : forall m, state_valid (empty_state m).
@@ -534,6 +565,7 @@ Proof.
   clear Hs0.
   unfold empty_state, state_csts in *; simpl in *.
   apply cst_map_if_csts in Hcs.
+  rewrite cst_map_of_csts_eq in Hcs.
   contradiction.
   assumption.
   apply domset_of_bounds_valid in Hb.
@@ -560,6 +592,7 @@ Proof.
   clear Hs0.
   unfold empty_state, state_csts in *; simpl in *.
   apply cst_map_if_csts in Hcs.
+  rewrite cst_map_of_csts_eq in Hcs.
   contradiction.
   assumption.
   apply domset_of_bounds_valid in Hb.
@@ -634,6 +667,7 @@ Proof.
   unfold empty_state, set_hint in *; simpl in *.
   apply H; try assumption.
   apply domset_of_bounds_valid; assumption.
+  rewrite <- cst_map_of_csts_eq.
   now apply cst_map_if_csts.
 Qed.
 
@@ -696,6 +730,7 @@ Proof.
   rewrite <- Hsc in H1.
   rewrite Heqs0 in H1.
   unfold empty_state, state_csts in H1; simpl in *.
+  rewrite <- cst_map_of_csts_eq in H1.
   contradiction.
 Qed.
 Definition certify_optimal_list m obj sol p_proof :=
