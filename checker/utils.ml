@@ -1,4 +1,11 @@
 (* Various helper functions *)
+let chomp tokens token =
+  let next = Stream.next tokens in
+  if next <> token then
+    begin
+      (* Format.fprintf fmt "Parse error: expected %s, got %s." (string_of_token token) (string_of_token next) ; *)
+      failwith "Parse error"
+    end
 
 let print_list ?sep:(sep=(";@," : (unit, Format.formatter, unit) format)) f fmt xs =
   Format.fprintf fmt "[@[" ;

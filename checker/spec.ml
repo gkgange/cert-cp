@@ -28,6 +28,7 @@ let listof sub_parse =
   in parser
     | [< 'Kwd "[" ; elts = aux ; 'Kwd "]" >] -> elts
     *)
+(*
 let listof sub_parse =
   let rec tail es = parser
     | [< 'Kwd "," ; k = sub_parse ; xs = tail (k :: es) >] -> xs
@@ -37,6 +38,20 @@ let listof sub_parse =
     | [< >] -> []
   in parser
     | [< 'Kwd "[" ; elts = aux ; 'Kwd "]" >] -> elts
+    *)
+let listof sub_parse toks =
+  let rec tail es =
+    match Stream.next toks with
+    | Kwd "," ->
+      let elt = sub_parse toks in
+      tail (elt :: es)
+    | Kwd "]" -> List.rev es
+    | _ -> failwith "Expected ',' or ']' for list tail."
+  in
+  Utils.chomp toks (Kwd "[") ;
+  match Stream.peek toks with
+  | Some (Kwd "]") -> (Stream.junk toks ; [])
+  | _ -> tail [ sub_parse toks ]
 
 let cons p1 p2 = parser
   | [< e1 = p1 ; 'Kwd "," ; e2 = p2 >] -> (e1, e2)

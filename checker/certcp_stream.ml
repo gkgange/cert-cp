@@ -20,7 +20,8 @@ let int_list = S.listof S.intconst
 
 let fmt = Format.std_formatter
 let err_fmt = Format.err_formatter
-let debug_print str = ()
+let debug_print str = () 
+(* let debug_print str = Format.fprintf err_fmt str *)
   
 let string_of_token = function
   | GL.Kwd s -> s
@@ -135,8 +136,11 @@ let main () =
   let opt_sol = match !COption.solfile with
     | None -> None
     | Some sf ->
+      debug_print "{Reading solution..." ;
       let asg_toks = Spec.lexer (Stream.of_channel (open_in sf)) in
-      Some (Pr.parse_solution model_info asg_toks)
+      let sol = Some (Pr.parse_solution model_info asg_toks) in
+      debug_print "done }@." ;
+      sol
   in
   (* Decide whether the literal semantics are inline or not. *)
   let p_step =
