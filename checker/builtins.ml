@@ -124,6 +124,18 @@ let parse_half model tokens =
   let c = Pr.parse_cst model tokens in
   C_impl.Half (r, c)
 
+let parse_memb model toks =
+   let z = parse_iterm model toks in
+   chomp (GL.Kwd ",") toks ;
+   let xs = S.listof (parse_iterm model) toks in
+   C_impl.make_memb z xs
+
+let parse_notmemb model toks =
+   let z = parse_iterm model toks in
+   chomp (GL.Kwd ",") toks ;
+   let xs = S.listof (parse_iterm model) toks in
+   C_impl.make_notmemb z xs
+
 let op_of_id id =
   match id with
   | "add" -> C_impl.Plus
@@ -169,6 +181,8 @@ let register () =
   Pr.add_cst_parser "linear_ne" minfo_parse_linear_ne ;
   Pr.add_cst_parser "element" parse_element ;
   Pr.add_cst_parser "cumulative" parse_cumul ;
+  Pr.add_cst_parser "memb" parse_memb ;
+  Pr.add_cst_parser "notmemb" parse_notmemb ;
   Pr.add_cst_parser "clause" minfo_parse_clause ;
   Pr.add_cst_parser "and" parse_conj ;
   Pr.add_cst_parser "or" parse_disj ;

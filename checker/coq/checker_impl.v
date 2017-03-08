@@ -18,6 +18,8 @@ Extraction "checker_impl.ml"
   model.make_lin_ne
   model.make_cumul
   model.make_element
+  model.make_memb
+  model.make_notmemb
   model.make_clause
   model.make_arith_eq
   model.make_arith_ne

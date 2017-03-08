@@ -19,6 +19,8 @@ Inductive cst :=
   | Lin : linear.LinearCon.(T) -> cst
   | LinNE : linear.LinearNE.(T) -> cst
   | Elem : element.ElemConstraint.(T) -> cst  
+  | Memb : element.MembConstraint.(T) -> cst  
+  | Notmem : element.NotmemConstraint.(T) -> cst  
   | Cumul : cumulative.CumulConstraint.(T) -> cst  
   | Clause : clause_domain.ClauseCst.(T) -> cst
   | Arith : arith.ArithConstraint.(T) -> cst
@@ -30,6 +32,8 @@ Inductive cst :=
 Definition make_linear xs k := Lin (xs, k).
 Definition make_lin_ne xs k := LinNE (xs, k).
 Definition make_element x y ks := Elem (element.Element x y ks).
+Definition make_memb z xs := Memb (element.Mem z xs).
+Definition make_notmemb z xs := Notmem (element.Notmem z xs).
 Definition make_cumul (c : cumulative.cumul) := Cumul c.                                  
 Definition make_clause (cl : lit.clause) := Clause cl.
 Definition make_conj x y := Conj x y.
@@ -46,6 +50,8 @@ Fixpoint eval_cst c (theta : valuation) := match c with
   | Lin x => linear.LinearCon.(eval) x theta
   | LinNE x => linear.LinearNE.(eval) x theta
   | Elem x => element.ElemConstraint.(eval) x theta
+  | Memb x => element.MembConstraint.(eval) x theta
+  | Notmem x => element.NotmemConstraint.(eval) x theta
   | Cumul x => cumulative.CumulConstraint.(eval) x theta
   | Clause x => clause_domain.ClauseCst.(eval) x theta
   | Arith x => arith.ArithConstraint.(eval) x theta
@@ -64,6 +70,8 @@ Fixpoint check_cst_unsat c (ds : domset) := match c with
   | Lin x => check_unsat linear.LinearCon linear.CheckLinearUnsat x ds
   | LinNE x => check_unsat linear.LinearNE linear.CheckLinearNeqUnsat x ds
   | Elem x => check_unsat element.ElemConstraint element.ElemCheckUnsat x ds
+  | Memb x => check_unsat element.MembConstraint element.MembCheck x ds
+  | Notmem x => check_unsat element.NotmemConstraint element.NotmemCheck x ds
   | Cumul x => check_unsat cumulative.CumulConstraint cumulative.CumulCheck x ds
   | Clause x => check_unsat clause_domain.ClauseCst clause_domain.ClauseCheckUnsat x ds
   | Arith x => check_unsat arith.ArithConstraint arith.ArithCheck x ds
@@ -100,6 +108,8 @@ Fixpoint check_cst_sol c (sol : valuation) := match c with
   | Lin x => check_sol linear.LinearCon linear.LinearSolCheck x sol
   | LinNE x => check_sol linear.LinearNE linear.LinearNESolCheck x sol
   | Elem x => check_sol element.ElemConstraint element.ElementSolCheck x sol
+  | Memb x => check_sol element.MembConstraint element.MembSolCheck x sol
+  | Notmem x => check_sol element.NotmemConstraint element.NotmemSolCheck x sol
   | Cumul x => check_sol cumulative.CumulConstraint cumulative.CumulSolCheck x sol
   | Clause x => check_sol clause_domain.ClauseCst clause_domain.ClauseSolCheck x sol
   | Arith x => check_sol arith.ArithConstraint arith.ArithSolCheck x sol
