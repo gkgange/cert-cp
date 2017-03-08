@@ -67,7 +67,8 @@ let rec print_arg fmt arg =
   | Pr.Ivar v -> Format.pp_print_string fmt v
   | Pr.Bvar v -> Format.fprintf fmt "%s >= 1" v
   | Pr.Blit b -> Format.pp_print_string fmt (string_of_bool b)
-  | Pr.Set s -> failwith "Sets not currently supported by certcp."
+  | Pr.Set s ->
+    Util.print_list Format.pp_print_int ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt (Dom.values s)
   | Pr.Arr xs -> Util.print_array print_arg ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt xs
 
 let print_call fmt ident args =
@@ -228,6 +229,13 @@ let init_printers () =
         print_conj
           [print_half r (print_neq (get_arith args.(0)) (get_arith args.(1))) ;
            print_half (negate r) (print_equal (get_arith args.(0)) (get_arith args.(1)))] fmt) ;
+      "set_in", (fun fmt pr args -> print_call fmt "memb" args) ;
+      "set_notin", (fun fmt pr args -> print_call fmt "notmemb" args) ;
+      "set_in_reif", (fun fmt pr args ->
+        let r = get_atom args.(2) in
+        print_conj
+          [print_half r (fun fmt -> print_call fmt "memb" [|args.(0) ; args.(1)|]);
+           print_half (negate r) (fun fmt -> print_call fmt "notmemb" [|args.(0); args.(1)|])] fmt) ;
       (* "bool_sum_le", (fun fmt pr args -> print_linear "le" args fmt) ; *)
       ]
   in

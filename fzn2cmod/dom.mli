@@ -8,6 +8,7 @@ val set : int list -> t
 
 val union : t -> t -> t
 
+val values : t -> int list
 val bounds : t -> (int * int)
 val holes : t -> (int * int) list
 

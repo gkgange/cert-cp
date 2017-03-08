@@ -36,6 +36,16 @@ let bounds d =
   | Set (k :: ks) -> List.fold_left min k ks, List.fold_left max k ks
   | _ -> failwith "Bounds of empty domain"
 
+let values d =
+  match d with
+  | Range (l, u) -> 
+    let rec aux acc u =
+      if u < l then
+        acc
+      else aux (u :: acc) (u-1)
+    in aux [] u
+  | Set ks -> ks
+      
 (* Compute the set of holes in a given domain *)
 let holes d =
   match d with
