@@ -172,6 +172,7 @@ let init_printers () =
       "array_int_element", (fun fmt pr args -> print_element args fmt) ;
       "array_var_int_element", (fun fmt pr args -> print_element args fmt) ;
       "chuffed_cumulative", (fun fmt pr args -> print_cumulative args fmt) ;
+      "chuffed_cumulative_vars", (fun fmt pr args -> print_cumulative args fmt) ;
       (* "all_different_int", print_alldiff ; *)
       (* We replace bool2int with x = y. *)
       "int_eq", (fun fmt pr args -> print_equal (get_arith args.(0)) (get_arith args.(1)) fmt) ;
@@ -219,6 +220,7 @@ let init_printers () =
       "bool2int" ,
         (fun fmt pr args -> print_equal (get_arith args.(0)) (get_arith args.(1)) fmt) ;
       "bool_clause", (fun fmt pr args -> print_clause args fmt) ;
+      "bool_eq", (fun fmt pr args -> print_equal (get_arith args.(0)) (get_arith (args.(1))) fmt) ;
       "bool_eq_reif", (fun fmt pr args ->
         let r = get_atom args.(2) in
         print_conj
