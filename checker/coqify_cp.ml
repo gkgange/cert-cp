@@ -102,13 +102,15 @@ let write_elem fmt x y ks =
   print_list Format.pp_print_int fmt ks ;
   Format.fprintf fmt ")@;"
 
-let write_cumul fmt c = 
+let write_cumul fmt c = failwith "Implement"
+(*
   Format.fprintf fmt "@[model.Cumul@ (@[cumulative.mkCumul@ @[" ;
   print_list (fun fmt task ->
     Format.fprintf fmt "cumulative.mkTask %d %d %d@;"
-      (C_impl.int_of_nat task.C_impl.duration) (C_impl.int_of_nat task.C_impl.resource) task.C_impl.svar
+      (task.C_impl.duration) (C_impl.int_of_nat task.C_impl.resource) task.C_impl.svar
   ) fmt c.C_impl.tasks ;
   Format.fprintf fmt "@ %d)@]@]@]" (C_impl.int_of_nat c.C_impl.limit)
+  *)
 
 let write_clause fmt cl = 
   Format.fprintf fmt "model.Clause " ;

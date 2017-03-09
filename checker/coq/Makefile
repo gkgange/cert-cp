@@ -94,6 +94,7 @@ VFILES:=assign.v\
   linear.v\
   element.v\
   cumulative.v\
+  var_cumulative.v\
 	arith_ops.v\
 	arith.v\
   resolution.v\

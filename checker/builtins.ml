@@ -81,23 +81,23 @@ let make_cumul xs durations resources lim =
   let rec tasks ys ds rs = match ys with
     | [] -> []
     | (y :: yt) ->
-        { C_impl.duration = C_impl.nat_of_int (List.hd ds) ;
-          C_impl.resource = C_impl.nat_of_int (List.hd rs) ;
+        { C_impl.duration = (List.hd ds) ;
+          C_impl.resource = (List.hd rs) ;
           C_impl.svar = y
         } :: (tasks yt (List.tl ds) (List.tl rs))
   in {
     C_impl.tasks = tasks xs durations resources ;
-    C_impl.limit = C_impl.nat_of_int lim
+    C_impl.limit = lim
   }
 
-let parse_cumul_args get_ivar = parser
-  | [< xs = (ivar_list get_ivar) ; 'Genlex.Kwd "," ; durations = int_list ;
-        'Genlex.Kwd "," ; resources = int_list ;
-        'Genlex.Kwd "," ; lim = S.intconst >] ->
+let parse_cumul_args get_iterm = parser
+  | [< xs = (S.listof get_iterm) ; 'Genlex.Kwd "," ; durations = (S.listof get_iterm) ;
+        'Genlex.Kwd "," ; resources = S.listof get_iterm ;
+        'Genlex.Kwd "," ; lim = get_iterm >] ->
           (xs, durations, resources, lim)
 
 let parse_cumul model tokens =
-  let (xs, durations, resources, lim) = parse_cumul_args (Pr.get_ivar model) tokens in
+  let (xs, durations, resources, lim) = parse_cumul_args (parse_iterm model) tokens in
   C_impl.make_cumul (make_cumul xs durations resources lim)
 ;;
 
