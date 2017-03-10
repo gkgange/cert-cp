@@ -41,6 +41,7 @@ public:
   T* begin(void) { return data; }
   T* end(void) { return data+sz; }
   int size(void) const { return sz; }
+  int& _size(void) { return sz; }
 
   T& last(void) { return data[sz-1]; }
 

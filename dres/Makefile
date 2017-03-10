@@ -1,5 +1,6 @@
 CXX = clang++
-CXXFLAGS = -O2 -g -I .
+CXXFLAGS = -O3 -g -I .
+#CXXFLAGS = -O2 -g -I .
 #CXXFLAGS = -O0 -g -I .
 #CXXFLAGS += -pg
 CXXFLAGS += -Wall -Wno-unused-function -Wno-deprecated -ffast-math -std=c++11
