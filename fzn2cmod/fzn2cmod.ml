@@ -19,6 +19,8 @@ type arith =
   | Div of arith * arith
   | Min of arith * arith
   | Max of arith * arith
+  | Abs of arith
+  | Uneg of arith
 
 let get_arith = function
   | Pr.Ilit k -> Int k
@@ -36,6 +38,8 @@ let rec print_arith fmt = function
   | Div (x, y) -> print_ariths "div" [|x; y|] fmt
   | Min (x, y) -> print_ariths "min" [|x; y|] fmt
   | Max (x, y) -> print_ariths "max" [|x; y|] fmt
+  | Uneg x -> print_ariths "neg" [|x|] fmt
+  | Abs x -> print_ariths "abs" [|x|] fmt
 and print_ariths ident args fmt =
   Format.fprintf fmt "%s@[<hov 1>(" ident ;
   Util.print_array ~pre:"" ~post:")@]" ~sep:",@," print_arith fmt args
@@ -207,6 +211,8 @@ let init_printers () =
         print_equal
           (get_arith args.(2))
           (Div (get_arith args.(0), get_arith args.(1))) fmt) ;
+      "int_neg", (fun fmt pr args -> print_equal (get_arith args.(1)) (Uneg (get_arith args.(0))) fmt) ;
+      "int_abs", (fun fmt pr args -> print_equal (get_arith args.(1)) (Abs (get_arith args.(0))) fmt) ;
       "int_eq_reif", (fun fmt pr args ->
         let r = get_atom args.(2) in
         print_conj
