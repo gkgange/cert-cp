@@ -1023,7 +1023,6 @@ Theorem span_max_ubZ : forall (ts : list task) (start : Z) (sz : Z) (k : Z) (the
     Z.le (eval_usage ts (Z.add start k) theta) (span_max ts start sz theta).
 Proof.
   intros ts start sz k theta Hk Hlt.
-  Check natlike_ind.
   apply (natlike_ind (fun sz' => Z.lt k sz' -> Z.le (eval_usage ts (Z.add start k) theta) (span_max ts start sz' theta))) with (x := sz).
   intro; omega.
 
@@ -1037,7 +1036,6 @@ Proof.
 
   rewrite <- Z.le_max_l.
   rewrite Z.pred_succ.
-  SearchAbout Z.le.
   apply Z_eq_le; f_equal.
   omega.
   omega.

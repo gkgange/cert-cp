@@ -13,6 +13,7 @@ Require arith_ops.
  * We're not doing full factorization, just bounds. *)
 
 Inductive binop := Plus | Times | Sub | Div | Min | Max.
+Inductive unop := Abs | Uminus.
 
 Definition rel_of f : Z -> Z -> Z -> Prop := fun z x y => Z.eq z (f x y).
 Definition part_of (f : Z -> Z -> Z) :=
@@ -31,7 +32,13 @@ Definition binop_rel op :=
      | Min => rel_of Z.min
      | Max => rel_of Z.max
    end.
-  
+
+Definition unop_fun op :=
+  match op with
+    | Abs => Z.abs
+    | Uminus => Z.opp
+  end.
+
 Definition binop_pfun op :=
   match op with
     | Plus => part_of Z.add
@@ -54,13 +61,16 @@ Definition binop_pfun op :=
     
 Inductive aexpr :=
 | T : iterm -> aexpr
-| Op : binop -> aexpr -> aexpr -> aexpr.
+| Op : binop -> aexpr -> aexpr -> aexpr
+| Un : unop -> aexpr -> aexpr.
 
 Fixpoint eval_aexpr exp theta v :=
   match exp with
     | T t => v = eval_iterm t theta
     | Op op x y =>
       exists x' y', eval_aexpr x theta x' /\ eval_aexpr y theta y' /\ binop_rel op v x' y'
+    | Un op x =>
+      exists x', eval_aexpr x theta x' /\ v = unop_fun op x'
   end.
 
 Definition arith_eq := (iterm * aexpr)%type.
@@ -90,9 +100,23 @@ Proof.
   + apply range.db_max_spec; assumption.
 Qed.
 
+Definition db_of_unop op :=
+  match op with
+    | Abs => arith_ops.db_abs
+    | Uminus => arith_ops.db_neg
+  end.
+Lemma db_of_unop_spec : forall op db k, sat_dbound db k -> sat_dbound (db_of_unop op db) (unop_fun op k).
+Proof.
+  intros op db k Hs; unfold db_of_unop, unop_fun.
+  destruct op.
+  + apply arith_ops.db_abs_valid; assumption.
+  + rewrite <- arith_ops.db_neg_valid; assumption.
+Qed.
+
 Fixpoint db_of_aexpr exp ds :=
   match exp with
   | T t => range_of_dom (term_dom ds t)
+  | Un op x => db_of_unop op (db_of_aexpr x ds)
   | Op op x y => db_of_binop op (db_of_aexpr x ds) (db_of_aexpr y ds)
   end.
 Lemma db_of_aexpr_spec : forall exp ds theta r, eval_domset ds theta -> eval_aexpr exp theta r -> sat_dbound (db_of_aexpr exp ds) r.
@@ -104,6 +128,9 @@ Proof.
     apply term_dom_valid; assumption.
   + intro Hxy; elim Hxy; clear Hxy; intros x' Hy; elim Hy; clear Hy; intros y' Hxy; destruct Hxy as [Hx [Hy Hr]].
     apply db_of_binop_spec with (k := x') (k' := y'); try (apply IHexp1 || apply IHexp2); try assumption.
+  + intro Hx; elim Hx; clear Hx; intros x' Hx.
+    destruct Hx as [Hx Hf].
+    rewrite Hf; apply db_of_unop_spec; apply IHexp; assumption.
 Qed.    
   
 (*
@@ -131,6 +158,11 @@ Definition ArithNE := mkConstraint (iterm * aexpr)%type eval_arith_neq.
 Fixpoint eval_aexpr_part expr theta :=
   match expr with
     | T t => Some (eval_iterm t theta)
+    | Un op x =>
+      match eval_aexpr_part x theta with
+        | Some k => Some (unop_fun op k)
+        | None => None
+      end
     | Op op x y =>
       binop_pfun op (eval_aexpr_part x theta) (eval_aexpr_part y theta)
   end.
@@ -145,6 +177,11 @@ Proof.
     exists v, v0; try intuition.
     rewrite H2 in Hr; simpl in Hr; congruence.
     eqelim (Z.eqb v0 0); try congruence.
+  + unfold eval_aexpr, eval_aexpr_part at 1; fold eval_aexpr; fold eval_aexpr_part; intro Hr.
+    eqelim (eval_aexpr_part expr theta); try congruence.
+    inversion Hr; clear Hr.
+    exists v.
+    intuition.
 Qed.
     
 Definition check_arith_sol arith theta :=

@@ -146,6 +146,12 @@ let op_of_id id =
   | "max" -> C_impl.Max
   | _ -> failwith (Format.sprintf "Expected arithmetic operator, got %s" id)
 
+let unop_of_id id =
+  match id with
+  | "neg" -> C_impl.Uminus
+  | "abs" -> C_impl.Abs
+  | _ -> failwith (Format.sprintf "Expected unary arithmetic operator, got %s" id)
+
 let rec parse_arith model tokens =
   match St.next tokens with
   | GL.Ident id ->
@@ -154,10 +160,16 @@ let rec parse_arith model tokens =
     | Some (GL.Kwd "(") ->
       let _ = St.junk tokens in
       let x = parse_arith model tokens in
-      chomp (GL.Kwd ",") tokens ;
-      let y = parse_arith model tokens in
-      chomp (GL.Kwd ")") tokens ;
-      C_impl.Op (op_of_id id, x, y)
+      begin
+        match St.peek tokens with
+        | Some (GL.Kwd ",") ->
+          St.junk tokens ;
+          let y = parse_arith model tokens in
+          C_impl.Op (op_of_id id, x, y)
+        | _ ->
+          chomp (GL.Kwd ")") tokens ;
+          C_impl.Un (unop_of_id id, x)
+      end
     | _ -> C_impl.T (C_impl.Ivar (Pr.get_ivar model id))
     end
   | GL.Int k -> C_impl.T (C_impl.Ilit k)

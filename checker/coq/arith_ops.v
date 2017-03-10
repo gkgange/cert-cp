@@ -487,3 +487,32 @@ Proof.
     apply db_sat_impl_meet; split; [assumption | apply db_div_sound; assumption].
   now apply H3 in Hs.
 Qed.
+
+Definition db_abs x :=
+  let (xn, xp) := db_split_m x in
+  db_join xp (db_neg xn).
+Lemma db_abs_valid : forall x k, sat_dbound x k -> sat_dbound (db_abs x) (Z.abs k).  
+Proof.
+  intros x k Hs.
+  unfold db_abs.
+  apply db_split_iff with (c := (-1)) in Hs.
+  unfold db_split_m.
+  apply db_join_if.
+  assert (Habs := Z.abs_spec k).
+  destruct Hs as [Hn | Hp].
+  right.
+  + assert (Hnn := db_split_left x (-1) k Hn).
+    destruct Habs; try omega; intuition.
+    rewrite H1.
+    rewrite <- db_neg_valid.
+    unfold db_split_at in Hn, H0; apply db_satmeet in Hn; simpl.
+    intuition.
+    apply db_sat_impl_meet; intuition.
+  + assert (Hpp := db_split_right x (-1) k Hp).
+    destruct Habs as [Habs | Habs]; try omega.
+    left.
+    unfold db_split_at in *; simpl in *; apply db_sat_impl_meet.
+    apply db_satmeet in Hp.
+    destruct Habs as [Hk Hak]; rewrite Hak; exact Hp.
+Qed.
+  
