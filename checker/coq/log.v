@@ -209,16 +209,28 @@ Proof.
     now rewrite H0 in H2.
 Qed.
 
-Definition check_inf bs cst cl := check_cst_unsat cst (domset_with_prod bs (negclause cl)).
+Definition check_inf bs cst cl :=
+  let ds := domset_with_prod bs (negclause cl) in
+  match ds with
+    | None => true
+    | Some _ => check_cst_unsat cst ds
+  end.
+
 Lemma check_inf_valid : forall bs cst cl, check_inf bs cst cl = true ->
   forall theta, eval_domset bs theta -> eval_cst cst theta -> eval_clause cl theta.
 Proof.
   intros bs cst cl; unfold check_inf; intros.
+  eqelim (domset_with_prod bs (negclause cl)).
   apply eval_clause_notprod; intro.
   apply check_cst_unsat_valid with (theta := theta) in H.
     contradiction.
-    apply domset_with_prod_iff; tauto.
+    rewrite <- H3; apply domset_with_prod_iff; tauto.
     assumption.
+    apply eval_clause_notprod.
+    intro.
+    assert (H' := domset_with_prod_iff (negclause cl) bs theta); intuition.
+    rewrite H3 in *.
+    unfold eval_domset in H6; contradiction.
 Qed.
 
 Definition check_inference (bs : domset) (s : state) (cl : clause) :=
