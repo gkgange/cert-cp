@@ -165,6 +165,7 @@ let rec parse_arith model tokens =
         | Some (GL.Kwd ",") ->
           St.junk tokens ;
           let y = parse_arith model tokens in
+          chomp (GL.Kwd ")") tokens ;
           C_impl.Op (op_of_id id, x, y)
         | _ ->
           chomp (GL.Kwd ")") tokens ;

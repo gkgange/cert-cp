@@ -67,14 +67,21 @@ let check_inferences_opt model_info obj k p_step toks =
   let hint = ref (-1) in
   let okay = ref true in
   (* *)
+  let count = ref 0 in
   while !okay && Stream.peek toks <> None
   do
     (* match Pr.parse_step model_info lmap toks *)
+    incr count ;
     match p_step toks
     with
     | C_impl.Intro (id, cl) ->
         if not (C_impl.check_inference_domset ds cst_map !hint cl) then
-          (okay := false; Format.fprintf fmt "Inference failed.@.")
+          begin
+            okay := false ;
+            Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
+            Pr.print_clause fmt cl ;
+            Format.fprintf fmt "@."
+          end
     | C_impl.Hint h -> hint := h
     | C_impl.Resolve _ -> ()
     | C_impl.Del _ -> ()
@@ -185,7 +192,7 @@ let main () =
     Format.fprintf fmt "ERROR: Solution and trace provided, but no objective.@."
   | (_, Some sol, _) ->
     begin
-      Format.fprintf fmt "Checking solution...@." ;
+      (* Format.fprintf fmt "Checking solution...@." ; *)
       let okay = C_impl.certify_solution model sol in
       if okay then
         Format.fprintf fmt "OKAY@."
