@@ -75,9 +75,20 @@ let rec print_arg fmt arg =
     Util.print_list Format.pp_print_int ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt (Dom.values s)
   | Pr.Arr xs -> Util.print_array print_arg ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt xs
 
-let print_call fmt ident args =
+let rec print_arg_noatom fmt arg =
+  match arg with
+  | Pr.Ilit k -> Format.pp_print_int fmt k
+  | Pr.Ivar v -> Format.pp_print_string fmt v
+  | Pr.Bvar v -> Format.pp_print_string fmt v
+  | Pr.Blit b -> Format.pp_print_int fmt (if b then 1 else 0)
+  | Pr.Set s ->
+    Util.print_list Format.pp_print_int ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt (Dom.values s)
+  | Pr.Arr xs -> Util.print_array print_arg_noatom ~pre:"@[<hov 1>[" ~post:"@]]" ~sep:",@," fmt xs
+
+let print_call ?(noatom=false) fmt ident args =
+  let pp_arg = if noatom then print_arg_noatom else print_arg in
   Format.fprintf fmt "%s(" ident ;
-  Util.print_array print_arg ~pre:"@[<hov 1>" ~post:"@]" ~sep:",@," fmt args ;
+  Util.print_array pp_arg ~pre:"@[<hov 1>" ~post:"@]" ~sep:",@," fmt args ;
   Format.fprintf fmt ")"
 
 (* linear_le([1, -1], [v0, v8], -2), *)
@@ -175,6 +186,10 @@ let init_printers () =
             (print_half (negate r) (print_linear_eq [|args.(0); args.(1); args.(2)|]))] fmt) ;
       "array_int_element", (fun fmt pr args -> print_element args fmt) ;
       "array_var_int_element", (fun fmt pr args -> print_element args fmt) ;
+      "array_bool_element", (fun fmt pr args ->
+        print_call ~noatom:true fmt "element" [|args.(2); args.(0); args.(1) |]) ;
+      "array_var_bool_element", (fun fmt pr args ->
+        print_call ~noatom:true fmt "element" [|args.(2); args.(0); args.(1) |]) ;
       "chuffed_cumulative", (fun fmt pr args -> print_cumulative args fmt) ;
       "chuffed_cumulative_vars", (fun fmt pr args -> print_cumulative args fmt) ;
       (* "all_different_int", print_alldiff ; *)
