@@ -1,6 +1,7 @@
 (** Options and command-line parsing **)
 val infile : string option ref
 val tracefile : string option ref
+val bintrace : bool ref
 val solfile : string option ref
 val objective : string option ref
 val litfile : string option ref

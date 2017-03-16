@@ -2,6 +2,7 @@
 let infile = ref None
 let modules = ref []
 let tracefile = ref None
+let bintrace = ref false
 let litfile = ref None
 let solfile = ref None
 let objective = ref None
@@ -43,6 +44,10 @@ let (speclist:(Arg.key * Arg.spec * Arg.doc) list) =
      ("-trace",
       Arg.String(fun f -> tracefile := Some f),
       " resolution proof trace to attempt to justify."
+     );
+     ("-bintrace",
+      Arg.Unit (fun f -> bintrace := true),
+      " read a binary (rather than text) proof trace."
      );
      ("-debug",
       Arg.Unit (fun () -> debug := true),

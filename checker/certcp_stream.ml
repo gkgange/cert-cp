@@ -37,90 +37,116 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
-let check_inferences model_info p_step toks =
+let check_inferences model_info p_step =
   let model = Pr.model_of_model_info model_info in
   let hint = ref (-1) in
   let count = ref 0 in
-  while Stream.peek toks <> None
+  let not_fin = ref true in
+  while !not_fin
   do
     incr count ;
     (* match Pr.parse_step model_info lmap toks *)
-    match p_step toks
-    with
-    | C_impl.Intro (id, cl) ->
-        if not (C_impl.check_inference_model model !hint cl) then
-          begin
-            Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
-            Pr.print_clause fmt cl ;
-            Format.fprintf fmt "@."
-          end
-    | C_impl.Hint h -> hint := h
-    | C_impl.Resolve _ -> ()
-    | C_impl.Del _ -> ()
+    try begin
+      match p_step ()
+      with
+      | C_impl.Intro (id, cl) ->
+          if not (C_impl.check_inference_model model !hint cl) then
+            begin
+              Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
+              Pr.print_clause fmt cl ;
+              Format.fprintf fmt "@."
+            end
+      | C_impl.Hint h -> hint := h
+      | C_impl.Resolve _ -> ()
+      | C_impl.Del _ -> ()
+    end with _ -> not_fin := false
   done
 
 (* let check_inferences_opt model_info obj k lmap toks = *)
-let check_inferences_opt model_info obj k p_step toks =
+let check_inferences_opt model_info obj k p_step =
   let (bs, csts) = Pr.model_of_model_info model_info in 
   let cst_map = C_impl.cst_map_of_csts csts in
   let ds = C_impl.domset_with_lt (C_impl.domset_of_bounds bs) obj k in
   let hint = ref (-1) in
   let okay = ref true in
+  let not_end = ref true in
   (* *)
   let count = ref 0 in
-  while !okay && Stream.peek toks <> None
+  while !okay && !not_end
   do
     (* match Pr.parse_step model_info lmap toks *)
     incr count ;
-    match p_step toks
-    with
-    | C_impl.Intro (id, cl) ->
-        if not (C_impl.check_inference_domset ds cst_map !hint cl) then
-          begin
-            okay := false ;
-            Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
-            Pr.print_clause fmt cl ;
-            Format.fprintf fmt "@."
-          end
-    | C_impl.Hint h -> hint := h
-    | C_impl.Resolve _ -> ()
-    | C_impl.Del _ -> ()
+    try
+      begin
+      match p_step ()
+      with
+      | C_impl.Intro (id, cl) ->
+          if not (C_impl.check_inference_domset ds cst_map !hint cl) then
+            begin
+              okay := false ;
+              Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
+              Pr.print_clause fmt cl ;
+              Format.fprintf fmt "@."
+            end
+      | C_impl.Hint h -> hint := h
+      | C_impl.Resolve _ -> ()
+      | C_impl.Del _ -> ()
+      end
+    with _ -> not_end := false
   done ;
   (* *)
   !okay
 
-let check_no_resolve model_info sol obj p_step toks =
+let check_no_resolve model_info sol obj p_step =
   (C_impl.certify_solution (Pr.model_of_model_info model_info) sol) &&
-    (check_inferences_opt model_info obj (sol obj) p_step toks)
+    (check_inferences_opt model_info obj (sol obj) p_step)
 
-let check_resolution model_info p_step toks =
+let check_resolution model_info p_step =
   let clause_db = H.create 17 in
   let okay = ref true in
-  while !okay && Stream.peek toks <> None
+  let not_fin = ref true in
+  while !okay && !not_fin
   do
     (* match Pr.parse_step model_info lmap toks *)
-    match p_step toks
-    with
-    | C_impl.Intro (id, cl) -> H.add clause_db id cl
-    | C_impl.Hint _ -> ()
-    | C_impl.Resolve (id, cl, ant_ids) ->
-      let ants = List.rev @@ List.map (H.find clause_db) ant_ids in
-      if not (C_impl.resolvable cl ants) then
-        begin
-          Format.fprintf fmt "@[Resolution failure:@ %d@ " id ;
-          Pr.print_clause fmt cl ;
-          Format.fprintf fmt "@ -/|@ " ;
-          print_list Format.pp_print_int fmt ant_ids ;
-          Format.fprintf fmt "@]@." ;
-          Format.open_box 2 ;
-          print_list Pr.print_clause fmt ants ;
-          Format.fprintf fmt "@]@.";
-          okay := false
-        end
-      else
-        H.add clause_db id cl
-    | C_impl.Del id -> H.remove clause_db id
+    try begin
+     match p_step ()
+      with
+      | C_impl.Intro (id, cl) -> H.add clause_db id cl
+      | C_impl.Hint _ -> ()
+      | C_impl.Resolve (id, cl, ant_ids) ->
+        let ants = List.rev @@ List.map (H.find clause_db) ant_ids in
+        if not (C_impl.resolvable cl ants) then
+          begin
+            Format.fprintf fmt "@[Resolution failure:@ %d@ " id ;
+            Pr.print_clause fmt cl ;
+            Format.fprintf fmt "@ -/|@ " ;
+            print_list Format.pp_print_int fmt ant_ids ;
+            Format.fprintf fmt "@]@." ;
+            Format.open_box 2 ;
+            print_list Pr.print_clause fmt ants ;
+            Format.fprintf fmt "@]@.";
+            okay := false
+          end
+        else
+          H.add clause_db id cl
+      | C_impl.Del id -> H.remove clause_db id
+    end with _ -> not_fin := false
   done
+
+let build_pstep model_info tchan =
+  match !COption.litfile, !COption.bintrace with
+  | Some lfile, true -> failwith "Warning: no support for Boolean binary traces"
+  | None, true -> failwith "Add binary logs here."
+  | None, false -> Pr.parse_step_fd model_info (Spec.lexer (Stream.of_channel tchan))
+  | Some lfile, false ->
+    begin
+      (* Read the literal semantics . *)
+      debug_print "{Reading literals..." ;
+      let lit_tokens = Spec.lexer (Stream.of_channel (open_in lfile)) in
+      let lmap = Pr.parse_lit_map model_info lit_tokens in
+      debug_print "done.}@." ;
+      Pr.parse_step model_info lmap (Spec.lexer (Stream.of_channel tchan))
+    end
 
 let main () =
   (* Parse the command-line arguments *)
@@ -150,6 +176,8 @@ let main () =
       sol
   in
   (* Decide whether the literal semantics are inline or not. *)
+  let model = Pr.model_of_model_info model_info in
+  (*
   let p_step =
     match !COption.litfile with
     | None -> Pr.parse_step_fd model_info
@@ -163,17 +191,20 @@ let main () =
         Pr.parse_step model_info lmap
       end
   in
-  let model = Pr.model_of_model_info model_info in
+  *)
   match (!COption.objective, opt_sol, !COption.tracefile) with
   | (Some ovar, Some sol, Some tfile) ->
     let tchannel = open_in tfile in
+    (*
     let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in
+    let step0 = Pr.create (p_step ttoks) in
+    *)
     let obj = Pr.get_ivar model_info ovar in
-    let step0 = Pr.create model_info p_step ttoks in
+    let p_step = build_pstep model_info tchannel in
     let next_step = Pr.next in
     if !COption.no_resolve then
       begin
-        let okay = check_no_resolve model_info sol obj p_step ttoks in
+        let okay = check_no_resolve model_info sol obj p_step in
         if okay then
           Format.fprintf fmt "OKAY@."
         else
@@ -182,6 +213,7 @@ let main () =
     else
       begin
         (* Format.fprintf fmt "Checking optimality...@." ; *)
+        let step0 = Pr.create p_step in
         let okay = C_impl.certify_optimal model obj sol max_int step0 next_step in
         if okay then
           Format.fprintf fmt "OKAY@."
@@ -202,16 +234,16 @@ let main () =
   | (_, _, Some tfile) ->
     begin
       let tchannel = open_in tfile in
-      (* let ttoks = Spec.lexer (Stream.of_channel tchannel) in *)
-      let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in
+      let p_step = build_pstep model_info tchannel in
+      (* let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in *)
       if !COption.debug then
         begin
-          check_inferences model_info p_step ttoks ;
-          check_resolution model_info p_step ttoks 
+          check_inferences model_info p_step ;
+          check_resolution model_info p_step 
         end
       else
         begin
-          let step0 = Pr.create model_info p_step ttoks in
+          let step0 = Pr.create p_step in
           let next_step = Pr.next in
           (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
           let okay = C_impl.certify_unsat model max_int step0 next_step in

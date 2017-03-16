@@ -137,7 +137,11 @@ Qed.
 
 Fixpoint check_csts_sol (cs : csts) sol := match cs with
   | nil => true
-  | cons (_, c) cs' => andb (check_cst_sol c sol) (check_csts_sol cs' sol)
+  (* | cons (_, c) cs' => andb (check_cst_sol c sol) (check_csts_sol cs' sol) *)
+  | cons (_, c) cs' =>
+    if check_cst_sol c sol then
+      check_csts_sol cs' sol
+    else false
   end.
 Lemma check_csts_sol_valid : forall cs sol, check_csts_sol cs sol = true -> eval_csts cs sol.
 Proof.
@@ -199,14 +203,21 @@ Fixpoint eval_bounds bs theta :=
 Fixpoint evalb_bounds bs theta :=
   match bs with
   | nil => true
-  | cons b bs' => andb (evalb_bound b theta) (evalb_bounds bs' theta)
+  (* | cons b bs' => andb (evalb_bound b theta) (evalb_bounds bs' theta) *)
+  | cons b bs' =>
+    if evalb_bound b theta then
+      evalb_bounds bs' theta
+    else
+      false
   end.
 Lemma evalb_bounds_iff : forall bs theta, evalb_bounds bs theta = true <-> eval_bounds bs theta.
 Proof.
   intros; induction bs.
   tsimpl.
 
-  tsimpl; [apply evalb_bound_iff ; assumption | apply evalb_bound_iff ; assumption ].
+  tsimpl.
+  now apply evalb_bound_iff.
+  apply evalb_bound_iff in H1; congruence.
 Qed.
 
 Lemma domset_with_bounds_valid : forall bs ds theta,

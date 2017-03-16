@@ -611,8 +611,26 @@ Proof.
   now rewrite Heqbs.
 Qed.
 
+Fixpoint list_length_Z_acc {A} acc (xs : list A) :=
+  match xs with
+  | nil => acc
+  | cons _ xs' => list_length_Z_acc (Z.succ acc) xs'
+  end.
+Lemma list_length_Z_length : forall A acc (xs : list A), list_length_Z_acc acc xs = Z.add acc (Z.of_nat (List.length xs)).
+Proof.
+  intros A acc xs.
+  generalize acc; clear acc; induction xs.
+  intros; unfold length, list_length_Z_acc; unfold Z_of_nat; omega.
+
+  intro acc; unfold list_length_Z_acc; fold (@list_length_Z_acc A).
+  rewrite IHxs.
+  unfold length; fold (@length A).
+  rewrite Nat2Z.inj_succ.
+  omega.
+Qed.
+  
 Definition certify_unsat_list (m : model) (ss : list step) :=
-  certify_unsat m (Z_of_nat (List.length ss)) (list step) ss
+  certify_unsat m (list_length_Z_acc 0%Z ss) (list step) ss
     (fun ss =>
        match ss with
        | nil => None

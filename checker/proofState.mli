@@ -24,15 +24,17 @@ val get_ivar : model_info -> ident -> int
 val parse_lit_map : model_info -> Genlex.token Stream.t -> literal_map
 
 (* val create : model_info -> literal_map -> Genlex.token Stream.t -> proof_state *)
-val create : model_info -> (Genlex.token Stream.t -> Checker_impl.step)
-  -> Genlex.token Stream.t -> proof_state
+type step_gen = unit -> Checker_impl.step
+
+val create : step_gen -> proof_state
 val next : proof_state -> (Checker_impl.step * proof_state) option
 
-val parse_step : model_info -> literal_map -> Genlex.token Stream.t -> Checker_impl.step
-val parse_step_fd : model_info -> Genlex.token Stream.t -> Checker_impl.step
+val parse_step : model_info -> literal_map -> Genlex.token Stream.t -> step_gen
+val parse_step_fd : model_info -> Genlex.token Stream.t -> step_gen
+(* val parse_step_binary : model_info -> literal_map -> in_channel -> step_gen *)
+
 (* val parse_proof : model_info -> literal_map -> Genlex.token Stream.t -> Checker_impl.step list *)
-val parse_proof : (Genlex.token Stream.t -> Checker_impl.step) ->
-  Genlex.token Stream.t -> Checker_impl.step list
+val parse_proof : step_gen -> Checker_impl.step list
 
 val print_lit : Format.formatter -> Checker_impl.lit -> unit
 val print_clause : Format.formatter -> Checker_impl.clause -> unit

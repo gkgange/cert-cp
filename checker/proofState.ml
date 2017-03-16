@@ -220,10 +220,11 @@ let parse_lit_map model tokens =
   done ;
     lmap
 
-type step_parser = Genlex.token Stream.t -> C_impl.step
+(* type 'a step_parser = 'a -> C_impl.step *)
+type step_gen = unit -> C_impl.step
 
 type _proof_state =
-| Open of (model_info * step_parser * Genlex.token Stream.t)
+| Open of step_gen
 | Closed of (C_impl.step * (_proof_state ref)) option
 
 type proof_state = _proof_state ref
@@ -271,18 +272,16 @@ let parse_inf_fd model = parser
       | _ -> C_impl.Resolve (cid, cl, ants)
 
 (* let create info lmap toks = ref (Open (info, lmap, toks)) *)
-let create info p_step toks = ref (Open (info, p_step, toks))
-let parse_step info lmap toks = parse_inf info lmap toks
-let parse_step_fd info toks = parse_inf_fd info toks
+let create p_step = ref (Open p_step)
+let parse_step info lmap toks = (fun () -> parse_inf info lmap toks)
+let parse_step_fd info toks = (fun () -> parse_inf_fd info toks)
 
 let next state =
   match !state with
-  | Open (model, p_step, toks) ->
-    let step = 
-        if Stream.peek toks = None then
-          None
-        else
-          Some ((p_step toks), ref (Open (model, p_step, toks)))
+  | Open p_step ->
+    let step =
+      try Some ((p_step ()), ref (Open p_step))
+      with _ ->  None
     in
     begin
       state := Closed step ;
@@ -292,7 +291,14 @@ let next state =
 
 (* Eagerly build a list of proof steps. *)
 (* let parse_proof minfo lmap toks = *)
-let parse_proof p_step toks =
+let parse_proof p_step =
+  let rec aux ss =
+    try
+      let s = p_step () in
+      aux (s :: ss)
+    with _ -> List.rev ss
+  in aux []
+  (*
   let rec aux ss =
     if Stream.peek toks = None then
       List.rev ss
@@ -300,6 +306,7 @@ let parse_proof p_step toks =
       aux ((p_step toks) :: ss)
   in
   aux []
+  *)
 
 let parse_solution minfo toks =
   let rec aux = parser
@@ -321,3 +328,51 @@ let print_lit fmt l =
   | C_impl.Neg v -> (Format.fprintf fmt "Neg (" ; print_vprop fmt v; Format.fprintf fmt ")")
  
 let print_clause fmt cl = print_list print_lit fmt cl
+
+(** Handling of binary proofs *)
+let hint_tag = Int32.to_int (Int32.max_int)
+let del_tag = hint_tag-1
+
+let parse_ilist_bin ch =
+  let rec aux sz acc =
+    if sz = 0 then
+      List.rev acc
+    else
+      aux (sz-1) ((input_binary_int ch) :: acc)
+  in
+  aux (input_binary_int ch) []
+
+let coqlit_of_bin_int lmap k =
+  let x, s = k lsr 1, k land 1 in
+  if s = 0 then
+    H.find lmap x
+  else
+    C_impl.neglit (H.find lmap x)
+
+let parse_lits_bin lmap ch =
+  let rec aux sz acc =
+  if sz = 0 then
+    List.rev acc
+  else
+    aux (sz-1) ((coqlit_of_bin_int lmap (input_binary_int ch)) :: acc)
+  in
+  aux (input_binary_int ch) []
+
+let parse_inf_bin model lmap ch =
+  let tag = input_binary_int ch in 
+  if tag = hint_tag then
+    let hint = input_binary_int ch in
+    C_impl.Hint (if hint = 0 then (-1) else hint)
+  else if tag = del_tag then
+    C_impl.Del (input_binary_int ch)
+  else
+    begin
+      (* Intro or infer *)
+      let lits = parse_lits_bin lmap ch in
+      let ants = parse_ilist_bin ch in
+      if List.length ants = 0 then
+        C_impl.Intro (tag, lits)
+      else
+        C_impl.Resolve (tag, lits, ants)
+    end
+let parse_step_binary info lmap toks = parse_inf_bin info lmap toks
