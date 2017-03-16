@@ -7,8 +7,11 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
-let print_list ?sep:(sep=(";@," : (unit, Format.formatter, unit) format)) f fmt xs =
-  Format.fprintf fmt "[@[" ;
+let print_list
+  ?pre:(pre=("@[<hov 1>[" : (unit, Format.formatter, unit) format))
+  ?sep:(sep=(";@," : (unit, Format.formatter, unit) format))
+  ?post:(post=("@]]" : (unit, Format.formatter, unit) format)) f fmt xs =
+  Format.fprintf fmt pre ;
   begin
     match xs with
     | [] -> ()
@@ -21,7 +24,7 @@ let print_list ?sep:(sep=(";@," : (unit, Format.formatter, unit) format)) f fmt 
         ) tl
       end
   end ;
-  Format.fprintf fmt "]@]"
+  Format.fprintf fmt post
 
 type fmtt = (unit, Format.formatter, unit) format
 let print_dynarray ?sep:(sep=(";@,": fmtt)) f fmt xs =

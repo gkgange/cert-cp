@@ -18,10 +18,37 @@ type ivar = int
 let ident_list = S.listof S.ident
 let int_list = S.listof S.intconst
 
+let parenthesize f fmt xs =
+  Format.fprintf fmt "@[<hov 1>(" ;
+  f fmt xs ;
+  Format.fprintf fmt "@])"
+
+(*
 type arith =
   | Mul of (ivar * (ivar * ivar))
   | Div of (ivar * (ivar * ivar))
+  *)
 
+let iterm_str = function
+  | C_impl.Ivar x -> Format.sprintf "(Ivar %d)" x
+  | C_impl.Ilit k -> Format.sprintf "(Ilit %d)" k
+
+let write_iterm fmt = function
+  | C_impl.Ivar x -> Format.fprintf fmt "Ivar %d" x
+  | C_impl.Ilit k -> Format.fprintf fmt "Ilit %d" k
+
+let binop_str = function
+  | C_impl.Plus -> "arith.Plus"
+  | C_impl.Times -> "arith.Times"
+  | C_impl.Sub -> "arith.Sub"
+  | C_impl.Div -> "arith.Div"
+  | C_impl.Min -> "arith.Min"
+  | C_impl.Max -> "arith.Max"
+
+let unop_str = function
+  | C_impl.Abs -> "arith.Abs"
+  | C_impl.Uminus -> "arith.Uminus"
+ 
 let emit_stream fmt f toks =
   Format.fprintf fmt "[@[" ;
   if Stream.peek toks <> None
@@ -92,55 +119,88 @@ let parse_sol minfo tokens =
 
 let write_coq_tuple f fmt xs = print_list ~sep:"," f fmt xs
 
-let write_lin fmt ks c =
-  Format.fprintf fmt "model.Lin (" ;
-  print_list (fun fmt (x, y) -> Format.fprintf fmt "(%d, %d)" x y) fmt ks ;
+let write_lin suff fmt ks c =
+  Format.fprintf fmt "model.Lin%s (" suff ;
+  print_list (fun fmt (x, y) -> Format.fprintf fmt "(%d, %s)" x (iterm_str y)) fmt ks ;
   Format.fprintf fmt ", %d)@;" c
 
 let write_elem fmt x y ks =
-  Format.fprintf fmt "model.Elem (element.Elem %d %d " x y ;
-  print_list Format.pp_print_int fmt ks ;
-  Format.fprintf fmt ")@;"
+  Format.fprintf fmt "model.Elem @[<hov 1>(element.Element %s %s " (iterm_str x) (iterm_str y) ;
+  print_list write_iterm fmt ks ;
+  Format.fprintf fmt "@])@;"
 
-let write_cumul fmt c = failwith "Implement"
-(*
-  Format.fprintf fmt "@[model.Cumul@ (@[cumulative.mkCumul@ @[" ;
+let write_cumul fmt c = 
+  Format.fprintf fmt "@[model.Cumul@ @[<hov 1>(@[var_cumulative.mkCumul@ @[" ;
   print_list (fun fmt task ->
-    Format.fprintf fmt "cumulative.mkTask %d %d %d@;"
-      (task.C_impl.duration) (C_impl.int_of_nat task.C_impl.resource) task.C_impl.svar
+    Format.fprintf fmt "var_cumulative.mkTask %s %s %s@;"
+      (iterm_str task.C_impl.duration)
+      (iterm_str task.C_impl.resource)
+      (iterm_str task.C_impl.svar)
   ) fmt c.C_impl.tasks ;
-  Format.fprintf fmt "@ %d)@]@]@]" (C_impl.int_of_nat c.C_impl.limit)
-  *)
+  Format.fprintf fmt "@ %s)@]@]@]@]" (iterm_str c.C_impl.limit)
 
 let write_clause fmt cl = 
   Format.fprintf fmt "model.Clause " ;
   (* print_list write_coq_lit fmt cl *)
   Pr.print_clause fmt cl
-let write_arith fmt arith =
-  Format.fprintf fmt "model.Arith <fix>"
+
+let rec write_aexpr fmt exp =
+  match exp with
+  | C_impl.T t ->
+    (Format.fprintf fmt "arith.T@ " ; parenthesize write_iterm fmt t)
+  | C_impl.Op (op, e, f) ->
+    begin
+      Format.fprintf fmt "arith.Op@ %s@ @[<hov 1>(" (binop_str op) ;
+      write_aexpr fmt e ;
+      Format.fprintf fmt "@])@ @[<hov 1>(" ;
+      write_aexpr fmt f ;
+      Format.fprintf fmt "@])"
+    end
+  | C_impl.Un (op, e) ->
+    begin
+      Format.fprintf fmt "arith.Un@ %s@ " (unop_str op) ;
+      parenthesize write_aexpr fmt e
+    end
+
+let write_arith suff fmt arith =
+  Format.fprintf fmt "model.Arith%s@[<hov 1>(" suff ;
+  write_iterm fmt (fst arith) ;
+  Format.fprintf fmt ",@," ;
+  write_aexpr fmt (snd arith) ;
+  Format.fprintf fmt "@])@;"
+
+let write_memb ident fmt x ks =
+  Format.fprintf fmt "%s@[<hov 1>(" ident ;
+  write_iterm fmt x ;
+  Format.fprintf fmt ",@," ;
+  print_list write_iterm ks ; 
+  Format.fprintf fmt "@])@;"
 
 let rec write_cst_body fmt cst =
   match cst with
-  | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
-  | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin fmt ts k
+  | C_impl.Lin obj -> let (ts, k) = Obj.magic obj in write_lin "" fmt ts k
+  | C_impl.LinNE obj -> let (ts, k) = Obj.magic obj in write_lin "NE" fmt ts k
   | C_impl.Elem obj -> let (x, y, ks) = Obj.magic obj in write_elem fmt x y ks
+  | C_impl.Memb obj -> let (x, vs) = Obj.magic obj in write_memb "model.Memb" fmt x vs
+  | C_impl.Notmem0 obj -> let (x, vs) = Obj.magic obj in write_memb "model.Notmem" fmt x vs
   | C_impl.Cumul obj -> let c = Obj.magic obj in  write_cumul fmt c
   | C_impl.Clause obj -> let cs = Obj.magic obj in write_clause fmt cs
-  | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith fmt arith
+  | C_impl.Arith obj -> let arith = Obj.magic obj in write_arith "" fmt arith
+  | C_impl.ArithNE obj -> let arith = Obj.magic obj in write_arith "NE" fmt arith
   | C_impl.Conj (x, y) -> write_meta fmt "model.Conj" [x; y]
   | C_impl.Disj (x, y) -> write_meta fmt "model.Disj" [x; y]
   | C_impl.Half (r, c) -> write_half fmt r c
   | C_impl.Tauto -> ()
 and write_meta fmt ident args =
-  Format.fprintf fmt "%s(@[<hov 1>" ident ;
-  Utils.print_list ~sep:";@," write_cst_body fmt args ;
-  Format.fprintf fmt ")@]"
+  Format.fprintf fmt "%s@[<hov 1>@ " ident ;
+  Utils.print_list ~pre:"" ~post:"" ~sep:"@ " (parenthesize write_cst_body) fmt args ;
+  Format.fprintf fmt "@]"
 and write_half fmt lit cst =
-  Format.fprintf fmt "half@[<hov 1(" ; 
-  Pr.print_lit fmt lit ;
-  Format.fprintf fmt ",@," ;
-  write_cst_body fmt cst ;
-  Format.fprintf fmt ")@]" 
+  Format.fprintf fmt "model.Half@[<hov 1>@ " ; 
+  parenthesize Pr.print_lit fmt lit ;
+  Format.fprintf fmt "@ " ;
+  parenthesize write_cst_body fmt cst ;
+  Format.fprintf fmt "@]" 
 
 let write_coq_cst fmt id cst =
   Format.fprintf fmt "@[(%d, " id ;
@@ -196,7 +256,8 @@ let write_coq_proof fmt ident model p_step proof_toks =
   Format.fprintf fmt ".@]@]@."
 
 let write_prelude fmt =
-  Format.fprintf fmt "Require Import prim.@." ;
+  (* Format.fprintf fmt "Require Import prim.@." ; *)
+  Format.fprintf fmt "Require Import assign.@." ;
   Format.fprintf fmt "Require Import lit.@." ;
   Format.fprintf fmt "Require Import model.@." ;
   Format.fprintf fmt "Require log.@." ;
