@@ -121,6 +121,7 @@ BASE_MLFILES:=\
   mTypes.ml\
   spec.ml\
   parse.ml\
+  bin_log.ml\
   proofState.ml\
   builtins.ml
 

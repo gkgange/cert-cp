@@ -38,7 +38,9 @@ let chomp tokens token =
     end
 
 let check_inferences model_info p_step =
-  let model = Pr.model_of_model_info model_info in
+  let (bs, csts) = Pr.model_of_model_info model_info in 
+  let cst_map = C_impl.cst_map_of_csts csts in
+  let ds = C_impl.domset_of_bounds bs in
   let hint = ref (-1) in
   let count = ref 0 in
   let not_fin = ref true in
@@ -50,7 +52,7 @@ let check_inferences model_info p_step =
       match p_step ()
       with
       | C_impl.Intro (id, cl) ->
-          if not (C_impl.check_inference_model model !hint cl) then
+          if not (C_impl.check_inference_domset ds cst_map !hint cl) then
             begin
               Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
               Pr.print_clause fmt cl ;
@@ -136,7 +138,7 @@ let check_resolution model_info p_step =
 let build_pstep model_info tchan =
   match !COption.litfile, !COption.bintrace with
   | Some lfile, true -> failwith "Warning: no support for Boolean binary traces"
-  | None, true -> failwith "Add binary logs here."
+  | None, true -> Bin_log.create model_info.Pr.ivars tchan
   | None, false -> Pr.parse_step_fd model_info (Spec.lexer (Stream.of_channel tchan))
   | Some lfile, false ->
     begin
