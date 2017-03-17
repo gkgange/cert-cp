@@ -12,33 +12,39 @@ typedef int lbool;
 #define l_False (-1)
 #define l_Undef 0
 
+#define VAR_UNDEF (INT_MAX>>2)
+
 enum AtKind { Gt = 0, Le = 1, Neq = 2, Eq = 3 };
 struct atom {
+  unsigned int tag;
+  int val;
+  /*
   int var;
   AtKind kind;
   int val;
+  */
 
   atom operator~(void) const {
-    return atom { var, (AtKind) (kind^1), val };
+    return atom { tag^1, val };
   }
 
   bool operator==(const atom& o) const {
-    return var == o.var && kind == o.kind && val == o.val;
+    return tag == o.tag && val == o.val;
   }
 
   bool operator!=(const atom& o) const {
-    return var != o.var || kind != o.kind || val != o.val;
+    return tag != o.tag || val != o.val;
   }
 };
 
 //inline unsigned int var(atom a) { return a.info>>2; }
 //inline unsigned int kind(atom a) { return a.info&3; }
 //inline int val(atom a) { return a.val; }
-inline unsigned int var(atom a) { return a.var; }
-inline unsigned int kind(atom a) { return a.kind; }
+inline unsigned int var(atom a) { return a.tag>>2; }
+inline unsigned int kind(atom a) { return a.tag&3; }
 inline int val(atom a) { return a.val; }
 
-static atom at_Undef = { INT_MAX, Le, INT_MIN };
+static atom at_Undef = { VAR_UNDEF|Eq, INT_MIN };
 
 class domain {
 public: 
@@ -237,6 +243,7 @@ public:
   T* begin(void) { return data; }
   T* end(void) { return data+sz; }
   int size(void) const { return sz; }
+  int& _size(void) { return sz; }
 
   T& last(void) { return data[sz-1]; }
 

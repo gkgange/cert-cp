@@ -8,6 +8,8 @@
 #include "ParseUtils.h"
 #include "fdres-types.h"
 
+#define VAR_UNDEF (INT_MAX>>2)
+
 class VarTable {
 public:
   VarTable(void) { }
@@ -19,6 +21,10 @@ public:
     names.push_back(s);
     table[s] = idx;
     return idx;    
+  }
+
+  unsigned int size(void) {
+    return names.size();
   }
 
   std::string operator[](int idx) const { return names[idx]; }
@@ -46,7 +52,7 @@ public:
         atoms.push(at_Undef);
     }
     atoms[i] = at;
-    var_max = std::max(var_max, at.var);
+    var_max = std::max(var_max, (int) var(at));
   }
 
   atom operator[](int i) const {
@@ -167,31 +173,29 @@ template<class In>
 atom read_satom(In& in, VarTable& vtbl) {
   Parse::skipWhitespace(in);
   std::string ident = read_ident(in);
-  int var = vtbl.get(ident);
+  unsigned int var = vtbl.get(ident);
   OpT op = read_op(in);
   int val = Parse::parseInt(in);
 
   switch(op) {
     case Op_Eq:  
-      return atom { var, Eq, val };
+      return atom { var<<2|Eq, val };
     case Op_Ne:  
-      return atom { var, Neq, val };
+      return atom { var<<2|Neq, val };
       break;
     case Op_Lt:  
-      return atom { var, Le, val-1 };
+      return atom { var<<2|Le, val-1 };
     case Op_Le:  
-      return atom { var, Le, val };
+      return atom { var<<2|Le, val };
     case Op_Gt:  
-      return atom { var, Gt, val };
+      return atom { var<<2|Gt, val };
     case Op_Ge:
-      return atom { var, Gt, val-1 };
+      return atom { var<<2|Gt, val-1 };
     default:
       assert (0 && "Unreachable");
       return atom { };
   }
 }
-
-
 
 template<class In>
 void read_atomdef(In& in, AtomTable& tbl) {
@@ -321,7 +325,7 @@ void LogParser<In>::read_clause(void) {
   Parse::skipWhitespace(in);
   while(*in != '0') {
     int lid = Parse::parseInt(in);
-    if(at[lid].var == INT_MAX) {
+    if(var(at[lid]) == VAR_UNDEF) {
       fprintf(stderr, "ERROR: unidentified atom %d", lid);
       exit(1);
     }

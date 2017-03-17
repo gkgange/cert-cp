@@ -29,14 +29,14 @@ struct fdres_env {
   }
 
   bool post(atom at) {
-    growTo(at.var+1);
-    changes.insert(at.var);
-    return dom[at.var].apply(at.kind, at.val);
+    growTo(var(at)+1);
+    changes.insert(var(at));
+    return dom[var(at)].apply(kind(at), val(at));
   }
 
   // Evaluate an atom under a domain 
   lbool value(atom at) {
-    return dom[at.var].value(at.kind, at.val); 
+    return dom[var(at)].value(kind(at), val(at)); 
   }
 
   const domain& operator[](int xi) const {

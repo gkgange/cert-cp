@@ -26,8 +26,8 @@ lbool FDres::value(atom l)
 
 std::string atom_str(atom at) {
   std::stringstream ss; 
-  ss << "x" << at.var; 
-  switch(at.kind) {
+  ss << "x" << var(at);
+  switch(kind(at)) {
     case Gt:
       ss << " > ";
       break;
@@ -308,8 +308,8 @@ inline int dequeue_var(FDres* r) {
 }
 
 inline void add_watch(FDres* r, atom at, Clause* cl) {
-  r->touched_vars.insert(at.var);
-  r->watches[at.var].push(FDres::watch { at, cl });
+  r->touched_vars.insert(var(at));
+  r->watches[var(at)].push(FDres::watch { at, cl });
 }
 
 inline void cleanup(FDres* r) {
@@ -395,7 +395,7 @@ bool FDres::check_clause_watch(vec<atom>& cl, vec<int>& ant_ids) {
 #ifdef CHECK_VERBOSE
       fprintf(stderr, "%s <- [%d]\n", atom_str(fst).c_str(), cl.ident);
 #endif
-      enqueue_var(this, fst.var);
+      enqueue_var(this, var(fst));
     }
 
 clause_prep_done:
@@ -403,11 +403,11 @@ clause_prep_done:
   }
   
   while(var_queue.size() > 0) {
-    int var = dequeue_var(this);
-//    assert(!var_is_queued[var]);
+    unsigned int v = dequeue_var(this);
+//    assert(!var_is_queued[v]);
     
     int wj = 0;
-    vec<watch>& ws(watches[var]);
+    vec<watch>& ws(watches[v]);
     for(watch w : ws) {
       // If the watch is still indeterminate, save it.
       if(env.value(w.at) == l_True)
@@ -437,7 +437,7 @@ clause_prep_done:
           // Watch found
           // If the watch is on the current var,
           // add_watch may invalidate the iterator.
-          if(at.var == var) {
+          if(var(at) == v) {
             ws[wj++] = { at, &cl };
           } else {
             add_watch(this, at, &cl);
@@ -458,7 +458,7 @@ clause_prep_done:
 #ifdef CHECK_VERBOSE
       fprintf(stderr, "%s <- [%d]\n", atom_str(fst).c_str(), cl.ident);
 #endif
-      enqueue_var(this, fst.var);
+      enqueue_var(this, var(fst));
         
 clause_watch_done:
       continue;
@@ -528,6 +528,6 @@ void FDres::grow_to(vec<atom>& cl)
 {
   int v = -1;
   for(atom l : cl)
-    v = std::max(v, l.var);
+    v = std::max(v, (int) var(l));
   grow_to(v+1);
 }

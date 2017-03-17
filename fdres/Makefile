@@ -2,7 +2,8 @@
 CXX = g++
 #CXXFLAGS = -O2 -g -I .
 #CXXFLAGS = -O0 -g -I .
-CXX_OPTFLAGS = -O3 -g -I .
+#CXX_OPTFLAGS = -O3 -g -I .
+CXX_OPTFLAGS = -O3 -g -I . -pg
 CXX_DEBUGFLAGS = -O0 -g -I .
 CXXFLAGS = -Wall -Wno-unused-function -Wno-deprecated -ffast-math -std=c++11
 LFLAGS = -lz
@@ -15,7 +16,7 @@ DEBUG_OBJS = $(addsuffix .debug.o, $(basename $(SRCS)))
 DEPS = $(addsuffix .d, $(basename $(SRCS)))
 
 
-TARGETS = fdres-check fdres-simp
+TARGETS = fdres-check fdres-simp fdres-check-bin fdres-simp-bin
 TARGETOBJS = $(addsuffix .o, $(TARGETS))
 DEBUG_TARGETOBJS = $(addsuffix .debug.o, $(TARGETS))
 TARGETDEPS = $(addsuffix .d, $(TARGETS))
