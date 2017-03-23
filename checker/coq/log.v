@@ -313,6 +313,7 @@ Proof.
     now apply check_inference_valid. assumption.
 Qed.
 
+(*
 Fixpoint clauses_deref (cs : clause_map) (ids : list Z) :=
   match ids with
   | nil => nil
@@ -323,25 +324,42 @@ Fixpoint clauses_deref (cs : clause_map) (ids : list Z) :=
       | Some cl => cons cl rest
       end
   end.
+*)
+Fixpoint clauses_deref (cs : clause_map) (ids : list Z) (acc : list clause) :=
+  match ids with
+    | nil => acc
+    | cons id ids' =>
+      let acc' := match ZMaps.find id cs with
+                    | None => acc
+                    | Some cl => cons cl acc
+                  end in
+      clauses_deref cs ids' acc'
+  end.
 
   
-Theorem clauses_deref_1 : forall cs ids theta,
-  eval_clmap cs theta -> eval_clauses (clauses_deref cs ids) theta.
+Theorem clauses_deref_1 : forall cs ids acc theta,
+  eval_clmap cs theta -> eval_clauses acc theta -> eval_clauses (clauses_deref cs ids acc) theta.
 Proof.
-  intros cs ids theta;
-  rewrite eval_clauses_iff; unfold eval_clmap, eval_clauses_alt; intros; induction ids.
-  unfold clauses_deref in *; now apply List.in_nil in H0.
-  unfold clauses_deref in H0; fold clauses_deref in H0.
-  remember (ZMaps.find a cs) as fa.
-  destruct fa; simpl in *.
-  destruct H0 as [Heq | Hin] ;
-    [rewrite <- Heq; symmetry in Heqfa; apply H with (id := a); now apply find_mapsto_iff | apply IHids ; now apply Hin].
-  now apply IHids.
+  intros cs ids; induction ids.
+
+  intros; trivial.
+  
+  intros acc theta Hm Hacc.
+  unfold clauses_deref; fold clauses_deref.
+  eqelim (ZMaps.find a cs).
+  + apply (IHids (cons c acc) theta Hm).
+    unfold eval_clauses; fold eval_clauses.
+    split.
+
+    - unfold eval_clmap in Hm.
+      now apply (Hm a _), find_mapsto_iff.
+    - exact Hacc.
+  + apply (IHids _ _ Hm Hacc).
 Qed.
 
 Definition get_clauses (s : state) (ids : list Z) :=
   match s with
-  | (cs, cls, h) => clauses_deref cls ids
+  | (cs, cls, h) => clauses_deref cls ids nil
   end.
 
 Definition apply_resolution (s : state) (id : Z) (cl : clause) (ants : list Z) :=
@@ -365,6 +383,7 @@ Proof.
     apply clauses_deref_1.
     unfold state_valid in H.
     unfold eval_clmap; intros; apply H with (id := id0); assumption.
+    unfold eval_clauses; trivial.
 Qed.
 
 Definition apply_step (bs : domset) (s : state) (d : step) :=
