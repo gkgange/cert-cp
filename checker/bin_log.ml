@@ -44,6 +44,11 @@ let get_int ch =
   lor ((b1 lsl 8) lor b0)
   *)
 
+let really_input_string ch len =
+  let s = String.create len in
+  really_input ch s 0 len ;
+  s
+
 let make_ctx var_tbl ch =
   (* Ignore first jump *)
   let _ = input_binary_int ch in

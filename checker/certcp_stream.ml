@@ -37,13 +37,14 @@ let chomp tokens token =
       failwith "Parse error"
     end
 
-let check_inferences model_info p_step =
+let check_inferences ?abort:(abort=false) model_info p_step =
   let (bs, csts) = Pr.model_of_model_info model_info in 
   let cst_map = C_impl.cst_map_of_csts csts in
   let ds = C_impl.domset_of_bounds bs in
   let hint = ref (-1) in
   let count = ref 0 in
   let not_fin = ref true in
+  let okay = ref true in
   while !not_fin
   do
     incr count ;
@@ -54,6 +55,11 @@ let check_inferences model_info p_step =
       | C_impl.Intro (id, cl) ->
           if not (C_impl.check_inference_domset ds cst_map !hint cl) then
             begin
+              okay := false ;
+              if abort then
+                not_fin := false
+              else
+                () ;
               Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
               Pr.print_clause fmt cl ;
               Format.fprintf fmt "@."
@@ -62,7 +68,8 @@ let check_inferences model_info p_step =
       | C_impl.Resolve _ -> ()
       | C_impl.Del _ -> ()
     end with _ -> not_fin := false
-  done
+  done ;
+  !okay
 
 (* let check_inferences_opt model_info obj k lmap toks = *)
 let check_inferences_opt model_info obj k p_step =
@@ -74,7 +81,7 @@ let check_inferences_opt model_info obj k p_step =
   let not_end = ref true in
   (* *)
   let count = ref 0 in
-  while !okay && !not_end
+  while !not_end
   do
     (* match Pr.parse_step model_info lmap toks *)
     incr count ;
@@ -86,6 +93,7 @@ let check_inferences_opt model_info obj k p_step =
           if not (C_impl.check_inference_domset ds cst_map !hint cl) then
             begin
               okay := false ;
+              not_end := false ;
               Format.fprintf fmt "Inference %d from c%d failed:@ " !count !hint ;
               Pr.print_clause fmt cl ;
               Format.fprintf fmt "@."
@@ -240,20 +248,25 @@ let main () =
       (* let ttoks = (Spec.lexer (Stream.of_channel tchannel)) in *)
       if !COption.debug then
         begin
-          check_inferences model_info p_step ;
-          check_resolution model_info p_step 
+          ignore (check_inferences ~abort:false model_info p_step) ;
+          (* check_resolution model_info p_step  *)
         end
       else
-        begin
-          let step0 = Pr.create p_step in
-          let next_step = Pr.next in
-          (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
-          let okay = C_impl.certify_unsat model max_int step0 next_step in
-          if okay then
-            Format.fprintf fmt "OKAY@."
+        let okay =
+          if !COption.no_resolve then
+            check_inferences ~abort:true model_info p_step
           else
-            Format.fprintf fmt "FAILED@."
-        end
+            begin
+              let step0 = Pr.create p_step in
+              let next_step = Pr.next in
+              (* Format.fprintf fmt "Checking unsatisfiability...@." ; *)
+              C_impl.certify_unsat model max_int step0 next_step
+            end
+        in
+        if okay then
+          Format.fprintf fmt "OKAY@."
+        else
+          Format.fprintf fmt "FAILED@."
     end
   | _ -> Format.fprintf fmt "ERROR: No solution or trace specified.@."
 
