@@ -2,8 +2,8 @@
 CXX = g++
 #CXXFLAGS = -O2 -g -I .
 #CXXFLAGS = -O0 -g -I .
-#CXX_OPTFLAGS = -O3 -g -I .
-CXX_OPTFLAGS = -O3 -g -I . -pg
+CXX_OPTFLAGS = -O3 -g -I .
+#CXX_OPTFLAGS = -O3 -g -I . -pg
 CXX_DEBUGFLAGS = -O0 -g -I .
 CXXFLAGS = -Wall -Wno-unused-function -Wno-deprecated -ffast-math -std=c++11
 LFLAGS = -lz

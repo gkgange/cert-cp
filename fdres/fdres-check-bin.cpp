@@ -1,4 +1,6 @@
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include "fdres-types.h"
 #include "fdres-state.h"
 #include "log-parser.h"
@@ -40,8 +42,8 @@ int parse_options(opts& o, int argc, char** argv) {
   return jj;
 }
 
-#define BUF_SZ 1024
-char buf[BUF_SZ];
+// #define BUF_SZ (1024*1024)
+// char buf[BUF_SZ];
 
 #define HINT_TAG INT_MAX
 #define DEL_TAG (INT_MAX-1)
@@ -67,7 +69,7 @@ vec<char> sbuf;
 bool verify_unsat(FILE* infile, int verbosity) {
   FDres res;
 
-  // setvbuf(infile, buf, _IOFBUF, BUF_SZ);
+//  setvbuf(infile, buf, _IOFBF, BUF_SZ);
   unsigned int hdr[2];
   vec<atom> atoms;
   vec<int> ants;

@@ -19,8 +19,8 @@ OCAMLINC=-I .
 OCAMLFLAGS+=$(OCAMLINC)
 OCAMLOPTFLAGS+=$(OCAMLINC)
 
-PROF = -ccopt "-pg"
-#PROF =
+#PROF = -ccopt "-pg"
+PROF =
 
 #---------------------------------------
 # Rules

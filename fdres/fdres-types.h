@@ -197,7 +197,7 @@ public:
   void clear(void) { lb = INT_MIN; ub = INT_MAX; holes.clear(); }
 
   int lb, ub;
-  iset holes; 
+  iset holes;
 };
 
 template <class T>

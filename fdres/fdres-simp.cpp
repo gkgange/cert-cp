@@ -27,6 +27,16 @@ struct opts {
 };
 
 bool is_tauto(fdres_env& env, vec<atom>& lemma) {
+  // Cheap check -- tautologies usually only talk about one variable
+  if(lemma.size() == 0)
+    return false;
+
+  unsigned int v = var(lemma[0]);
+  for(int ii = 1; ii < lemma.size(); ii++) {
+    if(var(lemma[ii]) != v)
+      return false;
+  }
+  
   for(atom at : lemma) {
     if(!env.post(~at)) {
       env.clear();
@@ -37,22 +47,54 @@ bool is_tauto(fdres_env& env, vec<atom>& lemma) {
   return false;
 }
 
+// Only emit those atoms which aren't entailed by the root domain.
 void extract_dom(fdres_env& env, unsigned int var, vec<atom>& lemmas) {
+#ifndef DOMAIN_COMMIT
   const domain& d(env[var]);
   if(d.lb == d.ub) {
     lemmas.push(atom { var<<2|Eq, d.lb });
     return;
   }
+  
   if(d.lb > INT_MIN)
     lemmas.push(atom { var<<2|Gt, d.lb-1 });
   if(d.ub < INT_MAX)
     lemmas.push(atom { var<<2|Le, d.ub });
   for(int k : d.holes)
-    lemmas.push(atom { var<<2|Neq, k });
+    lemmas.push(atom { var<<2|Neq, k});
+#else
+  // This extra work is useless if we never initialize
+  // variable domains.
+  const domain& d(env[var]);
+  const domain& d0(env.dom_0[var]);
+  if(d.lb == d.ub) {
+    lemmas.push(atom { var<<2|Eq, d.lb });
+    return;
+  }
+  if(d.lb > d0.lb)
+    lemmas.push(atom { var<<2|Gt, d.lb-1 });
+  if(d.ub < d0.ub)
+    lemmas.push(atom { var<<2|Le, d.ub });
+
+  iset::iterator it = d.holes.begin();
+  iset::iterator it0 = d0.holes.begin();
+
+  while(it0 != d0.holes.end()) {
+    if(*it == *it0) {
+      ++it; ++it0;
+    } else {
+      lemmas.push(atom { var<<2|Neq, *it });
+      ++it;
+    }
+  }
+  for(; it != d.holes.end(); ++it)
+    lemmas.push(atom { var<<2|Neq, *it});
+#endif
 }
 
 void simplify(fdres_env& env, vec<atom>& lemma) {
-  /*
+#ifdef DOMAIN_COMMIT
+  // First pass: drop any trivially false atoms.
   atom* tl = lemma.begin();
   for(atom at : lemma) {
     if(env.value(at) != l_False) {
@@ -61,7 +103,7 @@ void simplify(fdres_env& env, vec<atom>& lemma) {
     }
   }
   lemma.dropTo(tl - lemma.begin());
-  */
+#endif
   
   for(atom at : lemma) {
     if(!env.post(~at)) {
@@ -388,6 +430,25 @@ int parse_options(opts& o, int argc, char** argv) {
   return jj;
 }
 
+// Check that for each atom in inf, ~Ant |- ~at
+static bool is_alias(fdres_env& env, vec<atom>& inf, vec<atom>& ant) {
+  for(atom at : ant) {
+    if(!env.post(~at)) {
+      ERROR; // ant is a tautology 
+      env.clear();
+      return false;
+    }
+  }
+  for(atom at : inf) {
+    if(env.value(at) != l_False) {
+      env.clear();
+      return false;
+    }
+  }
+  env.clear();
+  return true;
+}
+
 int main(int argc, char** argv) {
   // Load the proof file. 
   opts o;
@@ -483,6 +544,13 @@ int main(int argc, char** argv) {
             clause_info[c_id].seen = false;
 
           if(live_ants.size() > 0) {
+#if 0
+            //=========================
+            // GKG: It turns out that, in some cases, it's necessary to have self-resolution.
+            // Consider c1: [x < 3] \/ [x > 4], c2: [x = 3 \/ x = 4].
+            // By unit propagation we get nothing. But by self-resolution, we can get:
+            // c1a: [x != 3], c1b: [x != 4].
+            //=========================
             if(!o.keep_alias && live_ants.size() == 1) {
               // Alias
               // clause_info[live_ants[0]].count++;
@@ -500,6 +568,22 @@ int main(int argc, char** argv) {
                 emit_clause(clause_info, ref, vtable);
               }
             }
+#else
+            // Always perform self-subsumption
+            simplify(env, parser.atoms);
+            if(!o.keep_alias && live_ants.size() == 1 && is_alias(env, parser.atoms, clause_info.atoms(live_ants[0]))) {
+              clause_info.inc_ref(live_ants[0]);
+              live_clauses.insert(std::make_pair(parser.id, live_ants[0]));
+            } else {
+              clause_set::ref_t ref(clause_info.add(parser.atoms, live_ants));
+              live_clauses.insert(std::make_pair(parser.id, ref));
+
+              if(parser.atoms.size() == 0) {
+                emit_clause(clause_info, ref, vtable);
+              }
+
+            }
+#endif
           } else {
             // Resolving tautologies _should_ still be a tautology
             if(!is_tauto(env, parser.atoms))
