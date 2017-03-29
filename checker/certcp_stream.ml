@@ -223,8 +223,8 @@ let main () =
     else
       begin
         (* Format.fprintf fmt "Checking optimality...@." ; *)
-        let step0 = Pr.create p_step in
-        let okay = C_impl.certify_optimal model obj sol max_int step0 next_step in
+        (* let step0 = Pr.create p_step in *)
+        let okay = C_impl.certify_optimal model obj sol max_int (Pr.create p_step) next_step in
         if okay then
           Format.fprintf fmt "OKAY@."
         else

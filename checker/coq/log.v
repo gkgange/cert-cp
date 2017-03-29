@@ -740,17 +740,19 @@ Qed.
 Definition certify_optimal (m : model) (obj : ivar) (sol : valuation) (lim : Z) (T : Type) (x : T) (next : T -> option (step * T)) :=
   let b0 := domset_of_bounds (fst m) in
   let bs := domset_with_lt b0 obj (sol obj) in
-  andb (certify_solution m sol) (state_unsat (apply_steps_gen bs (empty_state m) lim T x next)).
-
+  if certify_solution m sol then
+    state_unsat (apply_steps_gen bs (empty_state m) lim T x next)
+  else
+    false.
+  
 Theorem certify_optimal_valid : forall m obj sol lim T x next,
   certify_optimal m obj sol lim T x next = true -> is_model_minimum m obj sol.
 Proof.
   unfold certify_optimal, is_model_minimum, is_model_ub; intros.
-  rewrite Bool.andb_true_iff in H.
-  destruct H as [Hs Hp].
+  eqelim (certify_solution m sol).
   split; [now apply certify_solution_valid | trivial].
 
-  intros sol' H.
+  intros sol' Hm.
   remember (domset_of_bounds (fst m)) as b0.
   remember (domset_with_lt b0 obj (sol obj)) as bs.
   assert (Hs0 := empty_state_valid_bnd m bs).
@@ -762,10 +764,10 @@ Proof.
     intros.
     apply state_unsat_valid with (bs := bs); try assumption.
 
-  unfold eval_model in H; destruct m; destruct H as [Hb Hcs].
+  unfold eval_model in Hm; destruct m; destruct Hm as [Hb Hcs].
   assert (sol obj <= sol' obj \/ sol' obj < sol obj).
     omega.
-  destruct H ; [assumption | trivial].
+  destruct H2 ; [assumption | trivial].
   assert (eval_domset bs sol').
     rewrite Heqbs.
     apply domset_with_lt_iff.
@@ -774,13 +776,14 @@ Proof.
     now rewrite Heqb0.
     omega.
 
-  apply H0 in H1.  
+  apply H0 in H3.  
   apply cst_map_if_csts in Hcs.
-  rewrite <- Hsc in H1.
-  rewrite Heqs0 in H1.
-  unfold empty_state, state_csts in H1; simpl in *.
-  rewrite <- cst_map_of_csts_eq in H1.
+  rewrite <- Hsc in H3.
+  rewrite Heqs0 in H3.
+  unfold empty_state, state_csts in H3; simpl in *.
+  rewrite <- cst_map_of_csts_eq in H3.
   contradiction.
+  discriminate.
 Qed.
 Definition certify_optimal_list m obj sol p_proof :=
   certify_optimal m obj sol
